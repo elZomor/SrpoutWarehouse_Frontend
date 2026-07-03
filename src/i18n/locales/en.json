@@ -1,0 +1,11 @@
+{
+  "app": {
+    "name": "Sprout Warehouse"
+  },
+  "nav": {
+    "dashboard": "Dashboard"
+  },
+  "dashboard": {
+    "welcome": "Welcome to Sprout Warehouse"
+  }
+}
