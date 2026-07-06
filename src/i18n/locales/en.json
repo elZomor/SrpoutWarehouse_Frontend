@@ -7,5 +7,18 @@
   },
   "dashboard": {
     "welcome": "Welcome to Sprout Warehouse"
+  },
+  "auth": {
+    "login": {
+      "title": "Login",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "submit": "Login",
+      "emailRequired": "Email is required",
+      "emailInvalid": "Enter a valid email address",
+      "passwordRequired": "Password is required",
+      "error": "Invalid email or password"
+    },
+    "logout": "Logout"
   }
 }
