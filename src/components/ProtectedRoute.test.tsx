@@ -48,7 +48,13 @@ describe('ProtectedRoute', () => {
 
   it('renders the protected content when a session is active', async () => {
     mockedApiClient.get.mockResolvedValueOnce({
-      data: { user: { id: '1', name: 'Jane Doe', email: 'jane@example.com' } },
+      data: {
+        id: 1,
+        username: 'jane',
+        email: 'jane@example.com',
+        first_name: 'Jane',
+        last_name: 'Doe',
+      },
     });
 
     renderProtectedRoute();

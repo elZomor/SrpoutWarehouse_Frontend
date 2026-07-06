@@ -2,6 +2,7 @@ import { Button, Layout, Space, Typography } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
+import { getUserDisplayName } from '../features/auth/types';
 import { useCurrentUser, useLogout } from '../features/auth/useAuth';
 
 export function DashboardPage() {
@@ -22,7 +23,9 @@ export function DashboardPage() {
         extra={
           user && (
             <Space>
-              <Typography.Text style={{ color: 'white' }}>{user.name}</Typography.Text>
+              <Typography.Text style={{ color: 'white' }}>
+                {getUserDisplayName(user)}
+              </Typography.Text>
               <Button onClick={handleLogout} loading={logoutMutation.isPending}>
                 {t('auth.logout')}
               </Button>

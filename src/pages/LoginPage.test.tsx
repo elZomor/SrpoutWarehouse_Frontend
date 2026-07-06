@@ -44,7 +44,13 @@ describe('LoginPage', () => {
 
   it('logs in with valid credentials and redirects to the dashboard', async () => {
     mockedApiClient.post.mockResolvedValueOnce({
-      data: { user: { id: '1', name: 'Jane Doe', email: 'jane@example.com' } },
+      data: {
+        id: 1,
+        username: 'jane',
+        email: 'jane@example.com',
+        first_name: 'Jane',
+        last_name: 'Doe',
+      },
     });
 
     const user = userEvent.setup();

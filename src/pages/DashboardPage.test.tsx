@@ -22,9 +22,11 @@ function renderDashboardPage() {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   queryClient.setQueryData(currentUserQueryKey, {
-    id: '1',
-    name: 'Jane Doe',
+    id: 1,
+    username: 'jane',
     email: 'jane@example.com',
+    first_name: 'Jane',
+    last_name: 'Doe',
   });
 
   return render(

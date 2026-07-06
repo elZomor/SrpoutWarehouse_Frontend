@@ -1,6 +1,13 @@
 import { test, expect, type Route } from '@playwright/test';
 
-const USER = { id: '1', name: 'Jane Doe', email: 'jane@example.com' };
+const USER = {
+  id: 1,
+  username: 'jane',
+  email: 'jane@example.com',
+  first_name: 'Jane',
+  last_name: 'Doe',
+};
+const USER_DISPLAY_NAME = 'Jane Doe';
 
 async function stubAuth(route: Route, loggedIn: () => boolean) {
   const url = route.request().url();
@@ -8,7 +15,7 @@ async function stubAuth(route: Route, loggedIn: () => boolean) {
 
   if (url.endsWith('/api/auth/me/') && method === 'GET') {
     if (loggedIn()) {
-      await route.fulfill({ status: 200, json: { user: USER } });
+      await route.fulfill({ status: 200, json: USER });
     } else {
       await route.fulfill({ status: 401, json: {} });
     }
@@ -35,7 +42,7 @@ test('user logs in, sees their name on the dashboard, then logs out', async ({ p
 
     if (url.endsWith('/api/auth/login/') && method === 'POST') {
       loggedIn = true;
-      await route.fulfill({ status: 200, json: { user: USER } });
+      await route.fulfill({ status: 200, json: USER });
       return;
     }
 
@@ -55,7 +62,7 @@ test('user logs in, sees their name on the dashboard, then logs out', async ({ p
   await page.getByRole('button', { name: /login|تسجيل الدخول/i }).click();
 
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByText(USER.name)).toBeVisible();
+  await expect(page.getByText(USER_DISPLAY_NAME)).toBeVisible();
 
   await page.getByRole('button', { name: /logout|تسجيل الخروج/i }).click();
 

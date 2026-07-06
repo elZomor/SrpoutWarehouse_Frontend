@@ -11,15 +11,21 @@ vi.mock('../../lib/apiClient', () => ({
 
 const mockedApiClient = vi.mocked(apiClient, true);
 
+const USER = {
+  id: 1,
+  username: 'jane',
+  email: 'jane@example.com',
+  first_name: 'Jane',
+  last_name: 'Doe',
+};
+
 describe('auth api', () => {
   afterEach(() => {
     vi.clearAllMocks();
   });
 
   it('login posts credentials and returns the user', async () => {
-    mockedApiClient.post.mockResolvedValueOnce({
-      data: { user: { id: '1', name: 'Jane Doe', email: 'jane@example.com' } },
-    });
+    mockedApiClient.post.mockResolvedValueOnce({ data: USER });
 
     const user = await login({ email: 'jane@example.com', password: 'secret' });
 
@@ -27,7 +33,7 @@ describe('auth api', () => {
       email: 'jane@example.com',
       password: 'secret',
     });
-    expect(user).toEqual({ id: '1', name: 'Jane Doe', email: 'jane@example.com' });
+    expect(user).toEqual(USER);
   });
 
   it('logout posts to the logout endpoint', async () => {
@@ -39,13 +45,11 @@ describe('auth api', () => {
   });
 
   it('fetchCurrentUser returns the user on 200', async () => {
-    mockedApiClient.get.mockResolvedValueOnce({
-      data: { user: { id: '1', name: 'Jane Doe', email: 'jane@example.com' } },
-    });
+    mockedApiClient.get.mockResolvedValueOnce({ data: USER });
 
     const user = await fetchCurrentUser();
 
-    expect(user).toEqual({ id: '1', name: 'Jane Doe', email: 'jane@example.com' });
+    expect(user).toEqual(USER);
   });
 
   it('fetchCurrentUser returns null on a 401 (no active session)', async () => {
