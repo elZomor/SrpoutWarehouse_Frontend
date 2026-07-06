@@ -1,24 +1,17 @@
-import { Layout, Typography } from 'antd';
-import { useTranslation } from 'react-i18next';
-import { LanguageSwitcher } from './components/LanguageSwitcher';
-
-const { Header, Content } = Layout;
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { DashboardPage } from './pages/DashboardPage';
+import { LoginPage } from './pages/LoginPage';
 
 function App() {
-  const { t } = useTranslation();
-
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography.Title level={4} style={{ color: 'white', margin: 0 }}>
-          {t('app.name')}
-        </Typography.Title>
-        <LanguageSwitcher />
-      </Header>
-      <Content style={{ padding: 24 }}>
-        <Typography.Paragraph>{t('dashboard.welcome')}</Typography.Paragraph>
-      </Content>
-    </Layout>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<ProtectedRoute />}>
+        <Route path="/" element={<DashboardPage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 

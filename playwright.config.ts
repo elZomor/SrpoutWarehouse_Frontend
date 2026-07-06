@@ -17,5 +17,9 @@ export default defineConfig({
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    // .env is gitignored (dev-only) and CI never sets VITE_API_BASE_URL, so
+    // env.ts's validation would otherwise throw before the app can mount.
+    // Same-origin also means page.route() mocks don't need CORS headers.
+    env: { VITE_API_BASE_URL: 'http://localhost:4173' },
   },
 });
