@@ -1,17 +1,14 @@
-import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Form, Input, Layout, Typography } from 'antd';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { useCurrentUser, useLogin } from '../features/auth/useAuth';
 import { loginSchema, type LoginFormValues } from '../features/auth/schema';
 
 export function LoginPage() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const location = useLocation();
   const { data: user, isLoading: isLoadingUser } = useCurrentUser();
   const loginMutation = useLogin();
 
@@ -23,13 +20,6 @@ export function LoginPage() {
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   });
-
-  useEffect(() => {
-    if (user) {
-      const redirectTo = (location.state as { from?: string } | null)?.from ?? '/';
-      navigate(redirectTo, { replace: true });
-    }
-  }, [user, location.state, navigate]);
 
   if (isLoadingUser) {
     return null;
