@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createProductType, listProductTypes } from './api';
-import type { CreateProductTypeInput } from './types';
+import type { ProductTypeFormValues } from './schema';
 
-export const productTypesQueryKey = (search: string) => ['product-types', search] as const;
+const productTypesBaseKey = ['product-types'] as const;
+
+export const productTypesQueryKey = (search: string) => [...productTypesBaseKey, search] as const;
 
 export function useProductTypes(search: string) {
   return useQuery({
@@ -15,9 +17,7 @@ export function useCreateProductType() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: CreateProductTypeInput) => createProductType(input),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['product-types'] });
-    },
+    mutationFn: (input: ProductTypeFormValues) => createProductType(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: productTypesBaseKey }),
   });
 }

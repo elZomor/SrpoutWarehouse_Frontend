@@ -1,14 +1,15 @@
 import { apiClient } from '../../lib/apiClient';
-import type { CreateProductTypeInput, ProductType } from './types';
+import type { ProductTypeFormValues } from './schema';
+import type { ProductType } from './types';
 
 export async function listProductTypes(search?: string): Promise<ProductType[]> {
   const { data } = await apiClient.get<ProductType[]>('/api/product-types/', {
-    params: search ? { search } : undefined,
+    params: { search },
   });
   return data;
 }
 
-export async function createProductType(input: CreateProductTypeInput): Promise<ProductType> {
+export async function createProductType(input: ProductTypeFormValues): Promise<ProductType> {
   const { data } = await apiClient.post<ProductType>('/api/product-types/', input);
   return data;
 }

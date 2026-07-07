@@ -30,6 +30,8 @@
     "descriptionLabel": "الوصف",
     "searchPlaceholder": "البحث بالاسم أو رمز الموديل",
     "emptyState": "لا توجد أنواع منتجات",
+    "loadError": "فشل تحميل أنواع المنتجات. حاول مرة أخرى.",
+    "createError": "فشل إنشاء نوع المنتج. حاول مرة أخرى.",
     "form": {
       "nameRequired": "الاسم مطلوب"
     }

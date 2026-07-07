@@ -30,6 +30,8 @@
     "descriptionLabel": "Description",
     "searchPlaceholder": "Search by name or model code",
     "emptyState": "No product types found",
+    "loadError": "Failed to load product types. Please try again.",
+    "createError": "Failed to create product type. Please try again.",
     "form": {
       "nameRequired": "Name is required"
     }

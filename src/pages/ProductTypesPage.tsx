@@ -1,19 +1,65 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Button, Form, Input, Layout, Modal, Table, Typography } from 'antd';
-import { Controller, useForm } from 'react-hook-form';
+import { Alert, Button, Form, Input, Layout, Modal, Space, Table, Typography } from 'antd';
+import { Controller, type Control, type FieldError, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
+import { getUserDisplayName } from '../features/auth/types';
+import { useCurrentUser, useLogout } from '../features/auth/useAuth';
 import { productTypeSchema, type ProductTypeFormValues } from '../features/product-types/schema';
 import type { ProductType } from '../features/product-types/types';
 import { useCreateProductType, useProductTypes } from '../features/product-types/useProductTypes';
 
+const SEARCH_DEBOUNCE_MS = 300;
+
+interface ProductTypeFieldProps {
+  name: keyof ProductTypeFormValues;
+  label: string;
+  control: Control<ProductTypeFormValues>;
+  error?: FieldError;
+  multiline?: boolean;
+}
+
+function ProductTypeField({ name, label, control, error, multiline }: ProductTypeFieldProps) {
+  const { t } = useTranslation();
+
+  return (
+    <Form.Item
+      label={label}
+      htmlFor={`product-type-${name}`}
+      validateStatus={error ? 'error' : ''}
+      help={error ? t(error.message ?? '') : undefined}
+    >
+      <Controller
+        name={name}
+        control={control}
+        render={({ field }) =>
+          multiline ? (
+            <Input.TextArea {...field} id={`product-type-${name}`} />
+          ) : (
+            <Input {...field} id={`product-type-${name}`} />
+          )
+        }
+      />
+    </Form.Item>
+  );
+}
+
 export function ProductTypesPage() {
   const { t } = useTranslation();
+  const { data: user } = useCurrentUser();
+  const logoutMutation = useLogout();
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { data: productTypes, isLoading } = useProductTypes(search);
+  const { data: productTypes, isLoading, isError: isListError } = useProductTypes(search);
   const createMutation = useCreateProductType();
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timeout);
+  }, [searchInput]);
 
   const {
     control,
@@ -50,27 +96,54 @@ export function ProductTypesPage() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <AppHeader />
+      <AppHeader
+        extra={
+          user && (
+            <Space>
+              <Link to="/" style={{ color: 'white' }}>
+                {t('nav.dashboard')}
+              </Link>
+              <Typography.Text style={{ color: 'white' }}>
+                {getUserDisplayName(user)}
+              </Typography.Text>
+              <Button onClick={() => logoutMutation.mutate()} loading={logoutMutation.isPending}>
+                {t('auth.logout')}
+              </Button>
+            </Space>
+          )
+        }
+      />
       <Layout.Content style={{ padding: 24 }}>
         <Typography.Title level={3}>{t('productTypes.title')}</Typography.Title>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
           <Input.Search
             placeholder={t('productTypes.searchPlaceholder')}
             allowClear
-            onChange={(event) => setSearch(event.target.value)}
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
             style={{ maxWidth: 320 }}
           />
           <Button type="primary" onClick={() => setIsModalOpen(true)}>
             {t('productTypes.newButton')}
           </Button>
         </div>
-        <Table<ProductType>
-          rowKey="id"
-          columns={columns}
-          dataSource={productTypes}
-          loading={isLoading}
-          locale={{ emptyText: t('productTypes.emptyState') }}
-        />
+        {isListError && (
+          <Alert
+            type="error"
+            message={t('productTypes.loadError')}
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
+        {!isListError && (
+          <Table<ProductType>
+            rowKey="id"
+            columns={columns}
+            dataSource={productTypes}
+            loading={isLoading}
+            locale={{ emptyText: t('productTypes.emptyState') }}
+          />
+        )}
         <Modal
           title={t('productTypes.newButton')}
           open={isModalOpen}
@@ -79,35 +152,28 @@ export function ProductTypesPage() {
           confirmLoading={createMutation.isPending}
         >
           <Form layout="vertical" noValidate>
-            <Form.Item
+            <ProductTypeField
+              name="name"
               label={t('productTypes.nameLabel')}
-              htmlFor="product-type-name"
-              validateStatus={errors.name ? 'error' : ''}
-              help={errors.name ? t(errors.name.message ?? '') : undefined}
-            >
-              <Controller
-                name="name"
-                control={control}
-                render={({ field }) => <Input {...field} id="product-type-name" />}
-              />
-            </Form.Item>
-            <Form.Item label={t('productTypes.modelCodeLabel')} htmlFor="product-type-model-code">
-              <Controller
-                name="model_code"
-                control={control}
-                render={({ field }) => <Input {...field} id="product-type-model-code" />}
-              />
-            </Form.Item>
-            <Form.Item
+              control={control}
+              error={errors.name}
+            />
+            <ProductTypeField
+              name="model_code"
+              label={t('productTypes.modelCodeLabel')}
+              control={control}
+            />
+            <ProductTypeField
+              name="description"
               label={t('productTypes.descriptionLabel')}
-              htmlFor="product-type-description"
-            >
-              <Controller
-                name="description"
-                control={control}
-                render={({ field }) => <Input.TextArea {...field} id="product-type-description" />}
-              />
-            </Form.Item>
+              control={control}
+              multiline
+            />
+            {createMutation.isError && (
+              <Form.Item>
+                <Alert type="error" message={t('productTypes.createError')} showIcon />
+              </Form.Item>
+            )}
           </Form>
         </Modal>
       </Layout.Content>
