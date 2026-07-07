@@ -38,7 +38,7 @@ export function LoginPage() {
       <AppHeader />
       <Layout.Content style={{ padding: 24, maxWidth: 400, margin: '0 auto', width: '100%' }}>
         <Typography.Title level={3}>{t('auth.login.title')}</Typography.Title>
-        <Form layout="vertical" onFinish={handleSubmit(onSubmit)}>
+        <Form layout="vertical" noValidate onFinish={handleSubmit(onSubmit)}>
           <Form.Item
             label={t('auth.login.emailLabel')}
             htmlFor="login-email"

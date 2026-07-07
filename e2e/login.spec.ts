@@ -68,3 +68,68 @@ test('user logs in, sees their name on the dashboard, then logs out', async ({ p
 
   await expect(page).toHaveURL(/\/login$/);
 });
+
+test('client-side validation blocks submission and never calls the API', async ({ page }) => {
+  // WRH-19 TC-01 - TC-04
+  let loginRequestCount = 0;
+  await page.route('**/api/auth/**', async (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+
+    if (url.endsWith('/api/auth/login/') && method === 'POST') {
+      loginRequestCount += 1;
+    }
+
+    await stubAuth(route, () => false);
+  });
+
+  await page.goto('/login');
+
+  // Both fields empty
+  await page.getByRole('button', { name: /login|تسجيل الدخول/i }).click();
+  await expect(page.getByText(/email is required|البريد الإلكتروني مطلوب/i)).toBeVisible();
+  await expect(page.getByText(/password is required|كلمة المرور مطلوبة/i)).toBeVisible();
+
+  // Malformed email
+  await page.getByLabel(/email|البريد الإلكتروني/i).fill('not-an-email');
+  await page.getByLabel(/password|كلمة المرور/i).fill('some-password');
+  await page.getByRole('button', { name: /login|تسجيل الدخول/i }).click();
+  await expect(
+    page.getByText(/enter a valid email address|أدخل بريدًا إلكترونيًا صالحًا/i),
+  ).toBeVisible();
+
+  await expect(page).toHaveURL(/\/login$/);
+  expect(loginRequestCount).toBe(0);
+});
+
+test('failed login shows a generic error and never establishes a session', async ({ page }) => {
+  // WRH-19 TC-05/TC-06/TC-08
+  await page.route('**/api/auth/**', async (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+
+    if (url.endsWith('/api/auth/login/') && method === 'POST') {
+      await route.fulfill({
+        status: 401,
+        json: { detail: 'Invalid email or password.' },
+      });
+      return;
+    }
+
+    await stubAuth(route, () => false);
+  });
+
+  await page.goto('/login');
+
+  await page.getByLabel(/email|البريد الإلكتروني/i).fill('jane@example.com');
+  await page.getByLabel(/password|كلمة المرور/i).fill('wrong-password');
+  await page.getByRole('button', { name: /login|تسجيل الدخول/i }).click();
+
+  await expect(
+    page.getByText(/invalid email or password|البريد الإلكتروني أو كلمة المرور غير صحيحة/i),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/login$/);
+
+  const cookies = await page.context().cookies();
+  expect(cookies.some((cookie) => cookie.name === 'sessionid')).toBe(false);
+});
