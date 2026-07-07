@@ -130,6 +130,11 @@ test('failed login shows a generic error and never establishes a session', async
   ).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);
 
-  const cookies = await page.context().cookies();
-  expect(cookies.some((cookie) => cookie.name === 'sessionid')).toBe(false);
+  // No client-side authenticated state was established by the failed
+  // attempt: a protected route still bounces back to /login. (The actual
+  // absence of a real sessionid cookie is covered against the live backend
+  // by the sibling WRH-19 Django PR's test_no_session_cookie_on_failed_login
+  // - every request here is mocked, so no real Set-Cookie is ever in play.)
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/login$/);
 });
