@@ -1,5 +1,8 @@
 import { test, expect, type Route } from '@playwright/test';
 
+// This spec mocks the backend entirely via page.route (auth + product-types
+// endpoints) rather than assuming a live backend at VITE_API_BASE_URL,
+// following login.spec.ts's precedent.
 const USER = {
   id: 1,
   username: 'jane',

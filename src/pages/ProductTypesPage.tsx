@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Form, Input, Layout, Modal, Space, Table, Typography } from 'antd';
 import { Controller, type Control, type FieldError, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { getUserDisplayName } from '../features/auth/types';
 import { useCurrentUser, useLogout } from '../features/auth/useAuth';
@@ -48,6 +48,7 @@ function ProductTypeField({ name, label, control, error, multiline }: ProductTyp
 
 export function ProductTypesPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { data: user } = useCurrentUser();
   const logoutMutation = useLogout();
   const [searchInput, setSearchInput] = useState('');
@@ -74,10 +75,17 @@ export function ProductTypesPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     reset();
+    createMutation.reset();
   };
 
   const onSubmit = (values: ProductTypeFormValues) => {
     createMutation.mutate(values, { onSuccess: closeModal });
+  };
+
+  const handleLogout = () => {
+    logoutMutation.mutate(undefined, {
+      onSuccess: () => navigate('/login', { replace: true }),
+    });
   };
 
   const columns = [
@@ -106,7 +114,7 @@ export function ProductTypesPage() {
               <Typography.Text style={{ color: 'white' }}>
                 {getUserDisplayName(user)}
               </Typography.Text>
-              <Button onClick={() => logoutMutation.mutate()} loading={logoutMutation.isPending}>
+              <Button onClick={handleLogout} loading={logoutMutation.isPending}>
                 {t('auth.logout')}
               </Button>
             </Space>
@@ -127,15 +135,14 @@ export function ProductTypesPage() {
             {t('productTypes.newButton')}
           </Button>
         </div>
-        {isListError && (
+        {isListError ? (
           <Alert
             type="error"
             message={t('productTypes.loadError')}
             showIcon
             style={{ marginBottom: 16 }}
           />
-        )}
-        {!isListError && (
+        ) : (
           <Table<ProductType>
             rowKey="id"
             columns={columns}

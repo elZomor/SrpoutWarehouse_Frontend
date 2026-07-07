@@ -45,7 +45,7 @@ function renderProductTypesPage() {
       <MemoryRouter initialEntries={['/product-types']}>
         <Routes>
           <Route path="/product-types" element={<ProductTypesPage />} />
-          <Route path="/" element={<div>Dashboard Page</div>} />
+          <Route path="/login" element={<div>Login Page</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -165,6 +165,46 @@ describe('ProductTypesPage', () => {
       await screen.findByText(/failed to create product type|فشل إنشاء نوع المنتج/i),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'OK' })).toBeInTheDocument();
+  });
+
+  it('clears the create error when the modal is reopened after a failed submit', async () => {
+    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 400, data: { name: ['already exists'] } },
+    });
+
+    const user = userEvent.setup();
+    renderProductTypesPage();
+
+    await user.click(
+      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i }),
+    );
+    await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Bar LED Model A');
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await screen.findByText(/failed to create product type|فشل إنشاء نوع المنتج/i);
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(
+      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i }),
+    );
+
+    expect(
+      screen.queryByText(/failed to create product type|فشل إنشاء نوع المنتج/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it('logs out and redirects to the login-facing route', async () => {
+    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
+    mockedApiClient.post.mockResolvedValueOnce({ data: {} });
+
+    const user = userEvent.setup();
+    renderProductTypesPage();
+
+    await user.click(await screen.findByRole('button', { name: /logout|تسجيل الخروج/i }));
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/api/auth/logout/');
+    await waitFor(() => expect(screen.getByText('Login Page')).toBeInTheDocument());
   });
 
   it('shows an error banner when the list fails to load', async () => {

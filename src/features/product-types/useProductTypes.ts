@@ -4,7 +4,7 @@ import type { ProductTypeFormValues } from './schema';
 
 const productTypesBaseKey = ['product-types'] as const;
 
-export const productTypesQueryKey = (search: string) => [...productTypesBaseKey, search] as const;
+const productTypesQueryKey = (search: string) => [...productTypesBaseKey, search] as const;
 
 export function useProductTypes(search: string) {
   return useQuery({
