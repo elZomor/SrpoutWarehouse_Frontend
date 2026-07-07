@@ -3,7 +3,8 @@
     "name": "سبروت للمخازن"
   },
   "nav": {
-    "dashboard": "لوحة التحكم"
+    "dashboard": "لوحة التحكم",
+    "productTypes": "أنواع المنتجات"
   },
   "dashboard": {
     "welcome": "مرحبًا بك في سبروت للمخازن"
@@ -20,5 +21,17 @@
       "error": "البريد الإلكتروني أو كلمة المرور غير صحيحة"
     },
     "logout": "تسجيل الخروج"
+  },
+  "productTypes": {
+    "title": "أنواع المنتجات",
+    "newButton": "نوع منتج جديد",
+    "nameLabel": "الاسم",
+    "modelCodeLabel": "رمز الموديل",
+    "descriptionLabel": "الوصف",
+    "searchPlaceholder": "البحث بالاسم أو رمز الموديل",
+    "emptyState": "لا توجد أنواع منتجات",
+    "form": {
+      "nameRequired": "الاسم مطلوب"
+    }
   }
 }
