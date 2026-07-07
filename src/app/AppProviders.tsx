@@ -5,6 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { queryClient } from './queryClient';
 import { isRtl } from '../i18n';
+import { antdTheme } from '../theme/antdTheme';
 
 function DirectionSync({ children }: PropsWithChildren) {
   const { i18n } = useTranslation();
@@ -15,7 +16,11 @@ function DirectionSync({ children }: PropsWithChildren) {
     document.documentElement.lang = i18n.resolvedLanguage ?? i18n.language;
   }, [direction, i18n.resolvedLanguage, i18n.language]);
 
-  return <ConfigProvider direction={direction}>{children}</ConfigProvider>;
+  return (
+    <ConfigProvider direction={direction} theme={antdTheme}>
+      {children}
+    </ConfigProvider>
+  );
 }
 
 export function AppProviders({ children }: PropsWithChildren) {
