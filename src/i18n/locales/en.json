@@ -3,7 +3,8 @@
     "name": "Sprout Warehouse"
   },
   "nav": {
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "productTypes": "Product Types"
   },
   "dashboard": {
     "welcome": "Welcome to Sprout Warehouse"
@@ -20,5 +21,19 @@
       "error": "Invalid email or password"
     },
     "logout": "Logout"
+  },
+  "productTypes": {
+    "title": "Product Types",
+    "newButton": "New Product Type",
+    "nameLabel": "Name",
+    "modelCodeLabel": "Model Code",
+    "descriptionLabel": "Description",
+    "searchPlaceholder": "Search by name or model code",
+    "emptyState": "No product types found",
+    "loadError": "Failed to load product types. Please try again.",
+    "createError": "Failed to create product type. Please try again.",
+    "form": {
+      "nameRequired": "Name is required"
+    }
   }
 }

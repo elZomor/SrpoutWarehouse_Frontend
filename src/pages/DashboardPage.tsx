@@ -1,6 +1,6 @@
 import { Button, Layout, Space, Typography } from 'antd';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { getUserDisplayName } from '../features/auth/types';
 import { useCurrentUser, useLogout } from '../features/auth/useAuth';
@@ -35,6 +35,7 @@ export function DashboardPage() {
       />
       <Layout.Content style={{ padding: 24 }}>
         <Typography.Paragraph>{t('dashboard.welcome')}</Typography.Paragraph>
+        <Link to="/product-types">{t('nav.productTypes')}</Link>
       </Layout.Content>
     </Layout>
   );
