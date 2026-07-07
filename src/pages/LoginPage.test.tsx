@@ -66,4 +66,83 @@ describe('LoginPage', () => {
     });
     expect(await screen.findByText('Dashboard Page')).toBeInTheDocument();
   });
+
+  it('shows a required-field error and does not submit when email is empty', async () => {
+    // WRH-19 TC-01
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await user.type(await screen.findByLabelText(/password|كلمة المرور/i), 'some-password');
+    await user.click(screen.getByRole('button', { name: /login|تسجيل الدخول/i }));
+
+    expect(
+      await screen.findByText(/email is required|البريد الإلكتروني مطلوب/i),
+    ).toBeInTheDocument();
+    expect(mockedApiClient.post).not.toHaveBeenCalled();
+  });
+
+  it('shows a required-field error and does not submit when password is empty', async () => {
+    // WRH-19 TC-02
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await user.type(await screen.findByLabelText(/email|البريد الإلكتروني/i), 'jane@example.com');
+    await user.click(screen.getByRole('button', { name: /login|تسجيل الدخول/i }));
+
+    expect(await screen.findByText(/password is required|كلمة المرور مطلوبة/i)).toBeInTheDocument();
+    expect(mockedApiClient.post).not.toHaveBeenCalled();
+  });
+
+  it('shows both required-field errors and does not submit when both fields are empty', async () => {
+    // WRH-19 TC-03
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await user.click(await screen.findByRole('button', { name: /login|تسجيل الدخول/i }));
+
+    expect(
+      await screen.findByText(/email is required|البريد الإلكتروني مطلوب/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/password is required|كلمة المرور مطلوبة/i)).toBeInTheDocument();
+    expect(mockedApiClient.post).not.toHaveBeenCalled();
+  });
+
+  it('shows a format error and does not submit for a malformed email', async () => {
+    // WRH-19 TC-04
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await user.type(await screen.findByLabelText(/email|البريد الإلكتروني/i), 'not-an-email');
+    await user.type(screen.getByLabelText(/password|كلمة المرور/i), 'some-password');
+    await user.click(screen.getByRole('button', { name: /login|تسجيل الدخول/i }));
+
+    expect(
+      await screen.findByText(/enter a valid email address|أدخل بريدًا إلكترونيًا صالحًا/i),
+    ).toBeInTheDocument();
+    expect(mockedApiClient.post).not.toHaveBeenCalled();
+  });
+
+  it('shows a generic invalid-credentials error and stays on the login page on a 401', async () => {
+    // WRH-19 TC-05/TC-06: unregistered email and wrong password are
+    // indistinguishable to the backend response, so both are covered by the
+    // same 401 path here.
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 401, data: { detail: 'Invalid email or password.' } },
+    });
+
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await user.type(await screen.findByLabelText(/email|البريد الإلكتروني/i), 'jane@example.com');
+    await user.type(screen.getByLabelText(/password|كلمة المرور/i), 'wrong-password');
+    await user.click(screen.getByRole('button', { name: /login|تسجيل الدخول/i }));
+
+    expect(
+      await screen.findByText(
+        /invalid email or password|البريد الإلكتروني أو كلمة المرور غير صحيحة/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Dashboard Page')).not.toBeInTheDocument();
+  });
 });
