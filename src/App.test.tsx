@@ -42,7 +42,13 @@ describe('App', () => {
 
   it("shows the dashboard with the logged-in user's name in the nav bar for an authenticated visitor", async () => {
     mockedApiClient.get.mockResolvedValueOnce({
-      data: { user: { id: '1', name: 'Jane Doe', email: 'jane@example.com' } },
+      data: {
+        id: 1,
+        username: 'jane',
+        email: 'jane@example.com',
+        first_name: 'Jane',
+        last_name: 'Doe',
+      },
     });
 
     render(
