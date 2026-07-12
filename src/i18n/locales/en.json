@@ -50,8 +50,20 @@
     "emptyState": "No categories found",
     "loadError": "Failed to load categories. Please try again.",
     "createError": "Failed to create category. Please try again.",
+    "actionsLabel": "Actions",
+    "deleteButton": "Delete",
+    "deleteConfirmTitle": "Delete this category?",
+    "archiveButton": "Archive",
+    "archiveConfirmTitle": "Archive this category?",
+    "deleteSuccess": "Category deleted.",
+    "deleteError": "Failed to delete category. Please try again.",
+    "deleteBlockedError_one": "Cannot delete — 1 product type is assigned to this category. Archive it instead.",
+    "deleteBlockedError_other": "Cannot delete — {{count}} product types are assigned to this category. Archive it instead.",
+    "archiveSuccess": "Category archived.",
+    "archiveError": "Failed to archive category. Please try again.",
     "form": {
-      "nameRequired": "Name is required"
+      "nameRequired": "Name is required",
+      "nameDuplicate": "A category with this name already exists"
     }
   }
 }

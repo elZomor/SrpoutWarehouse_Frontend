@@ -13,6 +13,7 @@ vi.mock('../lib/apiClient', () => ({
   apiClient: {
     get: vi.fn(),
     post: vi.fn(),
+    delete: vi.fn(),
   },
 }));
 
@@ -23,6 +24,7 @@ function makeCategory(overrides: Partial<Category> = {}): Category {
     id: 1,
     name: 'Lighting',
     description: '',
+    archived: false,
     ...overrides,
   };
 }
@@ -131,11 +133,35 @@ describe('CategoriesPage', () => {
     expect(mockedApiClient.post).not.toHaveBeenCalled();
   });
 
-  it('shows an error and keeps the modal open when create fails', async () => {
+  it('shows a duplicate-name error inline and keeps the modal open', async () => {
+    // AC-2/TC-02: the specific duplicate-name message, not the generic banner
     mockedApiClient.get.mockResolvedValueOnce({ data: [] });
     mockedApiClient.post.mockRejectedValueOnce({
       isAxiosError: true,
-      response: { status: 400, data: { name: ['already exists'] } },
+      response: { status: 400, data: { name: ['A category with this name already exists.'] } },
+    });
+
+    const user = userEvent.setup();
+    renderCategoriesPage();
+
+    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
+    await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Lighting');
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+
+    expect(
+      await screen.findByText(/already exists|توجد فئة بهذا الاسم بالفعل/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/failed to create category|فشل إنشاء الفئة/i),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'OK' })).toBeInTheDocument();
+  });
+
+  it('shows the generic create-failed banner for non-name errors', async () => {
+    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 500, data: {} },
     });
 
     const user = userEvent.setup();
@@ -151,11 +177,11 @@ describe('CategoriesPage', () => {
     expect(screen.getByRole('button', { name: 'OK' })).toBeInTheDocument();
   });
 
-  it('clears the create error when the modal is reopened after a failed submit', async () => {
+  it('clears the duplicate-name error when the modal is reopened after a failed submit', async () => {
     mockedApiClient.get.mockResolvedValueOnce({ data: [] });
     mockedApiClient.post.mockRejectedValueOnce({
       isAxiosError: true,
-      response: { status: 400, data: { name: ['already exists'] } },
+      response: { status: 400, data: { name: ['A category with this name already exists.'] } },
     });
 
     const user = userEvent.setup();
@@ -164,14 +190,18 @@ describe('CategoriesPage', () => {
     await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Lighting');
     await user.click(screen.getByRole('button', { name: 'OK' }));
-    await screen.findByText(/failed to create category|فشل إنشاء الفئة/i);
+    await screen.findByText(/already exists|توجد فئة بهذا الاسم بالفعل/i);
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
 
-    expect(
-      screen.queryByText(/failed to create category|فشل إنشاء الفئة/i),
-    ).not.toBeInTheDocument();
+    // AntD's Form.Item help text animates out (rc-motion), so the node can
+    // still be present mid-transition - wait for it to actually leave.
+    await waitFor(() =>
+      expect(
+        screen.queryByText(/already exists|توجد فئة بهذا الاسم بالفعل/i),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   it('logs out and redirects to the login-facing route', async () => {
@@ -221,6 +251,69 @@ describe('CategoriesPage', () => {
     );
     await waitFor(() => expect(screen.queryByText('Staging')).not.toBeInTheDocument());
     expect(screen.getByText('Lighting')).toBeInTheDocument();
+  });
+
+  it('deletes a category with zero product types', async () => {
+    // AC-5/TC-05
+    mockedApiClient.get.mockResolvedValueOnce({ data: [makeCategory()] });
+    mockedApiClient.delete.mockResolvedValueOnce({ data: undefined });
+    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
+
+    const user = userEvent.setup();
+    renderCategoriesPage();
+
+    await screen.findByText('Lighting');
+    await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i }));
+    await user.click(await screen.findByRole('button', { name: /^ok$/i }));
+
+    await waitFor(() => expect(mockedApiClient.delete).toHaveBeenCalledWith('/api/categories/1/'));
+    await waitFor(() => expect(screen.queryByText('Lighting')).not.toBeInTheDocument());
+  });
+
+  it('shows a translated, pluralized message when delete is blocked by assigned product types', async () => {
+    // AC-3/TC-03: built from assigned_product_type_count, not the backend's
+    // raw (English-only) detail text.
+    mockedApiClient.get.mockResolvedValueOnce({ data: [makeCategory()] });
+    mockedApiClient.delete.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: {
+          detail: 'Cannot delete — 3 product types are assigned to this category.',
+          assigned_product_type_count: 3,
+        },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderCategoriesPage();
+
+    await screen.findByText('Lighting');
+    await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i }));
+    await user.click(await screen.findByRole('button', { name: /^ok$/i }));
+
+    expect(
+      await screen.findByText(/cannot delete.*3 product types|لا يمكن الحذف.*3/i),
+    ).toBeInTheDocument();
+  });
+
+  it('archives a category and it disappears from the list on refetch', async () => {
+    // AC-4/TC-04
+    mockedApiClient.get.mockResolvedValueOnce({ data: [makeCategory()] });
+    mockedApiClient.post.mockResolvedValueOnce({ data: makeCategory({ archived: true }) });
+    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
+
+    const user = userEvent.setup();
+    renderCategoriesPage();
+
+    await screen.findByText('Lighting');
+    await user.click(screen.getByRole('button', { name: /^archive$|^أرشفة$/i }));
+    await user.click(await screen.findByRole('button', { name: /^ok$/i }));
+
+    await waitFor(() =>
+      expect(mockedApiClient.post).toHaveBeenCalledWith('/api/categories/1/archive/'),
+    );
+    await waitFor(() => expect(screen.queryByText('Lighting')).not.toBeInTheDocument());
   });
 
   it('shows an empty state when the search has no matches', async () => {

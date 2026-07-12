@@ -35,6 +35,7 @@ function makeCategory(overrides: Partial<Category> = {}): Category {
     id: 1,
     name: 'Lighting',
     description: '',
+    archived: false,
     ...overrides,
   };
 }
