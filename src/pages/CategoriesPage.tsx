@@ -1,34 +1,33 @@
 import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, Button, Form, Input, Layout, Modal, Select, Space, Table, Typography } from 'antd';
+import { Alert, Button, Form, Input, Layout, Modal, Space, Table, Typography } from 'antd';
 import { Controller, type Control, type FieldError, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
-import { useCategories } from '../features/categories/useCategories';
+import { categorySchema, type CategoryFormValues } from '../features/categories/schema';
+import type { Category } from '../features/categories/types';
+import { useCategories, useCreateCategory } from '../features/categories/useCategories';
 import { getUserDisplayName } from '../features/auth/types';
 import { useCurrentUser, useLogout } from '../features/auth/useAuth';
-import { productTypeSchema, type ProductTypeFormValues } from '../features/product-types/schema';
-import type { ProductType } from '../features/product-types/types';
-import { useCreateProductType, useProductTypes } from '../features/product-types/useProductTypes';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
-interface ProductTypeFieldProps {
-  name: keyof ProductTypeFormValues;
+interface CategoryFieldProps {
+  name: keyof CategoryFormValues;
   label: string;
-  control: Control<ProductTypeFormValues>;
+  control: Control<CategoryFormValues>;
   error?: FieldError;
   multiline?: boolean;
 }
 
-function ProductTypeField({ name, label, control, error, multiline }: ProductTypeFieldProps) {
+function CategoryField({ name, label, control, error, multiline }: CategoryFieldProps) {
   const { t } = useTranslation();
 
   return (
     <Form.Item
       label={label}
-      htmlFor={`product-type-${name}`}
+      htmlFor={`category-${name}`}
       validateStatus={error ? 'error' : ''}
       help={error ? t(error.message ?? '') : undefined}
     >
@@ -37,9 +36,9 @@ function ProductTypeField({ name, label, control, error, multiline }: ProductTyp
         control={control}
         render={({ field }) =>
           multiline ? (
-            <Input.TextArea {...field} id={`product-type-${name}`} />
+            <Input.TextArea {...field} id={`category-${name}`} />
           ) : (
-            <Input {...field} id={`product-type-${name}`} />
+            <Input {...field} id={`category-${name}`} />
           )
         }
       />
@@ -47,7 +46,7 @@ function ProductTypeField({ name, label, control, error, multiline }: ProductTyp
   );
 }
 
-export function ProductTypesPage() {
+export function CategoriesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data: user } = useCurrentUser();
@@ -55,12 +54,8 @@ export function ProductTypesPage() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { data: productTypes, isLoading, isError: isListError } = useProductTypes(search);
-  const createMutation = useCreateProductType();
-  const { data: categories, isError: isCategoriesError } = useCategories('');
-  const categoryNameById = new Map(
-    (categories ?? []).map((category) => [category.id, category.name]),
-  );
+  const { data: categories, isLoading, isError: isListError } = useCategories(search);
+  const createMutation = useCreateCategory();
 
   useEffect(() => {
     const timeout = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
@@ -72,9 +67,9 @@ export function ProductTypesPage() {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<ProductTypeFormValues>({
-    resolver: zodResolver(productTypeSchema),
-    defaultValues: { name: '', model_code: '', description: '', category: undefined },
+  } = useForm<CategoryFormValues>({
+    resolver: zodResolver(categorySchema),
+    defaultValues: { name: '', description: '' },
   });
 
   const closeModal = () => {
@@ -83,7 +78,7 @@ export function ProductTypesPage() {
     createMutation.reset();
   };
 
-  const onSubmit = (values: ProductTypeFormValues) => {
+  const onSubmit = (values: CategoryFormValues) => {
     createMutation.mutate(values, { onSuccess: closeModal });
   };
 
@@ -94,22 +89,11 @@ export function ProductTypesPage() {
   };
 
   const columns = [
-    { title: t('productTypes.nameLabel'), dataIndex: 'name', key: 'name' },
+    { title: t('categories.nameLabel'), dataIndex: 'name', key: 'name' },
     {
-      title: t('productTypes.modelCodeLabel'),
-      dataIndex: 'model_code',
-      key: 'model_code',
-    },
-    {
-      title: t('productTypes.descriptionLabel'),
+      title: t('categories.descriptionLabel'),
       dataIndex: 'description',
       key: 'description',
-    },
-    {
-      title: t('productTypes.categoryLabel'),
-      dataIndex: 'category',
-      key: 'category',
-      render: (categoryId: number) => categoryNameById.get(categoryId) ?? categoryId,
     },
   ];
 
@@ -133,90 +117,58 @@ export function ProductTypesPage() {
         }
       />
       <Layout.Content style={{ padding: 24 }}>
-        <Typography.Title level={3}>{t('productTypes.title')}</Typography.Title>
+        <Typography.Title level={3}>{t('categories.title')}</Typography.Title>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
           <Input.Search
-            placeholder={t('productTypes.searchPlaceholder')}
+            placeholder={t('categories.searchPlaceholder')}
             allowClear
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             style={{ maxWidth: 320 }}
           />
           <Button type="primary" onClick={() => setIsModalOpen(true)}>
-            {t('productTypes.newButton')}
+            {t('categories.newButton')}
           </Button>
         </div>
         {isListError ? (
           <Alert
             type="error"
-            message={t('productTypes.loadError')}
+            message={t('categories.loadError')}
             showIcon
             style={{ marginBottom: 16 }}
           />
         ) : (
-          <Table<ProductType>
+          <Table<Category>
             rowKey="id"
             columns={columns}
-            dataSource={productTypes}
+            dataSource={categories}
             loading={isLoading}
-            locale={{ emptyText: t('productTypes.emptyState') }}
+            locale={{ emptyText: t('categories.emptyState') }}
           />
         )}
         <Modal
-          title={t('productTypes.newButton')}
+          title={t('categories.newButton')}
           open={isModalOpen}
           onCancel={closeModal}
           onOk={handleSubmit(onSubmit)}
           confirmLoading={createMutation.isPending}
         >
           <Form layout="vertical" noValidate>
-            <ProductTypeField
+            <CategoryField
               name="name"
-              label={t('productTypes.nameLabel')}
+              label={t('categories.nameLabel')}
               control={control}
               error={errors.name}
             />
-            <ProductTypeField
-              name="model_code"
-              label={t('productTypes.modelCodeLabel')}
-              control={control}
-            />
-            <ProductTypeField
+            <CategoryField
               name="description"
-              label={t('productTypes.descriptionLabel')}
+              label={t('categories.descriptionLabel')}
               control={control}
               multiline
             />
-            <Form.Item
-              label={t('productTypes.categoryLabel')}
-              htmlFor="product-type-category"
-              validateStatus={errors.category ? 'error' : ''}
-              help={errors.category ? t(errors.category.message ?? '') : undefined}
-            >
-              <Controller
-                name="category"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    {...field}
-                    id="product-type-category"
-                    placeholder={t('productTypes.categoryPlaceholder')}
-                    options={(categories ?? []).map((category) => ({
-                      value: category.id,
-                      label: category.name,
-                    }))}
-                  />
-                )}
-              />
-            </Form.Item>
-            {isCategoriesError && (
-              <Form.Item>
-                <Alert type="error" message={t('productTypes.loadCategoriesError')} showIcon />
-              </Form.Item>
-            )}
             {createMutation.isError && (
               <Form.Item>
-                <Alert type="error" message={t('productTypes.createError')} showIcon />
+                <Alert type="error" message={t('categories.createError')} showIcon />
               </Form.Item>
             )}
           </Form>

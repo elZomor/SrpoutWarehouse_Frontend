@@ -4,7 +4,8 @@
   },
   "nav": {
     "dashboard": "لوحة التحكم",
-    "productTypes": "أنواع المنتجات"
+    "productTypes": "أنواع المنتجات",
+    "categories": "الفئات"
   },
   "dashboard": {
     "welcome": "مرحبًا بك في سبروت للمخازن"
@@ -32,6 +33,23 @@
     "emptyState": "لا توجد أنواع منتجات",
     "loadError": "فشل تحميل أنواع المنتجات. حاول مرة أخرى.",
     "createError": "فشل إنشاء نوع المنتج. حاول مرة أخرى.",
+    "categoryLabel": "الفئة",
+    "categoryPlaceholder": "اختر فئة",
+    "loadCategoriesError": "فشل تحميل الفئات. حاول مرة أخرى.",
+    "form": {
+      "nameRequired": "الاسم مطلوب",
+      "categoryRequired": "الفئة مطلوبة"
+    }
+  },
+  "categories": {
+    "title": "الفئات",
+    "newButton": "فئة جديدة",
+    "nameLabel": "الاسم",
+    "descriptionLabel": "الوصف",
+    "searchPlaceholder": "البحث بالاسم",
+    "emptyState": "لا توجد فئات",
+    "loadError": "فشل تحميل الفئات. حاول مرة أخرى.",
+    "createError": "فشل إنشاء الفئة. حاول مرة أخرى.",
     "form": {
       "nameRequired": "الاسم مطلوب"
     }
