@@ -35,7 +35,10 @@ export function DashboardPage() {
       />
       <Layout.Content style={{ padding: 24 }}>
         <Typography.Paragraph>{t('dashboard.welcome')}</Typography.Paragraph>
-        <Link to="/product-types">{t('nav.productTypes')}</Link>
+        <Space direction="vertical">
+          <Link to="/categories">{t('nav.categories')}</Link>
+          <Link to="/product-types">{t('nav.productTypes')}</Link>
+        </Space>
       </Layout.Content>
     </Layout>
   );

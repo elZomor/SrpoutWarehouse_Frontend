@@ -1,8 +1,8 @@
 import { test, expect, type Route } from '@playwright/test';
 
-// This spec mocks the backend entirely via page.route (auth + product-types
-// endpoints) rather than assuming a live backend at VITE_API_BASE_URL,
-// following login.spec.ts's precedent.
+// This spec mocks the backend entirely via page.route (auth + categories +
+// product-types endpoints) rather than assuming a live backend at
+// VITE_API_BASE_URL, following login.spec.ts's precedent.
 const USER = {
   id: 1,
   username: 'jane',
@@ -23,16 +23,26 @@ async function stubAuth(route: Route) {
   await route.continue();
 }
 
-test('creates a product type and finds it via search', async ({ page }) => {
+test('creates a product type with a category and finds it via search', async ({ page }) => {
+  const categories = [{ id: 1, name: 'Lighting', description: '' }];
   const productTypes: Array<{
     id: number;
     name: string;
     model_code: string;
     description: string;
+    category: number;
   }> = [];
   let nextId = 1;
 
   await page.route('**/api/auth/**', stubAuth);
+  await page.route('**/api/categories/**', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, json: categories });
+      return;
+    }
+
+    await route.continue();
+  });
   await page.route('**/api/product-types/**', async (route) => {
     const url = new URL(route.request().url());
     const method = route.request().method();
@@ -55,6 +65,7 @@ test('creates a product type and finds it via search', async ({ page }) => {
         name: body.name,
         model_code: body.model_code ?? '',
         description: body.description ?? '',
+        category: body.category,
       };
       productTypes.push(created);
       await route.fulfill({ status: 201, json: created });
@@ -69,6 +80,8 @@ test('creates a product type and finds it via search', async ({ page }) => {
   await page.getByRole('button', { name: /new product type|نوع منتج جديد/i }).click();
   await page.getByLabel(/^name$|^الاسم$/i).fill('Bar LED Model A');
   await page.getByLabel(/model code|رمز الموديل/i).fill('BAR-LED-A');
+  await page.getByRole('combobox').click();
+  await page.getByTitle('Lighting').click();
   await page.getByRole('button', { name: 'OK' }).click();
 
   await expect(page.getByText('Bar LED Model A')).toBeVisible();
@@ -84,4 +97,43 @@ test('creates a product type and finds it via search', async ({ page }) => {
     .fill('nonexistent');
 
   await expect(page.getByText(/no product types found|لا توجد أنواع منتجات/i)).toBeVisible();
+});
+
+test('blocks product type submission without a category', async ({ page }) => {
+  // AC-4
+  await page.route('**/api/auth/**', stubAuth);
+  await page.route('**/api/categories/**', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, json: [{ id: 1, name: 'Lighting', description: '' }] });
+      return;
+    }
+
+    await route.continue();
+  });
+  let postCount = 0;
+  await page.route('**/api/product-types/**', async (route) => {
+    const method = route.request().method();
+
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, json: [] });
+      return;
+    }
+
+    if (method === 'POST') {
+      postCount += 1;
+      await route.fulfill({ status: 400, json: { category: ['This field is required.'] } });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto('/product-types');
+
+  await page.getByRole('button', { name: /new product type|نوع منتج جديد/i }).click();
+  await page.getByLabel(/^name$|^الاسم$/i).fill('Bar LED Model A');
+  await page.getByRole('button', { name: 'OK' }).click();
+
+  await expect(page.getByText(/category is required|الفئة مطلوبة/i)).toBeVisible();
+  expect(postCount).toBe(0);
 });

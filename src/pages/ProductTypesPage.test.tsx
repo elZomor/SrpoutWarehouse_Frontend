@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProductTypesPage } from './ProductTypesPage';
 import { currentUserQueryKey } from '../features/auth/useAuth';
+import type { Category } from '../features/categories/types';
 import type { ProductType } from '../features/product-types/types';
 import { apiClient } from '../lib/apiClient';
 import '../i18n';
@@ -24,8 +25,52 @@ function makeProductType(overrides: Partial<ProductType> = {}): ProductType {
     name: 'Bar LED Model A',
     model_code: 'BAR-A',
     description: '',
+    category: 1,
     ...overrides,
   };
+}
+
+function makeCategory(overrides: Partial<Category> = {}): Category {
+  return {
+    id: 1,
+    name: 'Lighting',
+    description: '',
+    ...overrides,
+  };
+}
+
+// GET calls are routed by URL rather than call order, since the page fires
+// both the product-types list query and the categories dropdown query on
+// mount and the two aren't guaranteed to resolve in declaration order.
+function mockListEndpoints({
+  productTypes = [],
+  categories = [makeCategory()],
+  productTypesError = false,
+}: {
+  productTypes?: ProductType[];
+  categories?: Category[];
+  productTypesError?: boolean;
+}) {
+  mockedApiClient.get.mockImplementation(
+    (url: string, config?: { params?: { search?: string } }) => {
+      if (url === '/api/categories/') {
+        return Promise.resolve({ data: categories });
+      }
+      if (url === '/api/product-types/') {
+        if (productTypesError) {
+          return Promise.reject({ isAxiosError: true, response: { status: 500, data: {} } });
+        }
+        const search = config?.params?.search?.toLowerCase() ?? '';
+        const results = productTypes.filter(
+          (productType) =>
+            productType.name.toLowerCase().includes(search) ||
+            productType.model_code.toLowerCase().includes(search),
+        );
+        return Promise.resolve({ data: results });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    },
+  );
 }
 
 function renderProductTypesPage() {
@@ -52,13 +97,18 @@ function renderProductTypesPage() {
   );
 }
 
+async function selectCategory(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByRole('combobox'));
+  await user.click(screen.getByTitle(name));
+}
+
 describe('ProductTypesPage', () => {
   afterEach(() => {
     vi.clearAllMocks();
   });
 
   it('renders product types returned from the API', async () => {
-    mockedApiClient.get.mockResolvedValueOnce({ data: [makeProductType()] });
+    mockListEndpoints({ productTypes: [makeProductType()] });
 
     renderProductTypesPage();
 
@@ -66,7 +116,7 @@ describe('ProductTypesPage', () => {
   });
 
   it("shows the logged-in user's name and a link back to the dashboard", async () => {
-    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
+    mockListEndpoints({});
 
     renderProductTypesPage();
 
@@ -76,12 +126,10 @@ describe('ProductTypesPage', () => {
 
   it('creates a product type with all fields and it appears in the list', async () => {
     // TC-01
-    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
+    const productTypes: ProductType[] = [];
+    mockListEndpoints({ productTypes });
     mockedApiClient.post.mockResolvedValueOnce({
       data: makeProductType({ description: 'Moving bar light' }),
-    });
-    mockedApiClient.get.mockResolvedValueOnce({
-      data: [makeProductType({ description: 'Moving bar light' })],
     });
 
     const user = userEvent.setup();
@@ -93,24 +141,25 @@ describe('ProductTypesPage', () => {
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Bar LED Model A');
     await user.type(screen.getByLabelText(/model code|رمز الموديل/i), 'BAR-A');
     await user.type(screen.getByLabelText(/description|الوصف/i), 'Moving bar light');
+    await selectCategory(user, 'Lighting');
+    productTypes.push(makeProductType({ description: 'Moving bar light' }));
     await user.click(screen.getByRole('button', { name: 'OK' }));
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/product-types/', {
       name: 'Bar LED Model A',
       model_code: 'BAR-A',
       description: 'Moving bar light',
+      category: 1,
     });
     expect(await screen.findByText('Moving bar light')).toBeInTheDocument();
   });
 
-  it('creates a product type with only a name', async () => {
+  it('creates a product type with only a name and a category', async () => {
     // TC-02 / AC-3
-    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
+    const productTypes: ProductType[] = [];
+    mockListEndpoints({ productTypes });
     mockedApiClient.post.mockResolvedValueOnce({
       data: makeProductType({ model_code: '' }),
-    });
-    mockedApiClient.get.mockResolvedValueOnce({
-      data: [makeProductType({ model_code: '' })],
     });
 
     const user = userEvent.setup();
@@ -120,18 +169,21 @@ describe('ProductTypesPage', () => {
       await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i }),
     );
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Bar LED Model A');
+    await selectCategory(user, 'Lighting');
+    productTypes.push(makeProductType({ model_code: '' }));
     await user.click(screen.getByRole('button', { name: 'OK' }));
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/product-types/', {
       name: 'Bar LED Model A',
       model_code: '',
       description: '',
+      category: 1,
     });
     expect(await screen.findByText('Bar LED Model A')).toBeInTheDocument();
   });
 
   it('requires a name before submitting', async () => {
-    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
+    mockListEndpoints({});
 
     const user = userEvent.setup();
     renderProductTypesPage();
@@ -145,12 +197,9 @@ describe('ProductTypesPage', () => {
     expect(mockedApiClient.post).not.toHaveBeenCalled();
   });
 
-  it('shows an error and keeps the modal open when create fails', async () => {
-    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
-    mockedApiClient.post.mockRejectedValueOnce({
-      isAxiosError: true,
-      response: { status: 400, data: { name: ['already exists'] } },
-    });
+  it('requires a category before submitting', async () => {
+    // AC-4
+    mockListEndpoints({});
 
     const user = userEvent.setup();
     renderProductTypesPage();
@@ -161,14 +210,27 @@ describe('ProductTypesPage', () => {
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Bar LED Model A');
     await user.click(screen.getByRole('button', { name: 'OK' }));
 
-    expect(
-      await screen.findByText(/failed to create product type|فشل إنشاء نوع المنتج/i),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'OK' })).toBeInTheDocument();
+    expect(await screen.findByText(/category is required|الفئة مطلوبة/i)).toBeInTheDocument();
+    expect(mockedApiClient.post).not.toHaveBeenCalled();
   });
 
-  it('clears the create error when the modal is reopened after a failed submit', async () => {
-    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
+  it('offers an existing category as a selectable option', async () => {
+    // AC-4 / TC-05
+    mockListEndpoints({ categories: [makeCategory({ id: 2, name: 'Lighting' })] });
+
+    const user = userEvent.setup();
+    renderProductTypesPage();
+
+    await user.click(
+      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i }),
+    );
+    await user.click(screen.getByRole('combobox'));
+
+    expect(screen.getByTitle('Lighting')).toBeInTheDocument();
+  });
+
+  it('shows an error and keeps the modal open when create fails', async () => {
+    mockListEndpoints({});
     mockedApiClient.post.mockRejectedValueOnce({
       isAxiosError: true,
       response: { status: 400, data: { name: ['already exists'] } },
@@ -181,6 +243,30 @@ describe('ProductTypesPage', () => {
       await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i }),
     );
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Bar LED Model A');
+    await selectCategory(user, 'Lighting');
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+
+    expect(
+      await screen.findByText(/failed to create product type|فشل إنشاء نوع المنتج/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'OK' })).toBeInTheDocument();
+  });
+
+  it('clears the create error when the modal is reopened after a failed submit', async () => {
+    mockListEndpoints({});
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 400, data: { name: ['already exists'] } },
+    });
+
+    const user = userEvent.setup();
+    renderProductTypesPage();
+
+    await user.click(
+      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i }),
+    );
+    await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Bar LED Model A');
+    await selectCategory(user, 'Lighting');
     await user.click(screen.getByRole('button', { name: 'OK' }));
     await screen.findByText(/failed to create product type|فشل إنشاء نوع المنتج/i);
 
@@ -195,7 +281,7 @@ describe('ProductTypesPage', () => {
   });
 
   it('logs out and redirects to the login-facing route', async () => {
-    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
+    mockListEndpoints({});
     mockedApiClient.post.mockResolvedValueOnce({ data: {} });
 
     const user = userEvent.setup();
@@ -208,10 +294,7 @@ describe('ProductTypesPage', () => {
   });
 
   it('shows an error banner when the list fails to load', async () => {
-    mockedApiClient.get.mockRejectedValueOnce({
-      isAxiosError: true,
-      response: { status: 500, data: {} },
-    });
+    mockListEndpoints({ productTypesError: true });
 
     renderProductTypesPage();
 
@@ -225,13 +308,12 @@ describe('ProductTypesPage', () => {
 
   it('filters the list when searching by name or model code', async () => {
     // TC-03
-    mockedApiClient.get.mockResolvedValueOnce({
-      data: [
+    mockListEndpoints({
+      productTypes: [
         makeProductType(),
         makeProductType({ id: 2, name: 'Fog Machine', model_code: 'FOG-01' }),
       ],
     });
-    mockedApiClient.get.mockResolvedValueOnce({ data: [makeProductType()] });
 
     renderProductTypesPage();
     await screen.findByText('Fog Machine');
@@ -252,8 +334,7 @@ describe('ProductTypesPage', () => {
 
   it('shows an empty state when the search has no matches', async () => {
     // TC-04
-    mockedApiClient.get.mockResolvedValueOnce({ data: [makeProductType()] });
-    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
+    mockListEndpoints({ productTypes: [makeProductType()] });
 
     renderProductTypesPage();
     await screen.findByText('Bar LED Model A');

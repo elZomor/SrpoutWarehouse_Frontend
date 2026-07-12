@@ -3,4 +3,5 @@ export interface ProductType {
   name: string;
   model_code: string;
   description: string;
+  category: number;
 }
