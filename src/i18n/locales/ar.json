@@ -125,5 +125,31 @@
       "serialNumberDuplicate": "توجد وحدة مسجلة بهذا الرقم التسلسلي بالفعل",
       "productTypeRequired": "نوع المنتج مطلوب"
     }
+  },
+  "purchaseOrders": {
+    "title": "أوامر الشراء",
+    "newButton": "أمر شراء جديد",
+    "supplierLabel": "المورد",
+    "orderDateLabel": "تاريخ الطلب",
+    "statusLabel": "الحالة",
+    "status": {
+      "pending": "قيد الانتظار"
+    },
+    "lineItemsLabel": "بنود الطلب",
+    "emptyState": "لا توجد أوامر شراء",
+    "loadError": "فشل تحميل أوامر الشراء. حاول مرة أخرى.",
+    "createError": "فشل إنشاء أمر الشراء. حاول مرة أخرى.",
+    "loadProductTypesError": "فشل تحميل أنواع المنتجات. حاول مرة أخرى.",
+    "form": {
+      "supplierNameRequired": "المورد مطلوب",
+      "orderDateRequired": "تاريخ الطلب مطلوب",
+      "lineItemsRequired": "يجب إضافة بند واحد على الأقل",
+      "productTypePlaceholder": "اختر نوع المنتج",
+      "productTypeRequired": "نوع المنتج مطلوب",
+      "expectedQuantityPlaceholder": "الكمية",
+      "expectedQuantityRequired": "يجب أن تكون الكمية 1 على الأقل",
+      "addLineItemButton": "إضافة بند",
+      "removeLineItemButton": "إزالة البند"
+    }
   }
 }
