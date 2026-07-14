@@ -206,13 +206,43 @@ describe('SerializedItemsPage', () => {
   });
 
   it('shows a duplicate-serial-number error inline when registration fails on a duplicate', async () => {
-    // AC-2
+    // AC-1/AC-2: matches on the serial_number field being present in the
+    // error response, not on the backend's exact wording (which embeds the
+    // submitted serial number and so varies per request).
     mockListEndpoints({ serializedItems: [makeSerializedItem()] });
     mockedApiClient.post.mockRejectedValueOnce({
       isAxiosError: true,
       response: {
         status: 400,
-        data: { serial_number: ['serialized item with this serial number already exists.'] },
+        data: { serial_number: ['Serial number SN-042 is already registered.'] },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderSerializedItemsPage();
+
+    await user.click(await screen.findByRole('button', { name: /register item|تسجيل وحدة/i }));
+    await user.type(screen.getByLabelText(/serial number|الرقم التسلسلي/i), 'SN-042');
+    await selectProductTypeInForm(user, 'Bar LED Model A');
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+
+    expect(
+      await screen.findByText(
+        /an item with this serial number is already registered|توجد وحدة مسجلة بهذا الرقم التسلسلي بالفعل/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a duplicate-serial-number error inline for the DB-constraint race fallback shape', async () => {
+    // AC-5: the race-condition fallback returns serial_number as a bare
+    // string rather than a list - must still be treated as a duplicate,
+    // not fall through to the generic banner.
+    mockListEndpoints({ serializedItems: [makeSerializedItem()] });
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: { serial_number: 'Serial number SN-042 is already registered.' },
       },
     });
 

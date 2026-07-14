@@ -16,7 +16,6 @@ import {
 } from '../features/serialized-items/useSerializedItems';
 
 const SEARCH_DEBOUNCE_MS = 300;
-const DUPLICATE_SERIAL_NUMBER_MESSAGE = 'serialized item with this serial number already exists.';
 // Only "available" exists today, but the backend's STATUS_CHOICES is an
 // extensible list - keyed by status so a future value (e.g. "issued",
 // "missing") doesn't silently inherit this color instead of getting its own.
@@ -67,16 +66,20 @@ export function SerializedItemsPage() {
     createMutation.mutate(values, {
       onSuccess: closeModal,
       onError: (error) => {
-        // AC-2: a raced/duplicate serial number gets its own inline
-        // message rather than the generic create-failed banner. The
-        // backend returns this text either as a list (the normal
-        // pre-check) or a bare string (the DB-constraint fallback for a
-        // race), so normalize both shapes before matching.
+        // AC-1/AC-2: a raced/duplicate serial number gets its own inline
+        // message rather than the generic create-failed banner. Required-
+        // field errors are already caught client-side by the zod resolver
+        // before a request is ever sent, so any serial_number error the
+        // backend returns at this point is the duplicate case - matching
+        // on the field's presence (rather than its exact wording) keeps
+        // this working regardless of how the backend phrases the message.
         const rawErrors = axios.isAxiosError<{ serial_number?: string | string[] }>(error)
           ? error.response?.data?.serial_number
           : undefined;
-        const serialErrors = Array.isArray(rawErrors) ? rawErrors : rawErrors ? [rawErrors] : [];
-        if (serialErrors.includes(DUPLICATE_SERIAL_NUMBER_MESSAGE)) {
+        const hasSerialNumberError = Array.isArray(rawErrors)
+          ? rawErrors.length > 0
+          : Boolean(rawErrors);
+        if (hasSerialNumberError) {
           setError('serial_number', {
             type: 'server',
             message: 'serializedItems.form.serialNumberDuplicate',
