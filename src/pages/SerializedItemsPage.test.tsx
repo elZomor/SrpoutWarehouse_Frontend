@@ -18,6 +18,15 @@ vi.mock('../lib/apiClient', () => ({
   },
 }));
 
+// getSerializedItemQrCodeUrl reads env directly (not through apiClient), so
+// it needs its own mock rather than piggybacking on the one above - CI has
+// no VITE_API_BASE_URL, and env.ts throws at import time without it.
+vi.mock('../config/env', () => ({
+  env: {
+    VITE_API_BASE_URL: 'http://localhost:8000',
+  },
+}));
+
 const mockedApiClient = vi.mocked(apiClient, true);
 
 function makeProductType(overrides: Partial<ProductType> = {}): ProductType {
@@ -40,7 +49,6 @@ function makeSerializedItem(overrides: Partial<SerializedItem> = {}): Serialized
     product_type: 1,
     product_type_name: 'Bar LED Model A',
     status: 'available',
-    qr_code: 'http://testserver/media/qr_codes/35acd300-e1d1-4cfd-87c0-daad35911605.png',
     last_work_order_reference: '',
     notes: '',
     ...overrides,
@@ -170,7 +178,7 @@ describe('SerializedItemsPage', () => {
     const printLink = await screen.findByRole('link', { name: /print qr|طباعة رمز qr/i });
     expect(printLink).toHaveAttribute(
       'href',
-      'http://testserver/media/qr_codes/35acd300-e1d1-4cfd-87c0-daad35911605.png',
+      'http://localhost:8000/api/serialized-items/1/qr-code/',
     );
   });
 

@@ -13,6 +13,15 @@ vi.mock('./lib/apiClient', () => ({
   },
 }));
 
+// App's route tree pulls in SerializedItemsPage, whose api.ts reads env
+// directly (not through apiClient) - CI has no VITE_API_BASE_URL, and
+// env.ts throws at import time without it.
+vi.mock('./config/env', () => ({
+  env: {
+    VITE_API_BASE_URL: 'http://localhost:8000',
+  },
+}));
+
 const mockedApiClient = vi.mocked(apiClient, true);
 
 describe('App', () => {

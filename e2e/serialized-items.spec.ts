@@ -18,7 +18,6 @@ interface SerializedItem {
   product_type: number;
   product_type_name: string;
   status: string;
-  qr_code: string;
   last_work_order_reference: string;
   notes: string;
 }
@@ -89,7 +88,6 @@ test('registers a serialized item, prints its QR, then filters and searches for 
         product_type: body.product_type,
         product_type_name: productTypeNames[body.product_type] ?? '',
         status: 'available',
-        qr_code: `http://localhost:4173/media/qr_codes/${id}.png`,
         last_work_order_reference: '',
         notes: '',
       };
@@ -114,7 +112,10 @@ test('registers a serialized item, prints its QR, then filters and searches for 
 
   const printLink = page.getByRole('link', { name: /print qr|طباعة رمز qr/i });
   await expect(printLink).toBeVisible();
-  await expect(printLink).toHaveAttribute('href', /qr_codes\/1\.png$/);
+  await expect(printLink).toHaveAttribute(
+    'href',
+    'http://localhost:4173/api/serialized-items/1/qr-code/',
+  );
 
   await page.getByRole('button', { name: /register item|تسجيل وحدة/i }).click();
   await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('FOG-001');
@@ -164,7 +165,6 @@ test('shows an inline error when registering a duplicate serial number', async (
             product_type: 1,
             product_type_name: 'Bar LED Model A',
             status: 'available',
-            qr_code: 'http://localhost:4173/media/qr_codes/1.png',
             last_work_order_reference: '',
             notes: '',
           },
