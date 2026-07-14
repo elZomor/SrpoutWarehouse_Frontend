@@ -61,7 +61,12 @@ function renderCategoriesPage() {
 
 describe('CategoriesPage', () => {
   afterEach(() => {
-    vi.clearAllMocks();
+    // resetAllMocks (not clearAllMocks) - this file chains
+    // mockResolvedValueOnce/mockRejectedValueOnce per test, and clearAllMocks
+    // only clears call history, not queued once-implementations. Any test
+    // that doesn't consume its queue exactly leaked stale values into later
+    // tests, causing order-dependent flake.
+    vi.resetAllMocks();
   });
 
   it('renders categories returned from the API', async () => {
