@@ -1,0 +1,24 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { createSerializedItem, listSerializedItems } from './api';
+import type { SerializedItemFormValues } from './schema';
+
+const serializedItemsBaseKey = ['serialized-items'] as const;
+
+const serializedItemsQueryKey = (search: string, productType?: number) =>
+  [...serializedItemsBaseKey, search, productType] as const;
+
+export function useSerializedItems(search: string, productType?: number) {
+  return useQuery({
+    queryKey: serializedItemsQueryKey(search, productType),
+    queryFn: () => listSerializedItems({ search: search || undefined, product_type: productType }),
+  });
+}
+
+export function useCreateSerializedItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: SerializedItemFormValues) => createSerializedItem(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: serializedItemsBaseKey }),
+  });
+}

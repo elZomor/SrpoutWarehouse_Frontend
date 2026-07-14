@@ -90,5 +90,31 @@
       "nameRequired": "Name is required",
       "nameDuplicate": "A category with this name already exists"
     }
+  },
+  "serializedItems": {
+    "title": "Serialized Items",
+    "newButton": "Register Item",
+    "serialNumberLabel": "Serial Number",
+    "productTypeLabel": "Product Type",
+    "productTypePlaceholder": "Select a product type",
+    "filterByProductTypePlaceholder": "Filter by product type",
+    "statusLabel": "Status",
+    "status": {
+      "available": "Available"
+    },
+    "lastWorkOrderLabel": "Last Work Order",
+    "noWorkOrder": "—",
+    "qrCodeLabel": "QR Code",
+    "printQrButton": "Print QR",
+    "searchPlaceholder": "Search by serial number",
+    "emptyState": "No serialized items found",
+    "loadError": "Failed to load serialized items. Please try again.",
+    "createError": "Failed to register item. Please try again.",
+    "loadProductTypesError": "Failed to load product types. Please try again.",
+    "form": {
+      "serialNumberRequired": "Serial number is required",
+      "serialNumberDuplicate": "An item with this serial number is already registered",
+      "productTypeRequired": "Product type is required"
+    }
   }
 }

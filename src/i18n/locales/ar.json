@@ -94,5 +94,31 @@
       "nameRequired": "الاسم مطلوب",
       "nameDuplicate": "توجد فئة بهذا الاسم بالفعل"
     }
+  },
+  "serializedItems": {
+    "title": "الوحدات المسجلة",
+    "newButton": "تسجيل وحدة",
+    "serialNumberLabel": "الرقم التسلسلي",
+    "productTypeLabel": "نوع المنتج",
+    "productTypePlaceholder": "اختر نوع المنتج",
+    "filterByProductTypePlaceholder": "التصفية حسب نوع المنتج",
+    "statusLabel": "الحالة",
+    "status": {
+      "available": "متاح"
+    },
+    "lastWorkOrderLabel": "آخر أمر عمل",
+    "noWorkOrder": "—",
+    "qrCodeLabel": "رمز QR",
+    "printQrButton": "طباعة رمز QR",
+    "searchPlaceholder": "البحث بالرقم التسلسلي",
+    "emptyState": "لا توجد وحدات مسجلة",
+    "loadError": "فشل تحميل الوحدات المسجلة. حاول مرة أخرى.",
+    "createError": "فشل تسجيل الوحدة. حاول مرة أخرى.",
+    "loadProductTypesError": "فشل تحميل أنواع المنتجات. حاول مرة أخرى.",
+    "form": {
+      "serialNumberRequired": "الرقم التسلسلي مطلوب",
+      "serialNumberDuplicate": "توجد وحدة مسجلة بهذا الرقم التسلسلي بالفعل",
+      "productTypeRequired": "نوع المنتج مطلوب"
+    }
   }
 }

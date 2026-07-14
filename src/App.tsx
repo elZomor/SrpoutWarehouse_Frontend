@@ -6,6 +6,7 @@ import { ComingSoonPage } from './pages/ComingSoonPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProductTypesPage } from './pages/ProductTypesPage';
+import { SerializedItemsPage } from './pages/SerializedItemsPage';
 import { ROUTES } from './routes';
 
 function App() {
@@ -17,10 +18,7 @@ function App() {
           <Route path={ROUTES.dashboard} element={<DashboardPage />} />
           <Route path={ROUTES.productTypes} element={<ProductTypesPage />} />
           <Route path={ROUTES.categories} element={<CategoriesPage />} />
-          <Route
-            path={ROUTES.serializedItems}
-            element={<ComingSoonPage titleKey="nav.serializedItems" />}
-          />
+          <Route path={ROUTES.serializedItems} element={<SerializedItemsPage />} />
           <Route path={ROUTES.boxes} element={<ComingSoonPage titleKey="nav.boxes" />} />
           <Route
             path={ROUTES.purchaseOrders}
