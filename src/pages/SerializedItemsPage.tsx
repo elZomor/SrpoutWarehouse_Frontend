@@ -17,6 +17,11 @@ import {
 
 const SEARCH_DEBOUNCE_MS = 300;
 const DUPLICATE_SERIAL_NUMBER_MESSAGE = 'serialized item with this serial number already exists.';
+// Only "available" exists today, but the backend's STATUS_CHOICES is an
+// extensible list - keyed by status so a future value (e.g. "issued",
+// "missing") doesn't silently inherit this color instead of getting its own.
+const STATUS_COLORS: Record<string, string> = { available: 'green' };
+const DEFAULT_STATUS_COLOR = 'default';
 
 export function SerializedItemsPage() {
   const { t } = useTranslation();
@@ -99,7 +104,11 @@ export function SerializedItemsPage() {
       title: t('serializedItems.statusLabel'),
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => <Tag color="green">{t(`serializedItems.status.${status}`)}</Tag>,
+      render: (status: string) => (
+        <Tag color={STATUS_COLORS[status] ?? DEFAULT_STATUS_COLOR}>
+          {t(`serializedItems.status.${status}`)}
+        </Tag>
+      ),
     },
     {
       title: t('serializedItems.lastWorkOrderLabel'),
