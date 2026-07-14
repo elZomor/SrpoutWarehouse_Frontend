@@ -20,7 +20,9 @@ const DUPLICATE_SERIAL_NUMBER_MESSAGE = 'serialized item with this serial number
 // Only "available" exists today, but the backend's STATUS_CHOICES is an
 // extensible list - keyed by status so a future value (e.g. "issued",
 // "missing") doesn't silently inherit this color instead of getting its own.
-const STATUS_COLORS: Record<string, string> = { available: 'green' };
+// A Map (not a plain object) avoids eslint-plugin-security's
+// detect-object-injection warning on the dynamic-key lookup below.
+const STATUS_COLORS = new Map<string, string>([['available', 'green']]);
 const DEFAULT_STATUS_COLOR = 'default';
 
 export function SerializedItemsPage() {
@@ -105,7 +107,7 @@ export function SerializedItemsPage() {
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => (
-        <Tag color={STATUS_COLORS[status] ?? DEFAULT_STATUS_COLOR}>
+        <Tag color={STATUS_COLORS.get(status) ?? DEFAULT_STATUS_COLOR}>
           {t(`serializedItems.status.${status}`)}
         </Tag>
       ),
