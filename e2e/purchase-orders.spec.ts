@@ -110,14 +110,14 @@ test('creates a purchase order with multiple line items and it appears in the li
     .fill('5');
 
   await page.getByRole('button', { name: /add line item|إضافة بند/i }).click();
+  // Select by keyboard rather than clicking a dropdown option by title:
+  // two Select instances share the same option list (one per line item),
+  // and the first one's closed dropdown can still be mid-close-animation
+  // (flaky under CI's slower rendering) when the second opens, so a
+  // title-text query can match either one's node non-deterministically.
   await page.getByRole('dialog').getByRole('combobox').nth(1).click();
-  // AntD keeps the first line item's closed dropdown option nodes in the
-  // DOM (hidden) - scope to the currently open (visible) dropdown, same
-  // workaround as the serialized-items product-type-filter spec.
-  await page
-    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-    .getByTitle('Fog Machine')
-    .click();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
   await page
     .getByPlaceholder(/qty|الكمية/i)
     .nth(1)
