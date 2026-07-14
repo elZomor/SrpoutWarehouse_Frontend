@@ -10,6 +10,7 @@ import {
   type SerializedItemFormValues,
 } from '../features/serialized-items/schema';
 import type { SerializedItem } from '../features/serialized-items/types';
+import { getSerializedItemQrCodeUrl } from '../features/serialized-items/api';
 import {
   useCreateSerializedItem,
   useSerializedItems,
@@ -128,7 +129,7 @@ export function SerializedItemsPage() {
       title: t('serializedItems.qrCodeLabel'),
       key: 'qr_code',
       render: (_: unknown, record: SerializedItem) => (
-        <a href={record.qr_code} target="_blank" rel="noreferrer">
+        <a href={getSerializedItemQrCodeUrl(record.id)} target="_blank" rel="noreferrer">
           {t('serializedItems.printQrButton')}
         </a>
       ),
