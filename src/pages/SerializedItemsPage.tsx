@@ -16,7 +16,6 @@ import {
 } from '../features/serialized-items/useSerializedItems';
 
 const SEARCH_DEBOUNCE_MS = 300;
-const DUPLICATE_SERIAL_NUMBER_MESSAGE = 'serialized item with this serial number already exists.';
 // Only "available" exists today, but the backend's STATUS_CHOICES is an
 // extensible list - keyed by status so a future value (e.g. "issued",
 // "missing") doesn't silently inherit this color instead of getting its own.
@@ -67,16 +66,23 @@ export function SerializedItemsPage() {
     createMutation.mutate(values, {
       onSuccess: closeModal,
       onError: (error) => {
-        // AC-2: a raced/duplicate serial number gets its own inline
+        // AC-1/AC-2: a raced/duplicate serial number gets its own inline
         // message rather than the generic create-failed banner. The
-        // backend returns this text either as a list (the normal
-        // pre-check) or a bare string (the DB-constraint fallback for a
-        // race), so normalize both shapes before matching.
+        // backend embeds the submitted serial number in its duplicate
+        // message ("Serial number SN-042 is already registered."), so an
+        // exact-text match can't work - match on the stable
+        // "already registered" phrase instead. This deliberately does NOT
+        // match on the serial_number field's mere presence: a
+        // whitespace-only or over-length serial number also returns a
+        // serial_number error (required/max-length), and that must still
+        // fall through to the generic banner rather than being mislabeled
+        // as a duplicate.
         const rawErrors = axios.isAxiosError<{ serial_number?: string | string[] }>(error)
           ? error.response?.data?.serial_number
           : undefined;
         const serialErrors = Array.isArray(rawErrors) ? rawErrors : rawErrors ? [rawErrors] : [];
-        if (serialErrors.includes(DUPLICATE_SERIAL_NUMBER_MESSAGE)) {
+        const isDuplicate = serialErrors.some((message) => message.includes('already registered'));
+        if (isDuplicate) {
           setError('serial_number', {
             type: 'server',
             message: 'serializedItems.form.serialNumberDuplicate',

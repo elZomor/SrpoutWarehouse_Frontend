@@ -147,7 +147,7 @@ test('registers a serialized item, prints its QR, then filters and searches for 
 });
 
 test('shows an inline error when registering a duplicate serial number', async ({ page }) => {
-  // AC-2
+  // AC-1/AC-2
   await page.route('**/api/auth/**', stubAuth);
   await registerProductTypesRoute(page);
   await page.route('**/api/serialized-items/**', async (route) => {
@@ -176,7 +176,7 @@ test('shows an inline error when registering a duplicate serial number', async (
     if (method === 'POST') {
       await route.fulfill({
         status: 400,
-        json: { serial_number: ['serialized item with this serial number already exists.'] },
+        json: { serial_number: ['Serial number SN-042 is already registered.'] },
       });
       return;
     }
