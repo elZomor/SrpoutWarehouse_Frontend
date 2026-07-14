@@ -26,13 +26,19 @@ Load the `react-conventions` skill before designing anything. It documents this 
 
 ---
 
-## Step 3 — Read current app state
+## Step 3 — Check lessons learned
+
+Read `LESSONS.md` at the repo root. It captures recurring, non-obvious mistakes caught in past PR reviews. If any entry is relevant to this ticket's scope, factor its rule into the plan and call it out explicitly (e.g. "per LESSONS.md <date> entry, doing X instead of Y"). If the file has no entries yet, note that and move on.
+
+---
+
+## Step 4 — Read current app state
 
 Read `src/App.tsx`, `src/app/AppProviders.tsx`, and check whether `src/pages/` or a route table already exists. If the ticket touches an existing domain, read its current `src/features/<domain>/` (or equivalent) files too.
 
 ---
 
-## Step 4 — Produce the plan
+## Step 5 — Produce the plan
 
 Write a concrete plan, mapped 1:1 to the ticket's Acceptance Criteria, covering:
 
@@ -47,6 +53,6 @@ Flag anything ambiguous in the ticket rather than guessing.
 
 ---
 
-## Step 5 — Present and stop
+## Step 6 — Present and stop
 
 Show the plan in chat. Do not proceed to implementation. Tell the user to run `/ticket-implement <JIRA-KEY>` once they've reviewed and approved it.

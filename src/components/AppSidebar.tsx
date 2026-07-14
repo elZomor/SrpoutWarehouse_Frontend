@@ -33,8 +33,8 @@ export function AppSidebar() {
       type: 'group',
       label: t('nav.groups.catalogue'),
       children: [
-        { key: ROUTES.productTypes, label: navLink(ROUTES.productTypes, t('nav.productTypes')) },
         { key: ROUTES.categories, label: navLink(ROUTES.categories, t('nav.categories')) },
+        { key: ROUTES.productTypes, label: navLink(ROUTES.productTypes, t('nav.productTypes')) },
         {
           key: ROUTES.serializedItems,
           label: navLink(ROUTES.serializedItems, t('nav.serializedItems')),
