@@ -10,7 +10,7 @@ The only reasons to stop before the end are genuine failures you can't safely re
 
 ## Step 1 — Plan
 
-Fetch the issue via Rovo MCP `getJiraIssue`. Load the `react-conventions` skill. Read `src/App.tsx`, `src/app/AppProviders.tsx`, and any existing route table/`src/pages/`/relevant `src/features/<domain>/` for present state. Produce a concrete plan (pages, hooks, forms, i18n keys for both locales, tests, e2e) mapped to the ticket's AC. Do not present it for approval — proceed straight to Step 2, but keep the plan to include in your final report.
+Fetch the issue via Rovo MCP `getJiraIssue`. Load the `react-conventions` skill. Read `LESSONS.md` at the repo root and factor any relevant entries into the plan. Read `src/App.tsx`, `src/app/AppProviders.tsx`, and any existing route table/`src/pages/`/relevant `src/features/<domain>/` for present state. Produce a concrete plan (pages, hooks, forms, i18n keys for both locales, tests, e2e) mapped to the ticket's AC. Do not present it for approval — proceed straight to Step 2, but keep the plan to include in your final report.
 
 ---
 
