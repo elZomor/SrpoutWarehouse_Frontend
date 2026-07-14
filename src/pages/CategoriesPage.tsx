@@ -162,12 +162,22 @@ export function CategoriesPage() {
           <Popconfirm
             title={t('categories.archiveConfirmTitle')}
             onConfirm={() => handleArchive(record.id)}
+            okText={t('common.ok')}
+            cancelText={t('common.cancel')}
+            okButtonProps={{
+              loading: archiveMutation.isPending && archiveMutation.variables === record.id,
+            }}
           >
             <Button size="small">{t('categories.archiveButton')}</Button>
           </Popconfirm>
           <Popconfirm
             title={t('categories.deleteConfirmTitle')}
             onConfirm={() => handleDelete(record.id)}
+            okText={t('common.ok')}
+            cancelText={t('common.cancel')}
+            okButtonProps={{
+              loading: deleteMutation.isPending && deleteMutation.variables === record.id,
+            }}
           >
             <Button size="small" danger>
               {t('categories.deleteButton')}

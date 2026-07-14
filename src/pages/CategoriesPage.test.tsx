@@ -204,6 +204,29 @@ describe('CategoriesPage', () => {
     );
   });
 
+  it('clears the generic create-failed banner when the modal is reopened after a failed submit', async () => {
+    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 500, data: {} },
+    });
+
+    const user = userEvent.setup();
+    renderCategoriesPage();
+
+    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
+    await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Lighting');
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await screen.findByText(/failed to create category|فشل إنشاء الفئة/i);
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
+
+    expect(
+      screen.queryByText(/failed to create category|فشل إنشاء الفئة/i),
+    ).not.toBeInTheDocument();
+  });
+
   it('logs out and redirects to the login-facing route', async () => {
     mockedApiClient.get.mockResolvedValueOnce({ data: [] });
     mockedApiClient.post.mockResolvedValueOnce({ data: {} });
@@ -264,7 +287,7 @@ describe('CategoriesPage', () => {
 
     await screen.findByText('Lighting');
     await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i }));
-    await user.click(await screen.findByRole('button', { name: /^ok$/i }));
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i }));
 
     await waitFor(() => expect(mockedApiClient.delete).toHaveBeenCalledWith('/api/categories/1/'));
     await waitFor(() => expect(screen.queryByText('Lighting')).not.toBeInTheDocument());
@@ -290,7 +313,7 @@ describe('CategoriesPage', () => {
 
     await screen.findByText('Lighting');
     await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i }));
-    await user.click(await screen.findByRole('button', { name: /^ok$/i }));
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i }));
 
     expect(
       await screen.findByText(/cannot delete.*3 product types|لا يمكن الحذف.*3/i),
@@ -308,7 +331,7 @@ describe('CategoriesPage', () => {
 
     await screen.findByText('Lighting');
     await user.click(screen.getByRole('button', { name: /^archive$|^أرشفة$/i }));
-    await user.click(await screen.findByRole('button', { name: /^ok$/i }));
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i }));
 
     await waitFor(() =>
       expect(mockedApiClient.post).toHaveBeenCalledWith('/api/categories/1/archive/'),

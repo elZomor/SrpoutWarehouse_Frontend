@@ -2,6 +2,10 @@
   "app": {
     "name": "Sprout Warehouse"
   },
+  "common": {
+    "ok": "OK",
+    "cancel": "Cancel"
+  },
   "nav": {
     "dashboard": "Dashboard",
     "productTypes": "Product Types",

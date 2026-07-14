@@ -31,6 +31,7 @@ test('creates a product type with a category and finds it via search', async ({ 
     model_code: string;
     description: string;
     category: number;
+    category_name: string;
   }> = [];
   let nextId = 1;
 
@@ -66,6 +67,7 @@ test('creates a product type with a category and finds it via search', async ({ 
         model_code: body.model_code ?? '',
         description: body.description ?? '',
         category: body.category,
+        category_name: categories.find((c) => c.id === body.category)?.name ?? '',
       };
       productTypes.push(created);
       await route.fulfill({ status: 201, json: created });
