@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { App as AntApp } from 'antd';
 import { CategoriesPage } from './CategoriesPage';
 import { AppLayout } from '../components/AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
@@ -44,14 +45,16 @@ function renderCategoriesPage() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/categories']}>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route path="/categories" element={<CategoriesPage />} />
-          </Route>
-          <Route path="/login" element={<div>Login Page</div>} />
-        </Routes>
-      </MemoryRouter>
+      <AntApp>
+        <MemoryRouter initialEntries={['/categories']}>
+          <Routes>
+            <Route element={<AppLayout />}>
+              <Route path="/categories" element={<CategoriesPage />} />
+            </Route>
+            <Route path="/login" element={<div>Login Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </AntApp>
     </QueryClientProvider>,
   );
 }
@@ -180,6 +183,31 @@ describe('CategoriesPage', () => {
     expect(screen.getByRole('button', { name: 'OK' })).toBeInTheDocument();
   });
 
+  it('shows the generic banner (not the duplicate-name message) for a non-duplicate name error', async () => {
+    // Regression: a blank/whitespace-only name gets `{name: ["Name is required."]}`
+    // from the backend, which is a `name` error but not a duplicate - it must not
+    // be mislabeled as "a category with this name already exists".
+    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 400, data: { name: ['Name is required.'] } },
+    });
+
+    const user = userEvent.setup();
+    renderCategoriesPage();
+
+    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
+    await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Lighting');
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+
+    expect(
+      await screen.findByText(/failed to create category|فشل إنشاء الفئة/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/already exists|توجد فئة بهذا الاسم بالفعل/i),
+    ).not.toBeInTheDocument();
+  });
+
   it('clears the duplicate-name error when the modal is reopened after a failed submit', async () => {
     mockedApiClient.get.mockResolvedValueOnce({ data: [] });
     mockedApiClient.post.mockRejectedValueOnce({
@@ -228,6 +256,34 @@ describe('CategoriesPage', () => {
     expect(
       screen.queryByText(/failed to create category|فشل إنشاء الفئة/i),
     ).not.toBeInTheDocument();
+  });
+
+  it('clears the generic create-failed banner as soon as the name is edited, without closing the modal', async () => {
+    // Regression: React Hook Form re-validates on change, which can clear
+    // `errors.name` before the mutation's own error state is reset - if the
+    // mutation error isn't cleared too, the generic banner flashes back on
+    // the very next keystroke even though nothing has been resubmitted yet.
+    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 500, data: {} },
+    });
+
+    const user = userEvent.setup();
+    renderCategoriesPage();
+
+    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
+    await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Lighting');
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await screen.findByText(/failed to create category|فشل إنشاء الفئة/i);
+
+    await user.type(screen.getByLabelText(/^name$|^الاسم$/i), ' Fixtures');
+
+    await waitFor(() =>
+      expect(
+        screen.queryByText(/failed to create category|فشل إنشاء الفئة/i),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   it('logs out and redirects to the login-facing route', async () => {
