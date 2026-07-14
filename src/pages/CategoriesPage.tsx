@@ -1,13 +1,31 @@
 import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, Button, Form, Input, Layout, Modal, Space, Table, Typography } from 'antd';
+import {
+  Alert,
+  Button,
+  Form,
+  Input,
+  Layout,
+  message,
+  Modal,
+  Popconfirm,
+  Space,
+  Table,
+  Typography,
+} from 'antd';
+import axios from 'axios';
 import { Controller, type Control, type FieldError, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { categorySchema, type CategoryFormValues } from '../features/categories/schema';
 import type { Category } from '../features/categories/types';
-import { useCategories, useCreateCategory } from '../features/categories/useCategories';
+import {
+  useArchiveCategory,
+  useCategories,
+  useCreateCategory,
+  useDeleteCategory,
+} from '../features/categories/useCategories';
 import { getUserDisplayName } from '../features/auth/types';
 import { useCurrentUser, useLogout } from '../features/auth/useAuth';
 
@@ -56,6 +74,8 @@ export function CategoriesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { data: categories, isLoading, isError: isListError } = useCategories(search);
   const createMutation = useCreateCategory();
+  const deleteMutation = useDeleteCategory();
+  const archiveMutation = useArchiveCategory();
 
   useEffect(() => {
     const timeout = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
@@ -66,6 +86,7 @@ export function CategoriesPage() {
     control,
     handleSubmit,
     reset,
+    setError,
     formState: { errors },
   } = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
@@ -79,12 +100,50 @@ export function CategoriesPage() {
   };
 
   const onSubmit = (values: CategoryFormValues) => {
-    createMutation.mutate(values, { onSuccess: closeModal });
+    createMutation.mutate(values, {
+      onSuccess: closeModal,
+      onError: (error) => {
+        // AC-2: duplicate name gets its own inline message, not the
+        // generic create-failed banner.
+        const nameError = axios.isAxiosError<{ name?: string[] }>(error)
+          ? error.response?.data.name
+          : undefined;
+        if (nameError?.length) {
+          setError('name', { type: 'server', message: 'categories.form.nameDuplicate' });
+        }
+      },
+    });
   };
 
   const handleLogout = () => {
     logoutMutation.mutate(undefined, {
       onSuccess: () => navigate('/login', { replace: true }),
+    });
+  };
+
+  const handleDelete = (id: number) => {
+    deleteMutation.mutate(id, {
+      onSuccess: () => message.success(t('categories.deleteSuccess')),
+      onError: (error) => {
+        // AC-3: build the blocked-delete message from the backend's count
+        // rather than showing its (English-only) `detail` text as-is, so
+        // it's properly translated/pluralized in both AR and EN.
+        const assignedCount = axios.isAxiosError<{ assigned_product_type_count?: number }>(error)
+          ? error.response?.data.assigned_product_type_count
+          : undefined;
+        message.error(
+          assignedCount != null
+            ? t('categories.deleteBlockedError', { count: assignedCount })
+            : t('categories.deleteError'),
+        );
+      },
+    });
+  };
+
+  const handleArchive = (id: number) => {
+    archiveMutation.mutate(id, {
+      onSuccess: () => message.success(t('categories.archiveSuccess')),
+      onError: () => message.error(t('categories.archiveError')),
     });
   };
 
@@ -94,6 +153,38 @@ export function CategoriesPage() {
       title: t('categories.descriptionLabel'),
       dataIndex: 'description',
       key: 'description',
+    },
+    {
+      title: t('categories.actionsLabel'),
+      key: 'actions',
+      render: (_: unknown, record: Category) => (
+        <Space>
+          <Popconfirm
+            title={t('categories.archiveConfirmTitle')}
+            onConfirm={() => handleArchive(record.id)}
+            okText={t('common.ok')}
+            cancelText={t('common.cancel')}
+            okButtonProps={{
+              loading: archiveMutation.isPending && archiveMutation.variables === record.id,
+            }}
+          >
+            <Button size="small">{t('categories.archiveButton')}</Button>
+          </Popconfirm>
+          <Popconfirm
+            title={t('categories.deleteConfirmTitle')}
+            onConfirm={() => handleDelete(record.id)}
+            okText={t('common.ok')}
+            cancelText={t('common.cancel')}
+            okButtonProps={{
+              loading: deleteMutation.isPending && deleteMutation.variables === record.id,
+            }}
+          >
+            <Button size="small" danger>
+              {t('categories.deleteButton')}
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
     },
   ];
 
@@ -166,7 +257,7 @@ export function CategoriesPage() {
               control={control}
               multiline
             />
-            {createMutation.isError && (
+            {createMutation.isError && !errors.name && (
               <Form.Item>
                 <Alert type="error" message={t('categories.createError')} showIcon />
               </Form.Item>

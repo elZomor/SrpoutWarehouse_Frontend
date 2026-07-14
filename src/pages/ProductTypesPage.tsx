@@ -57,10 +57,12 @@ export function ProductTypesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { data: productTypes, isLoading, isError: isListError } = useProductTypes(search);
   const createMutation = useCreateProductType();
+  // Only used to populate the create-form's category dropdown - archived
+  // categories are correctly excluded here (AC-6). The table's category
+  // column reads `category_name` straight off each ProductType instead (see
+  // columns below), so a Product Type whose category gets archived later
+  // still displays a name instead of falling back to a raw numeric id.
   const { data: categories, isError: isCategoriesError } = useCategories('');
-  const categoryNameById = new Map(
-    (categories ?? []).map((category) => [category.id, category.name]),
-  );
 
   useEffect(() => {
     const timeout = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
@@ -107,9 +109,8 @@ export function ProductTypesPage() {
     },
     {
       title: t('productTypes.categoryLabel'),
-      dataIndex: 'category',
+      dataIndex: 'category_name',
       key: 'category',
-      render: (categoryId: number) => categoryNameById.get(categoryId) ?? categoryId,
     },
   ];
 

@@ -2,6 +2,10 @@
   "app": {
     "name": "سبروت للمخازن"
   },
+  "common": {
+    "ok": "موافق",
+    "cancel": "إلغاء"
+  },
   "nav": {
     "dashboard": "لوحة التحكم",
     "productTypes": "أنواع المنتجات",
@@ -50,8 +54,24 @@
     "emptyState": "لا توجد فئات",
     "loadError": "فشل تحميل الفئات. حاول مرة أخرى.",
     "createError": "فشل إنشاء الفئة. حاول مرة أخرى.",
+    "actionsLabel": "الإجراءات",
+    "deleteButton": "حذف",
+    "deleteConfirmTitle": "هل تريد حذف هذه الفئة؟",
+    "archiveButton": "أرشفة",
+    "archiveConfirmTitle": "هل تريد أرشفة هذه الفئة؟",
+    "deleteSuccess": "تم حذف الفئة.",
+    "deleteError": "فشل حذف الفئة. حاول مرة أخرى.",
+    "deleteBlockedError_zero": "لا يمكن الحذف — لا توجد أنواع منتجات مرتبطة بهذه الفئة. قم بالأرشفة بدلاً من ذلك.",
+    "deleteBlockedError_one": "لا يمكن الحذف — يوجد نوع منتج واحد مرتبط بهذه الفئة. قم بالأرشفة بدلاً من ذلك.",
+    "deleteBlockedError_two": "لا يمكن الحذف — يوجد نوعا منتج مرتبطان بهذه الفئة. قم بالأرشفة بدلاً من ذلك.",
+    "deleteBlockedError_few": "لا يمكن الحذف — {{count}} أنواع منتجات مرتبطة بهذه الفئة. قم بالأرشفة بدلاً من ذلك.",
+    "deleteBlockedError_many": "لا يمكن الحذف — {{count}} نوع منتج مرتبط بهذه الفئة. قم بالأرشفة بدلاً من ذلك.",
+    "deleteBlockedError_other": "لا يمكن الحذف — {{count}} نوع منتج مرتبط بهذه الفئة. قم بالأرشفة بدلاً من ذلك.",
+    "archiveSuccess": "تمت أرشفة الفئة.",
+    "archiveError": "فشلت أرشفة الفئة. حاول مرة أخرى.",
     "form": {
-      "nameRequired": "الاسم مطلوب"
+      "nameRequired": "الاسم مطلوب",
+      "nameDuplicate": "توجد فئة بهذا الاسم بالفعل"
     }
   }
 }

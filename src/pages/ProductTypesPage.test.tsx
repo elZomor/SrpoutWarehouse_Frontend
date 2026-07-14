@@ -26,6 +26,7 @@ function makeProductType(overrides: Partial<ProductType> = {}): ProductType {
     model_code: 'BAR-A',
     description: '',
     category: 1,
+    category_name: 'Lighting',
     ...overrides,
   };
 }
@@ -35,6 +36,7 @@ function makeCategory(overrides: Partial<Category> = {}): Category {
     id: 1,
     name: 'Lighting',
     description: '',
+    archived: false,
     ...overrides,
   };
 }
@@ -113,6 +115,22 @@ describe('ProductTypesPage', () => {
     renderProductTypesPage();
 
     expect(await screen.findByText('Bar LED Model A')).toBeInTheDocument();
+  });
+
+  it("shows a product type's category name even when that category is archived", async () => {
+    // Regression: the category column used to be looked up from the (now
+    // archived-excluding) categories list, so an archived category's name
+    // would disappear from rows that still reference it. It now reads
+    // category_name straight off the Product Type instead.
+    mockListEndpoints({
+      productTypes: [makeProductType({ category_name: 'Lighting' })],
+      categories: [],
+    });
+
+    renderProductTypesPage();
+
+    expect(await screen.findByText('Bar LED Model A')).toBeInTheDocument();
+    expect(screen.getByText('Lighting')).toBeInTheDocument();
   });
 
   it("shows the logged-in user's name and a link back to the dashboard", async () => {
