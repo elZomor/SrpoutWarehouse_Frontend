@@ -1,17 +1,6 @@
 import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  Alert,
-  Button,
-  Form,
-  Input,
-  message,
-  Modal,
-  Popconfirm,
-  Space,
-  Table,
-  Typography,
-} from 'antd';
+import { Alert, App, Button, Form, Input, Modal, Popconfirm, Space, Table, Typography } from 'antd';
 import axios from 'axios';
 import { Controller, type Control, type FieldError, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -32,9 +21,17 @@ interface CategoryFieldProps {
   control: Control<CategoryFormValues>;
   error?: FieldError;
   multiline?: boolean;
+  onValueChange?: () => void;
 }
 
-function CategoryField({ name, label, control, error, multiline }: CategoryFieldProps) {
+function CategoryField({
+  name,
+  label,
+  control,
+  error,
+  multiline,
+  onValueChange,
+}: CategoryFieldProps) {
   const { t } = useTranslation();
 
   return (
@@ -47,20 +44,27 @@ function CategoryField({ name, label, control, error, multiline }: CategoryField
       <Controller
         name={name}
         control={control}
-        render={({ field }) =>
-          multiline ? (
-            <Input.TextArea {...field} id={`category-${name}`} />
+        render={({ field }) => {
+          const handleChange: typeof field.onChange = (...args) => {
+            field.onChange(...args);
+            onValueChange?.();
+          };
+          return multiline ? (
+            <Input.TextArea {...field} onChange={handleChange} id={`category-${name}`} />
           ) : (
-            <Input {...field} id={`category-${name}`} />
-          )
-        }
+            <Input {...field} onChange={handleChange} id={`category-${name}`} />
+          );
+        }}
       />
     </Form.Item>
   );
 }
 
+const DUPLICATE_NAME_MESSAGE = 'A category with this name already exists.';
+
 export function CategoriesPage() {
   const { t } = useTranslation();
+  const { message } = App.useApp();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -96,11 +100,14 @@ export function CategoriesPage() {
       onSuccess: closeModal,
       onError: (error) => {
         // AC-2: duplicate name gets its own inline message, not the
-        // generic create-failed banner.
-        const nameError = axios.isAxiosError<{ name?: string[] }>(error)
-          ? error.response?.data.name
+        // generic create-failed banner. Match on the backend's specific
+        // duplicate-name text so other `name` validation failures (e.g. a
+        // blank/whitespace-only name) fall through to the generic banner
+        // instead of being mislabeled as a duplicate.
+        const nameErrors = axios.isAxiosError<{ name?: string[] }>(error)
+          ? error.response?.data?.name
           : undefined;
-        if (nameError?.length) {
+        if (nameErrors?.includes(DUPLICATE_NAME_MESSAGE)) {
           setError('name', { type: 'server', message: 'categories.form.nameDuplicate' });
         }
       },
@@ -115,7 +122,7 @@ export function CategoriesPage() {
         // rather than showing its (English-only) `detail` text as-is, so
         // it's properly translated/pluralized in both AR and EN.
         const assignedCount = axios.isAxiosError<{ assigned_product_type_count?: number }>(error)
-          ? error.response?.data.assigned_product_type_count
+          ? error.response?.data?.assigned_product_type_count
           : undefined;
         message.error(
           assignedCount != null
@@ -218,6 +225,11 @@ export function CategoriesPage() {
             label={t('categories.nameLabel')}
             control={control}
             error={errors.name}
+            onValueChange={() => {
+              if (createMutation.isError) {
+                createMutation.reset();
+              }
+            }}
           />
           <CategoryField
             name="description"

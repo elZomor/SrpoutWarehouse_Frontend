@@ -1,6 +1,6 @@
 import { useEffect, type PropsWithChildren } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ConfigProvider } from 'antd';
+import { App as AntApp, ConfigProvider } from 'antd';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { queryClient } from './queryClient';
@@ -18,7 +18,7 @@ function DirectionSync({ children }: PropsWithChildren) {
 
   return (
     <ConfigProvider direction={direction} theme={antdTheme}>
-      {children}
+      <AntApp>{children}</AntApp>
     </ConfigProvider>
   );
 }
