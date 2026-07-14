@@ -121,5 +121,31 @@
       "serialNumberDuplicate": "An item with this serial number is already registered",
       "productTypeRequired": "Product type is required"
     }
+  },
+  "purchaseOrders": {
+    "title": "Purchase Orders",
+    "newButton": "New PO",
+    "supplierLabel": "Supplier",
+    "orderDateLabel": "Order Date",
+    "statusLabel": "Status",
+    "status": {
+      "pending": "Pending"
+    },
+    "lineItemsLabel": "Line Items",
+    "emptyState": "No purchase orders found",
+    "loadError": "Failed to load purchase orders. Please try again.",
+    "createError": "Failed to create purchase order. Please try again.",
+    "loadProductTypesError": "Failed to load product types. Please try again.",
+    "form": {
+      "supplierNameRequired": "Supplier is required",
+      "orderDateRequired": "Order date is required",
+      "lineItemsRequired": "At least one line item is required",
+      "productTypePlaceholder": "Select a product type",
+      "productTypeRequired": "Product type is required",
+      "expectedQuantityPlaceholder": "Qty",
+      "expectedQuantityRequired": "Quantity must be at least 1",
+      "addLineItemButton": "Add line item",
+      "removeLineItemButton": "Remove line item"
+    }
   }
 }
