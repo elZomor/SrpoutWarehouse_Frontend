@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProductTypesPage } from './ProductTypesPage';
+import { AppLayout } from '../components/AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
 import type { Category } from '../features/categories/types';
 import type { ProductType } from '../features/product-types/types';
@@ -91,7 +92,9 @@ function renderProductTypesPage() {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/product-types']}>
         <Routes>
-          <Route path="/product-types" element={<ProductTypesPage />} />
+          <Route element={<AppLayout />}>
+            <Route path="/product-types" element={<ProductTypesPage />} />
+          </Route>
           <Route path="/login" element={<div>Login Page</div>} />
         </Routes>
       </MemoryRouter>

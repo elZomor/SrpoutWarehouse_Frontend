@@ -25,6 +25,15 @@ export const antdTheme: ThemeConfig = {
     Layout: {
       headerBg: colors.primary,
       bodyBg: colors.pageBackground,
+      siderBg: colors.primary,
+    },
+    Menu: {
+      darkItemBg: 'transparent',
+      darkItemColor: 'rgba(255, 255, 255, 0.75)',
+      darkItemHoverBg: 'rgba(255, 255, 255, 0.08)',
+      darkItemSelectedBg: 'rgba(255, 255, 255, 0.12)',
+      darkItemSelectedColor: '#FFFFFF',
+      darkGroupTitleColor: 'rgba(255, 255, 255, 0.4)',
     },
   },
 };

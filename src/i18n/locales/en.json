@@ -9,7 +9,26 @@
   "nav": {
     "dashboard": "Dashboard",
     "productTypes": "Product Types",
-    "categories": "Categories"
+    "categories": "Categories",
+    "serializedItems": "Serialized Items",
+    "boxes": "Boxes",
+    "purchaseOrders": "Purchase Orders",
+    "workOrders": "Work Orders",
+    "missingItems": "Missing Items",
+    "damageReports": "Damage Reports",
+    "maintenanceOrders": "Maintenance Orders",
+    "transactionLog": "Transaction Log",
+    "settings": "Settings",
+    "companyLogoPlaceholder": "Company logo",
+    "groups": {
+      "catalogue": "Catalogue",
+      "transactions": "Transactions",
+      "reports": "Reports",
+      "settings": "Settings"
+    }
+  },
+  "comingSoon": {
+    "message": "This screen will be added in a future build."
   },
   "dashboard": {
     "welcome": "Welcome to Sprout Warehouse"
@@ -17,7 +36,9 @@
   "auth": {
     "login": {
       "title": "Login",
+      "tagline": "Stop losing your equipment",
       "emailLabel": "Email",
+      "emailPlaceholder": "example@company.com",
       "passwordLabel": "Password",
       "submit": "Login",
       "emailRequired": "Email is required",

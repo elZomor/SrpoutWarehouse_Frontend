@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CategoriesPage } from './CategoriesPage';
+import { AppLayout } from '../components/AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
 import type { Category } from '../features/categories/types';
 import { apiClient } from '../lib/apiClient';
@@ -45,7 +46,9 @@ function renderCategoriesPage() {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/categories']}>
         <Routes>
-          <Route path="/categories" element={<CategoriesPage />} />
+          <Route element={<AppLayout />}>
+            <Route path="/categories" element={<CategoriesPage />} />
+          </Route>
           <Route path="/login" element={<div>Login Page</div>} />
         </Routes>
       </MemoryRouter>
