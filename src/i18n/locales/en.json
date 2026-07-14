@@ -111,6 +111,11 @@
     "loadError": "Failed to load serialized items. Please try again.",
     "createError": "Failed to register item. Please try again.",
     "loadProductTypesError": "Failed to load product types. Please try again.",
+    "actionsLabel": "Actions",
+    "deleteButton": "Delete",
+    "deleteConfirmTitle": "Delete this item?",
+    "deleteSuccess": "Item deleted.",
+    "deleteError": "Failed to delete item. Please try again.",
     "form": {
       "serialNumberRequired": "Serial number is required",
       "serialNumberDuplicate": "An item with this serial number is already registered",

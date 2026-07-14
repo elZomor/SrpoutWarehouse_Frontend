@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { App as AntApp } from 'antd';
 import { SerializedItemsPage } from './SerializedItemsPage';
 import { AppLayout } from '../components/AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
@@ -15,6 +16,7 @@ vi.mock('../lib/apiClient', () => ({
   apiClient: {
     get: vi.fn(),
     post: vi.fn(),
+    delete: vi.fn(),
   },
 }));
 
@@ -105,14 +107,16 @@ function renderSerializedItemsPage() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/serialized-items']}>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route path="/serialized-items" element={<SerializedItemsPage />} />
-          </Route>
-          <Route path="/login" element={<div>Login Page</div>} />
-        </Routes>
-      </MemoryRouter>
+      <AntApp>
+        <MemoryRouter initialEntries={['/serialized-items']}>
+          <Routes>
+            <Route element={<AppLayout />}>
+              <Route path="/serialized-items" element={<SerializedItemsPage />} />
+            </Route>
+            <Route path="/login" element={<div>Login Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </AntApp>
     </QueryClientProvider>,
   );
 }
@@ -133,7 +137,11 @@ async function selectProductTypeFilter(user: ReturnType<typeof userEvent.setup>,
 
 describe('SerializedItemsPage', () => {
   afterEach(() => {
-    vi.clearAllMocks();
+    // resetAllMocks (not clearAllMocks) - this file chains
+    // mockResolvedValueOnce/mockRejectedValueOnce/mockImplementationOnce per
+    // test, and clearAllMocks leaves unconsumed once-queues (and the prior
+    // test's mockImplementation) in place, bleeding into the next test.
+    vi.resetAllMocks();
   });
 
   it('renders serialized items returned from the API', async () => {
@@ -425,5 +433,100 @@ describe('SerializedItemsPage', () => {
 
     await waitFor(() => expect(screen.queryByText('SN-042')).not.toBeInTheDocument());
     expect(screen.getByText('FOG-001')).toBeInTheDocument();
+  });
+
+  it('deletes a serialized item and it no longer appears in the list', async () => {
+    // TC-01/AC-1
+    // The page fires two GET calls on mount (list + product-types dropdown),
+    // so a plain mockResolvedValueOnce on apiClient.get for the post-delete
+    // refetch can't target the right one - mutate the shared array instead
+    // and let mockListEndpoints' URL-routed implementation pick it up,
+    // matching this file's registration test's pattern.
+    const serializedItems = [makeSerializedItem()];
+    mockListEndpoints({ serializedItems });
+    mockedApiClient.delete.mockImplementationOnce(async () => {
+      serializedItems.splice(0, 1);
+      return { data: undefined };
+    });
+
+    // Popconfirm's rc-motion enter animation leaves the confirm button's
+    // pointer-events: none for a moment after it mounts - jsdom never
+    // finishes the CSS transition, so userEvent's real-click guard sees a
+    // stale "not clickable" state and times out. Not a real bug (browsers
+    // finish the transition); disable the check for this Popconfirm click.
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderSerializedItemsPage();
+
+    await screen.findByText('SN-042');
+    await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i }));
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i }));
+
+    await waitFor(() =>
+      expect(mockedApiClient.delete).toHaveBeenCalledWith('/api/serialized-items/1/'),
+    );
+    await waitFor(() => expect(screen.queryByText('SN-042')).not.toBeInTheDocument());
+  });
+
+  it('deleting one item leaves a sibling item unaffected', async () => {
+    // TC-02/AC-2
+    const serializedItems = [
+      makeSerializedItem(),
+      makeSerializedItem({ id: 2, serial_number: 'SN-043' }),
+    ];
+    mockListEndpoints({ serializedItems });
+    mockedApiClient.delete.mockImplementationOnce(async () => {
+      const index = serializedItems.findIndex((item) => item.id === 1);
+      serializedItems.splice(index, 1);
+      return { data: undefined };
+    });
+
+    // See the pointerEventsCheck note above on the delete test.
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderSerializedItemsPage();
+
+    await screen.findByText('SN-043');
+    const row = screen.getByRole('row', { name: /SN-042/ });
+    await user.click(within(row).getByRole('button', { name: /^delete$|^حذف$/i }));
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i }));
+
+    await waitFor(() =>
+      expect(mockedApiClient.delete).toHaveBeenCalledWith('/api/serialized-items/1/'),
+    );
+    await waitFor(() => expect(screen.queryByText('SN-042')).not.toBeInTheDocument());
+    expect(screen.getByText('SN-043')).toBeInTheDocument();
+  });
+
+  it('leaves the item untouched when the delete confirmation is dismissed', async () => {
+    // TC-03/AC-3
+    mockListEndpoints({ serializedItems: [makeSerializedItem()] });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderSerializedItemsPage();
+
+    await screen.findByText('SN-042');
+    await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i }));
+    await user.click(await screen.findByRole('button', { name: /^cancel$|^إلغاء$/i }));
+
+    expect(mockedApiClient.delete).not.toHaveBeenCalled();
+    expect(screen.getByText('SN-042')).toBeInTheDocument();
+  });
+
+  it('shows an error banner when delete fails', async () => {
+    mockListEndpoints({ serializedItems: [makeSerializedItem()] });
+    mockedApiClient.delete.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 500, data: {} },
+    });
+
+    // See the pointerEventsCheck note above on the delete test.
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderSerializedItemsPage();
+
+    await screen.findByText('SN-042');
+    await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i }));
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i }));
+
+    expect(await screen.findByText(/failed to delete item|فشل حذف الوحدة/i)).toBeInTheDocument();
+    expect(screen.getByText('SN-042')).toBeInTheDocument();
   });
 });

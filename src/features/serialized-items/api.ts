@@ -24,6 +24,10 @@ export async function createSerializedItem(
   return data;
 }
 
+export async function deleteSerializedItem(id: number): Promise<void> {
+  await apiClient.delete(`/api/serialized-items/${id}/`);
+}
+
 // The QR code is generated on demand rather than stored (see SerializedItem's
 // backend model comment) - this is a plain URL, not an api.ts call, since the
 // Print QR link navigates the browser there directly instead of fetching it
