@@ -18,6 +18,15 @@ vi.mock('../lib/apiClient', () => ({
   },
 }));
 
+// getSerializedItemQrCodeUrl reads env directly (not through apiClient), so
+// it needs its own mock rather than piggybacking on the one above - CI has
+// no VITE_API_BASE_URL, and env.ts throws at import time without it.
+vi.mock('../config/env', () => ({
+  env: {
+    VITE_API_BASE_URL: 'http://localhost:8000',
+  },
+}));
+
 const mockedApiClient = vi.mocked(apiClient, true);
 
 function makeProductType(overrides: Partial<ProductType> = {}): ProductType {
