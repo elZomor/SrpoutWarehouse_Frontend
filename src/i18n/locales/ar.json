@@ -9,7 +9,26 @@
   "nav": {
     "dashboard": "لوحة التحكم",
     "productTypes": "أنواع المنتجات",
-    "categories": "الفئات"
+    "categories": "الفئات",
+    "serializedItems": "الوحدات المسجلة",
+    "boxes": "الصناديق",
+    "purchaseOrders": "أوامر الشراء",
+    "workOrders": "أوامر العمل",
+    "missingItems": "المعدات المفقودة",
+    "damageReports": "تقارير التلف",
+    "maintenanceOrders": "أوامر الصيانة",
+    "transactionLog": "سجل المعاملات",
+    "settings": "الإعدادات",
+    "companyLogoPlaceholder": "شعار الشركة",
+    "groups": {
+      "catalogue": "الكتالوج",
+      "transactions": "المعاملات",
+      "reports": "التقارير",
+      "settings": "الإعدادات"
+    }
+  },
+  "comingSoon": {
+    "message": "ستتم إضافة هذه الشاشة في إصدار قادم."
   },
   "dashboard": {
     "welcome": "مرحبًا بك في سبروت للمخازن"
@@ -17,7 +36,9 @@
   "auth": {
     "login": {
       "title": "تسجيل الدخول",
+      "tagline": "وقّف ضياع المعدات",
       "emailLabel": "البريد الإلكتروني",
+      "emailPlaceholder": "example@company.com",
       "passwordLabel": "كلمة المرور",
       "submit": "تسجيل الدخول",
       "emailRequired": "البريد الإلكتروني مطلوب",

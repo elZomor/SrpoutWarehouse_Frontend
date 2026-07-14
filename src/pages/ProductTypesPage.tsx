@@ -1,13 +1,9 @@
 import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, Button, Form, Input, Layout, Modal, Select, Space, Table, Typography } from 'antd';
+import { Alert, Button, Form, Input, Modal, Select, Table, Typography } from 'antd';
 import { Controller, type Control, type FieldError, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
-import { AppHeader } from '../components/AppHeader';
 import { useCategories } from '../features/categories/useCategories';
-import { getUserDisplayName } from '../features/auth/types';
-import { useCurrentUser, useLogout } from '../features/auth/useAuth';
 import { productTypeSchema, type ProductTypeFormValues } from '../features/product-types/schema';
 import type { ProductType } from '../features/product-types/types';
 import { useCreateProductType, useProductTypes } from '../features/product-types/useProductTypes';
@@ -49,9 +45,6 @@ function ProductTypeField({ name, label, control, error, multiline }: ProductTyp
 
 export function ProductTypesPage() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { data: user } = useCurrentUser();
-  const logoutMutation = useLogout();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -89,12 +82,6 @@ export function ProductTypesPage() {
     createMutation.mutate(values, { onSuccess: closeModal });
   };
 
-  const handleLogout = () => {
-    logoutMutation.mutate(undefined, {
-      onSuccess: () => navigate('/login', { replace: true }),
-    });
-  };
-
   const columns = [
     { title: t('productTypes.nameLabel'), dataIndex: 'name', key: 'name' },
     {
@@ -115,114 +102,95 @@ export function ProductTypesPage() {
   ];
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <AppHeader
-        extra={
-          user && (
-            <Space>
-              <Link to="/" style={{ color: 'white' }}>
-                {t('nav.dashboard')}
-              </Link>
-              <Typography.Text style={{ color: 'white' }}>
-                {getUserDisplayName(user)}
-              </Typography.Text>
-              <Button onClick={handleLogout} loading={logoutMutation.isPending}>
-                {t('auth.logout')}
-              </Button>
-            </Space>
-          )
-        }
-      />
-      <Layout.Content style={{ padding: 24 }}>
-        <Typography.Title level={3}>{t('productTypes.title')}</Typography.Title>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-          <Input.Search
-            placeholder={t('productTypes.searchPlaceholder')}
-            allowClear
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            style={{ maxWidth: 320 }}
+    <>
+      <Typography.Title level={3}>{t('productTypes.title')}</Typography.Title>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Input.Search
+          placeholder={t('productTypes.searchPlaceholder')}
+          allowClear
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.target.value)}
+          style={{ maxWidth: 320 }}
+        />
+        <Button type="primary" onClick={() => setIsModalOpen(true)}>
+          {t('productTypes.newButton')}
+        </Button>
+      </div>
+      {isListError ? (
+        <Alert
+          type="error"
+          message={t('productTypes.loadError')}
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      ) : (
+        <Table<ProductType>
+          rowKey="id"
+          columns={columns}
+          dataSource={productTypes}
+          loading={isLoading}
+          locale={{ emptyText: t('productTypes.emptyState') }}
+        />
+      )}
+      <Modal
+        title={t('productTypes.newButton')}
+        open={isModalOpen}
+        onCancel={closeModal}
+        onOk={handleSubmit(onSubmit)}
+        confirmLoading={createMutation.isPending}
+      >
+        <Form layout="vertical" noValidate>
+          <ProductTypeField
+            name="name"
+            label={t('productTypes.nameLabel')}
+            control={control}
+            error={errors.name}
           />
-          <Button type="primary" onClick={() => setIsModalOpen(true)}>
-            {t('productTypes.newButton')}
-          </Button>
-        </div>
-        {isListError ? (
-          <Alert
-            type="error"
-            message={t('productTypes.loadError')}
-            showIcon
-            style={{ marginBottom: 16 }}
+          <ProductTypeField
+            name="model_code"
+            label={t('productTypes.modelCodeLabel')}
+            control={control}
           />
-        ) : (
-          <Table<ProductType>
-            rowKey="id"
-            columns={columns}
-            dataSource={productTypes}
-            loading={isLoading}
-            locale={{ emptyText: t('productTypes.emptyState') }}
+          <ProductTypeField
+            name="description"
+            label={t('productTypes.descriptionLabel')}
+            control={control}
+            multiline
           />
-        )}
-        <Modal
-          title={t('productTypes.newButton')}
-          open={isModalOpen}
-          onCancel={closeModal}
-          onOk={handleSubmit(onSubmit)}
-          confirmLoading={createMutation.isPending}
-        >
-          <Form layout="vertical" noValidate>
-            <ProductTypeField
-              name="name"
-              label={t('productTypes.nameLabel')}
+          <Form.Item
+            label={t('productTypes.categoryLabel')}
+            htmlFor="product-type-category"
+            validateStatus={errors.category ? 'error' : ''}
+            help={errors.category ? t(errors.category.message ?? '') : undefined}
+          >
+            <Controller
+              name="category"
               control={control}
-              error={errors.name}
+              render={({ field }) => (
+                <Select
+                  {...field}
+                  id="product-type-category"
+                  placeholder={t('productTypes.categoryPlaceholder')}
+                  options={(categories ?? []).map((category) => ({
+                    value: category.id,
+                    label: category.name,
+                  }))}
+                />
+              )}
             />
-            <ProductTypeField
-              name="model_code"
-              label={t('productTypes.modelCodeLabel')}
-              control={control}
-            />
-            <ProductTypeField
-              name="description"
-              label={t('productTypes.descriptionLabel')}
-              control={control}
-              multiline
-            />
-            <Form.Item
-              label={t('productTypes.categoryLabel')}
-              htmlFor="product-type-category"
-              validateStatus={errors.category ? 'error' : ''}
-              help={errors.category ? t(errors.category.message ?? '') : undefined}
-            >
-              <Controller
-                name="category"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    {...field}
-                    id="product-type-category"
-                    placeholder={t('productTypes.categoryPlaceholder')}
-                    options={(categories ?? []).map((category) => ({
-                      value: category.id,
-                      label: category.name,
-                    }))}
-                  />
-                )}
-              />
+          </Form.Item>
+          {isCategoriesError && (
+            <Form.Item>
+              <Alert type="error" message={t('productTypes.loadCategoriesError')} showIcon />
             </Form.Item>
-            {isCategoriesError && (
-              <Form.Item>
-                <Alert type="error" message={t('productTypes.loadCategoriesError')} showIcon />
-              </Form.Item>
-            )}
-            {createMutation.isError && (
-              <Form.Item>
-                <Alert type="error" message={t('productTypes.createError')} showIcon />
-              </Form.Item>
-            )}
-          </Form>
-        </Modal>
-      </Layout.Content>
-    </Layout>
+          )}
+          {createMutation.isError && (
+            <Form.Item>
+              <Alert type="error" message={t('productTypes.createError')} showIcon />
+            </Form.Item>
+          )}
+        </Form>
+      </Modal>
+    </>
   );
 }

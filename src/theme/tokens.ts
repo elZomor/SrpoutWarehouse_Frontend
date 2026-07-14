@@ -22,3 +22,5 @@ export const colors = {
 export const fontFamily = "'Cairo', sans-serif";
 
 export const borderRadius = 8;
+
+export const sidebarWidth = 240;

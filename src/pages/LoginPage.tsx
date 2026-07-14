@@ -1,11 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, Button, Form, Input, Layout, Typography } from 'antd';
+import { Alert, Button, Form, Input, Typography } from 'antd';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
-import { AppHeader } from '../components/AppHeader';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
+import { SproutMark } from '../components/SproutMark';
 import { useCurrentUser, useLogin } from '../features/auth/useAuth';
 import { loginSchema, type LoginFormValues } from '../features/auth/schema';
+import { colors } from '../theme/tokens';
 
 export function LoginPage() {
   const { t } = useTranslation();
@@ -34,10 +36,53 @@ export function LoginPage() {
   };
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <AppHeader />
-      <Layout.Content style={{ padding: 24, maxWidth: 400, margin: '0 auto', width: '100%' }}>
-        <Typography.Title level={3}>{t('auth.login.title')}</Typography.Title>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: `linear-gradient(180deg, ${colors.primary} 0%, ${colors.primaryDark} 100%)`,
+        padding: 24,
+        position: 'relative',
+      }}
+    >
+      <div style={{ position: 'absolute', insetInlineEnd: 24, insetBlockStart: 24 }}>
+        <LanguageSwitcher />
+      </div>
+      <div
+        style={{
+          width: 'min(380px, 100%)',
+          background: '#FFFFFF',
+          borderRadius: 12,
+          padding: '40px 36px',
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.25)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 6,
+            marginBottom: 28,
+          }}
+        >
+          <SproutMark size={56} />
+          <Typography.Text
+            style={{ display: 'block', fontSize: 22, fontWeight: 800, marginTop: 8 }}
+          >
+            {t('app.name')}
+          </Typography.Text>
+          <Typography.Text
+            style={{ display: 'block', fontSize: 14, color: colors.textMuted, fontWeight: 600 }}
+          >
+            {t('auth.login.tagline')}
+          </Typography.Text>
+        </div>
+        <Typography.Title level={4} style={{ textAlign: 'center', marginBottom: 18 }}>
+          {t('auth.login.title')}
+        </Typography.Title>
         <Form layout="vertical" noValidate onFinish={handleSubmit(onSubmit)}>
           <Form.Item
             label={t('auth.login.emailLabel')}
@@ -49,7 +94,13 @@ export function LoginPage() {
               name="email"
               control={control}
               render={({ field }) => (
-                <Input {...field} id="login-email" type="email" autoComplete="email" />
+                <Input
+                  {...field}
+                  id="login-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder={t('auth.login.emailPlaceholder')}
+                />
               )}
             />
           </Form.Item>
@@ -72,13 +123,19 @@ export function LoginPage() {
               <Alert type="error" message={t('auth.login.error')} showIcon />
             </Form.Item>
           )}
-          <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loginMutation.isPending} block>
+          <Form.Item style={{ marginBottom: 0 }}>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={loginMutation.isPending}
+              block
+              size="large"
+            >
               {t('auth.login.submit')}
             </Button>
           </Form.Item>
         </Form>
-      </Layout.Content>
-    </Layout>
+      </div>
+    </div>
   );
 }
