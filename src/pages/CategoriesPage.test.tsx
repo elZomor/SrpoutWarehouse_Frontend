@@ -365,10 +365,6 @@ describe('CategoriesPage', () => {
   it('shows a translated, pluralized message when delete is blocked by assigned product types', async () => {
     // AC-3/TC-03: built from assigned_product_type_count, not the backend's
     // raw (English-only) detail text.
-    // Popconfirm's confirm click + the error-path AntD message toast render
-    // push this one closer to the 5000ms default than the other Popconfirm
-    // tests - never reproduced locally, only under CI's slower runners.
-    // Bumped per-test timeout rather than the global default.
     mockedApiClient.get.mockResolvedValueOnce({ data: [makeCategory()] });
     mockedApiClient.delete.mockRejectedValueOnce({
       isAxiosError: true,
@@ -392,7 +388,7 @@ describe('CategoriesPage', () => {
     expect(
       await screen.findByText(/cannot delete.*3 product types|لا يمكن الحذف.*3/i),
     ).toBeInTheDocument();
-  }, 10000);
+  });
 
   it('archives a category and it disappears from the list on refetch', async () => {
     // AC-4/TC-04

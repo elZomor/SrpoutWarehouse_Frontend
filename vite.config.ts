@@ -10,6 +10,11 @@ export default defineConfig({
     globals: true,
     setupFiles: './src/test/setup.ts',
     exclude: ['node_modules', 'dist', 'e2e'],
+    // Default 5000ms is tight for AntD Popconfirm/Modal rc-motion-heavy
+    // tests under CI's slower runners - CategoriesPage's Popconfirm tests
+    // intermittently timed out one at a time in CI (never locally) until
+    // this was raised.
+    testTimeout: 10000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
