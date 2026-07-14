@@ -346,7 +346,12 @@ describe('CategoriesPage', () => {
     mockedApiClient.delete.mockResolvedValueOnce({ data: undefined });
     mockedApiClient.get.mockResolvedValueOnce({ data: [] });
 
-    const user = userEvent.setup();
+    // Popconfirm's rc-motion enter animation leaves the confirm button's
+    // pointer-events: none for a moment after it mounts - jsdom never
+    // finishes the CSS transition, so userEvent's real-click guard sees a
+    // stale "not clickable" state and times out. Not a real bug (browsers
+    // finish the transition); disable the check for this Popconfirm click.
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderCategoriesPage();
 
     await screen.findByText('Lighting');
@@ -372,7 +377,8 @@ describe('CategoriesPage', () => {
       },
     });
 
-    const user = userEvent.setup();
+    // See the pointerEventsCheck note above on the delete test.
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderCategoriesPage();
 
     await screen.findByText('Lighting');
@@ -390,7 +396,8 @@ describe('CategoriesPage', () => {
     mockedApiClient.post.mockResolvedValueOnce({ data: makeCategory({ archived: true }) });
     mockedApiClient.get.mockResolvedValueOnce({ data: [] });
 
-    const user = userEvent.setup();
+    // See the pointerEventsCheck note above on the delete test.
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderCategoriesPage();
 
     await screen.findByText('Lighting');
