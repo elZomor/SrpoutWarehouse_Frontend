@@ -67,19 +67,22 @@ export function SerializedItemsPage() {
       onSuccess: closeModal,
       onError: (error) => {
         // AC-1/AC-2: a raced/duplicate serial number gets its own inline
-        // message rather than the generic create-failed banner. Required-
-        // field errors are already caught client-side by the zod resolver
-        // before a request is ever sent, so any serial_number error the
-        // backend returns at this point is the duplicate case - matching
-        // on the field's presence (rather than its exact wording) keeps
-        // this working regardless of how the backend phrases the message.
+        // message rather than the generic create-failed banner. The
+        // backend embeds the submitted serial number in its duplicate
+        // message ("Serial number SN-042 is already registered."), so an
+        // exact-text match can't work - match on the stable
+        // "already registered" phrase instead. This deliberately does NOT
+        // match on the serial_number field's mere presence: a
+        // whitespace-only or over-length serial number also returns a
+        // serial_number error (required/max-length), and that must still
+        // fall through to the generic banner rather than being mislabeled
+        // as a duplicate.
         const rawErrors = axios.isAxiosError<{ serial_number?: string | string[] }>(error)
           ? error.response?.data?.serial_number
           : undefined;
-        const hasSerialNumberError = Array.isArray(rawErrors)
-          ? rawErrors.length > 0
-          : Boolean(rawErrors);
-        if (hasSerialNumberError) {
+        const serialErrors = Array.isArray(rawErrors) ? rawErrors : rawErrors ? [rawErrors] : [];
+        const isDuplicate = serialErrors.some((message) => message.includes('already registered'));
+        if (isDuplicate) {
           setError('serial_number', {
             type: 'server',
             message: 'serializedItems.form.serialNumberDuplicate',

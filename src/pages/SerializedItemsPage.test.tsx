@@ -261,6 +261,67 @@ describe('SerializedItemsPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the generic banner (not the duplicate message) for a whitespace-only serial number', async () => {
+    // A single space passes the client-side zod schema (min length 1, no
+    // trim), but the backend trims and rejects it as blank - that must not
+    // be mislabeled as a duplicate.
+    mockListEndpoints({});
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: { serial_number: ['Serial number is required.'] },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderSerializedItemsPage();
+
+    await user.click(await screen.findByRole('button', { name: /register item|تسجيل وحدة/i }));
+    await user.type(screen.getByLabelText(/serial number|الرقم التسلسلي/i), ' ');
+    await selectProductTypeInForm(user, 'Bar LED Model A');
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+
+    expect(
+      await screen.findByText(/failed to register item|فشل تسجيل الوحدة/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        /an item with this serial number is already registered|توجد وحدة مسجلة بهذا الرقم التسلسلي بالفعل/i,
+      ),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the generic banner (not the duplicate message) for a too-long serial number', async () => {
+    // The backend's 255-char max isn't mirrored client-side; a max-length
+    // rejection must not be mislabeled as a duplicate either.
+    mockListEndpoints({});
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: { serial_number: ['Ensure this field has no more than 255 characters.'] },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderSerializedItemsPage();
+
+    await user.click(await screen.findByRole('button', { name: /register item|تسجيل وحدة/i }));
+    await user.type(screen.getByLabelText(/serial number|الرقم التسلسلي/i), 'SN-042'.repeat(50));
+    await selectProductTypeInForm(user, 'Bar LED Model A');
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+
+    expect(
+      await screen.findByText(/failed to register item|فشل تسجيل الوحدة/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        /an item with this serial number is already registered|توجد وحدة مسجلة بهذا الرقم التسلسلي بالفعل/i,
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   it('shows a generic error banner when registration fails for another reason', async () => {
     mockListEndpoints({});
     mockedApiClient.post.mockRejectedValueOnce({
