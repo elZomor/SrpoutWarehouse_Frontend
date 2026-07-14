@@ -115,6 +115,11 @@
     "loadError": "فشل تحميل الوحدات المسجلة. حاول مرة أخرى.",
     "createError": "فشل تسجيل الوحدة. حاول مرة أخرى.",
     "loadProductTypesError": "فشل تحميل أنواع المنتجات. حاول مرة أخرى.",
+    "actionsLabel": "الإجراءات",
+    "deleteButton": "حذف",
+    "deleteConfirmTitle": "هل تريد حذف هذه الوحدة؟",
+    "deleteSuccess": "تم حذف الوحدة.",
+    "deleteError": "فشل حذف الوحدة. حاول مرة أخرى.",
     "form": {
       "serialNumberRequired": "الرقم التسلسلي مطلوب",
       "serialNumberDuplicate": "توجد وحدة مسجلة بهذا الرقم التسلسلي بالفعل",

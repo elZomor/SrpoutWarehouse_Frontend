@@ -61,8 +61,9 @@ test('registers a serialized item, prints its QR, then filters and searches for 
   await page.route('**/api/serialized-items/**', async (route) => {
     const url = new URL(route.request().url());
     const method = route.request().method();
+    const pathMatch = url.pathname.match(/\/api\/serialized-items\/(\d+)\/$/);
 
-    if (method === 'GET') {
+    if (method === 'GET' && !pathMatch) {
       const search = url.searchParams.get('search')?.toLowerCase() ?? '';
       const productTypeFilter = url.searchParams.get('product_type');
       const results = serializedItems.filter(
@@ -74,7 +75,7 @@ test('registers a serialized item, prints its QR, then filters and searches for 
       return;
     }
 
-    if (method === 'POST') {
+    if (method === 'POST' && !pathMatch) {
       const body = route.request().postDataJSON();
       const id = nextId++;
       const productTypeNames: Record<number, string> = {
@@ -93,6 +94,16 @@ test('registers a serialized item, prints its QR, then filters and searches for 
       };
       serializedItems.push(created);
       await route.fulfill({ status: 201, json: created });
+      return;
+    }
+
+    if (method === 'DELETE' && pathMatch) {
+      const id = Number(pathMatch[1]);
+      const index = serializedItems.findIndex((item) => item.id === id);
+      if (index !== -1) {
+        serializedItems.splice(index, 1);
+      }
+      await route.fulfill({ status: 204, body: '' });
       return;
     }
 
@@ -198,4 +209,68 @@ test('shows an inline error when registering a duplicate serial number', async (
       /an item with this serial number is already registered|توجد وحدة مسجلة بهذا الرقم التسلسلي بالفعل/i,
     ),
   ).toBeVisible();
+});
+
+test('deletes a serialized item, leaving a sibling item unaffected', async ({ page }) => {
+  // TC-01/AC-1, TC-02/AC-2
+  const serializedItems: SerializedItem[] = [
+    {
+      id: 1,
+      serial: '00000000-0000-0000-0000-000000000001',
+      serial_number: 'SN-042',
+      product_type: 1,
+      product_type_name: 'Bar LED Model A',
+      status: 'available',
+      last_work_order_reference: '',
+      notes: '',
+    },
+    {
+      id: 2,
+      serial: '00000000-0000-0000-0000-000000000002',
+      serial_number: 'SN-043',
+      product_type: 1,
+      product_type_name: 'Bar LED Model A',
+      status: 'available',
+      last_work_order_reference: '',
+      notes: '',
+    },
+  ];
+
+  await page.route('**/api/auth/**', stubAuth);
+  await registerProductTypesRoute(page);
+  await page.route('**/api/serialized-items/**', async (route) => {
+    const url = new URL(route.request().url());
+    const method = route.request().method();
+    const pathMatch = url.pathname.match(/\/api\/serialized-items\/(\d+)\/$/);
+
+    if (method === 'GET' && !pathMatch) {
+      await route.fulfill({ status: 200, json: serializedItems });
+      return;
+    }
+
+    if (method === 'DELETE' && pathMatch) {
+      const id = Number(pathMatch[1]);
+      const index = serializedItems.findIndex((item) => item.id === id);
+      if (index !== -1) {
+        serializedItems.splice(index, 1);
+      }
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto('/serialized-items');
+  await expect(page.getByText('SN-042')).toBeVisible();
+  await expect(page.getByText('SN-043')).toBeVisible();
+
+  await page
+    .getByRole('row', { name: /SN-042/ })
+    .getByRole('button', { name: /^delete$|^حذف$/i })
+    .click();
+  await page.getByRole('button', { name: /^ok$|^موافق$/i }).click();
+
+  await expect(page.getByText('SN-042')).not.toBeVisible();
+  await expect(page.getByText('SN-043')).toBeVisible();
 });

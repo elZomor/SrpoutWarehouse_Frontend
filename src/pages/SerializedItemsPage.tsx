@@ -1,6 +1,19 @@
 import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, Button, Form, Input, Modal, Select, Table, Tag, Typography } from 'antd';
+import {
+  Alert,
+  App,
+  Button,
+  Form,
+  Input,
+  Modal,
+  Popconfirm,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd';
 import axios from 'axios';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +26,7 @@ import type { SerializedItem } from '../features/serialized-items/types';
 import { getSerializedItemQrCodeUrl } from '../features/serialized-items/api';
 import {
   useCreateSerializedItem,
+  useDeleteSerializedItem,
   useSerializedItems,
 } from '../features/serialized-items/useSerializedItems';
 
@@ -27,6 +41,7 @@ const DEFAULT_STATUS_COLOR = 'default';
 
 export function SerializedItemsPage() {
   const { t } = useTranslation();
+  const { message } = App.useApp();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [productTypeFilter, setProductTypeFilter] = useState<number | undefined>();
@@ -37,6 +52,7 @@ export function SerializedItemsPage() {
     isError: isListError,
   } = useSerializedItems(search, productTypeFilter);
   const createMutation = useCreateSerializedItem();
+  const deleteMutation = useDeleteSerializedItem();
   // Populates both the page-level product type filter and the registration
   // form's product type dropdown.
   const { data: productTypes, isError: isProductTypesError } = useProductTypes('');
@@ -93,6 +109,13 @@ export function SerializedItemsPage() {
     });
   };
 
+  const handleDelete = (id: number) => {
+    deleteMutation.mutate(id, {
+      onSuccess: () => message.success(t('serializedItems.deleteSuccess')),
+      onError: () => message.error(t('serializedItems.deleteError')),
+    });
+  };
+
   const productTypeOptions = (productTypes ?? []).map((productType) => ({
     value: productType.id,
     label: productType.name,
@@ -132,6 +155,27 @@ export function SerializedItemsPage() {
         <a href={getSerializedItemQrCodeUrl(record.id)} target="_blank" rel="noreferrer">
           {t('serializedItems.printQrButton')}
         </a>
+      ),
+    },
+    {
+      title: t('serializedItems.actionsLabel'),
+      key: 'actions',
+      render: (_: unknown, record: SerializedItem) => (
+        <Space>
+          <Popconfirm
+            title={t('serializedItems.deleteConfirmTitle')}
+            onConfirm={() => handleDelete(record.id)}
+            okText={t('common.ok')}
+            cancelText={t('common.cancel')}
+            okButtonProps={{
+              loading: deleteMutation.isPending && deleteMutation.variables === record.id,
+            }}
+          >
+            <Button size="small" danger>
+              {t('serializedItems.deleteButton')}
+            </Button>
+          </Popconfirm>
+        </Space>
       ),
     },
   ];
