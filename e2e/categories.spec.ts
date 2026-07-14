@@ -155,6 +155,11 @@ test('blocks deleting a category with assigned product types and archives it ins
   await expect(page.getByText(/cannot delete.*3 product types|لا يمكن الحذف.*3/i)).toBeVisible();
   await expect(page.getByText('Lighting')).toBeVisible();
 
+  // The delete Popconfirm's OK button fades out asynchronously after being
+  // clicked; wait for it to fully unmount so the archive Popconfirm's OK
+  // button (opened next) is the only one matching this role/name.
+  await expect(page.getByRole('button', { name: /^ok$/i })).toHaveCount(0);
+
   await page.getByRole('button', { name: /^archive$|^أرشفة$/i }).click();
   await page.getByRole('button', { name: /^ok$/i }).click();
 
