@@ -14,7 +14,6 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import axios from 'axios';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useProductTypes } from '../features/product-types/useProductTypes';
@@ -29,6 +28,7 @@ import {
   useDeleteSerializedItem,
   useSerializedItems,
 } from '../features/serialized-items/useSerializedItems';
+import { getFieldErrorMessages } from '../lib/apiErrors';
 
 const SEARCH_DEBOUNCE_MS = 300;
 // Only "available" exists today, but the backend's STATUS_CHOICES is an
@@ -94,10 +94,7 @@ export function SerializedItemsPage() {
         // serial_number error (required/max-length), and that must still
         // fall through to the generic banner rather than being mislabeled
         // as a duplicate.
-        const rawErrors = axios.isAxiosError<{ serial_number?: string | string[] }>(error)
-          ? error.response?.data?.serial_number
-          : undefined;
-        const serialErrors = Array.isArray(rawErrors) ? rawErrors : rawErrors ? [rawErrors] : [];
+        const serialErrors = getFieldErrorMessages(error, 'serial_number');
         const isDuplicate = serialErrors.some((message) => message.includes('already registered'));
         if (isDuplicate) {
           setError('serial_number', {

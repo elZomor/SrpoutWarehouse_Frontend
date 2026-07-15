@@ -16,6 +16,8 @@ interface PurchaseOrderLineItem {
   product_type: number;
   product_type_name: string;
   expected_quantity: number;
+  received_quantity: number;
+  remaining_quantity: number;
 }
 
 interface PurchaseOrder {
@@ -84,6 +86,8 @@ test('creates a purchase order with multiple line items and it appears in the li
             product_type: item.product_type,
             product_type_name: productTypeNames[item.product_type] ?? '',
             expected_quantity: item.expected_quantity,
+            received_quantity: 0,
+            remaining_quantity: item.expected_quantity,
           }),
         ),
       };
@@ -155,4 +159,76 @@ test('requires a product type and quantity before submitting', async ({ page }) 
   await expect(
     page.getByText(/quantity must be at least 1|يجب أن تكون الكمية 1 على الأقل/i),
   ).toBeVisible();
+});
+
+test('receives a PO by scanning serials, showing partial then full receipt', async ({ page }) => {
+  // TC-01/TC-03/AC-1/AC-3
+  const purchaseOrder: PurchaseOrder = {
+    id: 1,
+    supplier_name: 'Acme Lighting Co',
+    order_date: '2026-07-01',
+    status: 'pending',
+    line_items: [
+      {
+        id: 1,
+        product_type: 1,
+        product_type_name: 'Bar LED Model A',
+        expected_quantity: 2,
+        received_quantity: 0,
+        remaining_quantity: 2,
+      },
+    ],
+  };
+
+  await page.route('**/api/auth/**', stubAuth);
+  await registerProductTypesRoute(page);
+  await page.route('**/api/purchase-orders/**', async (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+
+    if (method === 'POST' && url.includes('/receive/')) {
+      const body = route.request().postDataJSON() as { line_item: number; serial_number: string };
+      const lineItem = purchaseOrder.line_items.find((item) => item.id === body.line_item);
+      if (lineItem) {
+        lineItem.received_quantity += 1;
+        lineItem.remaining_quantity -= 1;
+      }
+      purchaseOrder.status = purchaseOrder.line_items.every((item) => item.remaining_quantity <= 0)
+        ? 'received'
+        : 'partially_received';
+      await route.fulfill({ status: 201, json: purchaseOrder });
+      return;
+    }
+
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, json: [purchaseOrder] });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto('/purchase-orders');
+
+  // Scoped to the submit button's type attribute rather than its accessible
+  // name: AntD prefixes the loading spinner's own "loading" label onto the
+  // button's name while a scan is in flight (briefly turning "Scan"/"مسح"
+  // into "loading Scan"/"loading مسح"), which can race an anchored
+  // name-based locator's retry window on a second scan fired right after
+  // the first one settles.
+  const scanButton = page.getByRole('dialog').locator('button[type="submit"]');
+
+  await page.getByRole('button', { name: /receive|استلام/i }).click();
+  await page.getByRole('dialog').getByRole('combobox').click();
+  await page.getByTitle('Bar LED Model A').click();
+  await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-1001');
+  await scanButton.click();
+
+  await expect(page.getByRole('dialog').getByRole('row').last()).toContainText('1');
+
+  await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-1002');
+  await scanButton.click();
+  await page.getByRole('button', { name: /done|تم/i }).click();
+
+  await expect(page.getByText(/^received$|^تم الاستلام$/i)).toBeVisible();
 });

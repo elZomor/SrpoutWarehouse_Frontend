@@ -129,13 +129,36 @@
     "orderDateLabel": "Order Date",
     "statusLabel": "Status",
     "status": {
-      "pending": "Pending"
+      "pending": "Pending",
+      "partially_received": "Partially Received",
+      "received": "Received"
     },
     "lineItemsLabel": "Line Items",
     "emptyState": "No purchase orders found",
     "loadError": "Failed to load purchase orders. Please try again.",
     "createError": "Failed to create purchase order. Please try again.",
     "loadProductTypesError": "Failed to load product types. Please try again.",
+    "actionsLabel": "Actions",
+    "receiveButton": "Receive",
+    "receive": {
+      "title": "Receive: {{supplierName}}",
+      "lineItemHeader": "Product",
+      "expectedHeader": "Expected",
+      "receivedHeader": "Received",
+      "remainingHeader": "Remaining",
+      "lineItemLabel": "Line Item",
+      "lineItemPlaceholder": "Select a line item",
+      "lineItemRequired": "Line item is required",
+      "serialNumberLabel": "Serial Number",
+      "serialNumberPlaceholder": "Scan or type a serial number",
+      "serialNumberRequired": "Serial number is required",
+      "scanButton": "Scan",
+      "doneButton": "Done",
+      "duplicateSerialError": "This serial number is already registered.",
+      "overCapError": "This line item has already received its expected quantity.",
+      "archivedError": "This product type is archived and can't receive new items.",
+      "genericError": "Failed to record this scan. Please try again."
+    },
     "form": {
       "supplierNameRequired": "Supplier is required",
       "orderDateRequired": "Order date is required",
