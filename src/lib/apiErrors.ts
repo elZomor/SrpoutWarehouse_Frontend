@@ -11,6 +11,10 @@ export function getFieldErrorMessages(error: unknown, field: string): string[] {
   const data = axios.isAxiosError<Record<string, string | string[] | undefined>>(error)
     ? error.response?.data
     : undefined;
-  const raw = data ? Reflect.get(data, field) : undefined;
+  // Reflect.get throws on a non-object target (e.g. if a proxy/load
+  // balancer ever returns a plain-string error body instead of JSON) -
+  // data[field] would just return undefined for that case, so guard for
+  // "is actually an object" rather than merely "is truthy".
+  const raw = typeof data === 'object' && data !== null ? Reflect.get(data, field) : undefined;
   return Array.isArray(raw) ? raw : raw ? [raw] : [];
 }
