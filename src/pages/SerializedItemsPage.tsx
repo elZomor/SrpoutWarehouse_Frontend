@@ -125,7 +125,10 @@ export function SerializedItemsPage() {
         link.href = url;
         link.download = 'qr-labels.pdf';
         link.click();
-        URL.revokeObjectURL(url);
+        // Deferred rather than revoked immediately after click(): the
+        // browser's actual blob read for the download isn't guaranteed to
+        // finish synchronously, and revoking too early can truncate it.
+        setTimeout(() => URL.revokeObjectURL(url), 0);
       },
       onError: () => message.error(t('serializedItems.downloadQrPdfError')),
     });
@@ -167,7 +170,16 @@ export function SerializedItemsPage() {
       title: t('serializedItems.qrCodeLabel'),
       key: 'qr_code',
       render: (_: unknown, record: SerializedItem) => (
-        <Button type="link" size="small" onClick={() => printSerializedItemLabel(record)}>
+        <Button
+          type="link"
+          size="small"
+          onClick={() =>
+            printSerializedItemLabel(record, {
+              qrAlt: t('serializedItems.qrCodeLabel'),
+              loadError: t('serializedItems.printQrLoadError'),
+            })
+          }
+        >
           {t('serializedItems.printQrButton')}
         </Button>
       ),

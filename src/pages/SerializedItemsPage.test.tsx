@@ -198,11 +198,37 @@ describe('SerializedItemsPage', () => {
     expect(openSpy).toHaveBeenCalled();
     const img = fakePrintWindow.document.querySelector('img');
     expect(img?.getAttribute('src')).toBe('http://localhost:8000/api/serialized-items/1/qr-code/');
+    expect(img?.getAttribute('alt')).toBeTruthy();
     expect(fakePrintWindow.document.body.textContent).toContain('SN-042');
     expect(fakePrintWindow.document.body.textContent).toContain('Bar LED Model A');
 
     img?.dispatchEvent(new Event('load'));
     expect(printSpy).toHaveBeenCalled();
+
+    openSpy.mockRestore();
+  });
+
+  it('shows a fallback message in the print window when the QR image fails to load', async () => {
+    mockListEndpoints({ serializedItems: [makeSerializedItem()] });
+    const fakePrintWindow = {
+      document: window.document.implementation.createHTMLDocument(),
+      focus: vi.fn(),
+      print: vi.fn(),
+    };
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(fakePrintWindow as never);
+
+    const user = userEvent.setup();
+    renderSerializedItemsPage();
+
+    await user.click(await screen.findByRole('button', { name: /print qr|طباعة رمز qr/i }));
+
+    const img = fakePrintWindow.document.querySelector('img');
+    img?.dispatchEvent(new Event('error'));
+
+    expect(fakePrintWindow.document.querySelector('img')).toBeNull();
+    expect(fakePrintWindow.document.body.textContent).toMatch(
+      /failed to load qr code|فشل تحميل رمز qr/i,
+    );
 
     openSpy.mockRestore();
   });
