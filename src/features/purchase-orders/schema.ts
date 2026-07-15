@@ -23,3 +23,15 @@ export const purchaseOrderSchema = z.object({
 
 export type PurchaseOrderLineItemFormValues = z.infer<typeof purchaseOrderLineItemSchema>;
 export type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
+
+export const receiveItemSchema = z.object({
+  line_item: z
+    .number()
+    .optional()
+    .refine((value): value is number => value !== undefined, {
+      message: 'purchaseOrders.receive.lineItemRequired',
+    }),
+  serial_number: z.string().min(1, 'purchaseOrders.receive.serialNumberRequired'),
+});
+
+export type ReceiveItemFormValues = z.infer<typeof receiveItemSchema>;

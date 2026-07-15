@@ -133,13 +133,36 @@
     "orderDateLabel": "تاريخ الطلب",
     "statusLabel": "الحالة",
     "status": {
-      "pending": "قيد الانتظار"
+      "pending": "قيد الانتظار",
+      "partially_received": "مستلم جزئيًا",
+      "received": "تم الاستلام"
     },
     "lineItemsLabel": "بنود الطلب",
     "emptyState": "لا توجد أوامر شراء",
     "loadError": "فشل تحميل أوامر الشراء. حاول مرة أخرى.",
     "createError": "فشل إنشاء أمر الشراء. حاول مرة أخرى.",
     "loadProductTypesError": "فشل تحميل أنواع المنتجات. حاول مرة أخرى.",
+    "actionsLabel": "الإجراءات",
+    "receiveButton": "استلام",
+    "receive": {
+      "title": "استلام: {{supplierName}}",
+      "lineItemHeader": "المنتج",
+      "expectedHeader": "المتوقع",
+      "receivedHeader": "المستلم",
+      "remainingHeader": "المتبقي",
+      "lineItemLabel": "بند الطلب",
+      "lineItemPlaceholder": "اختر بند الطلب",
+      "lineItemRequired": "بند الطلب مطلوب",
+      "serialNumberLabel": "الرقم التسلسلي",
+      "serialNumberPlaceholder": "امسح أو أدخل الرقم التسلسلي",
+      "serialNumberRequired": "الرقم التسلسلي مطلوب",
+      "scanButton": "مسح",
+      "doneButton": "تم",
+      "duplicateSerialError": "هذا الرقم التسلسلي مسجل بالفعل.",
+      "overCapError": "استلم هذا البند بالفعل الكمية المتوقعة.",
+      "archivedError": "هذا النوع من المنتجات مؤرشف ولا يمكنه استلام عناصر جديدة.",
+      "genericError": "فشل تسجيل هذا المسح. حاول مرة أخرى."
+    },
     "form": {
       "supplierNameRequired": "المورد مطلوب",
       "orderDateRequired": "تاريخ الطلب مطلوب",

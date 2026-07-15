@@ -40,7 +40,14 @@ function makePurchaseOrder(overrides: Partial<PurchaseOrder> = {}): PurchaseOrde
     order_date: '2026-07-01',
     status: 'pending',
     line_items: [
-      { id: 1, product_type: 1, product_type_name: 'Bar LED Model A', expected_quantity: 5 },
+      {
+        id: 1,
+        product_type: 1,
+        product_type_name: 'Bar LED Model A',
+        expected_quantity: 5,
+        received_quantity: 0,
+        remaining_quantity: 5,
+      },
     ],
     ...overrides,
   };
@@ -70,6 +77,83 @@ function mockListEndpoints({
     }
     return Promise.reject(new Error(`Unexpected GET ${url}`));
   });
+}
+
+// Simulates the backend's receive endpoint: each POST recomputes
+// received/remaining quantities and status from the running scan count,
+// mirroring PurchaseOrder.recompute_status() so multi-scan tests (TC-01,
+// TC-03/TC-04 partial-then-complete, TC-05 mixed line items) see the same
+// progression the real API would return.
+function mockReceiveEndpoint(initialPurchaseOrder: PurchaseOrder) {
+  let current: PurchaseOrder = structuredClone(initialPurchaseOrder);
+  const seenSerialNumbers = new Set<string>();
+
+  mockedApiClient.post.mockImplementation((url: string, body: unknown) => {
+    if (url !== `/api/purchase-orders/${current.id}/receive/`) {
+      return Promise.reject(new Error(`Unexpected POST ${url}`));
+    }
+    const { line_item, serial_number } = body as { line_item: number; serial_number: string };
+
+    if (seenSerialNumbers.has(serial_number)) {
+      return Promise.reject({
+        isAxiosError: true,
+        response: {
+          status: 400,
+          data: { serial_number: [`Serial number ${serial_number} is already registered.`] },
+        },
+      });
+    }
+    const targetLineItem = current.line_items.find((item) => item.id === line_item);
+    if (targetLineItem && targetLineItem.remaining_quantity <= 0) {
+      return Promise.reject({
+        isAxiosError: true,
+        response: {
+          status: 400,
+          data: { line_item: ['This line item has already received its expected quantity.'] },
+        },
+      });
+    }
+
+    seenSerialNumbers.add(serial_number);
+    const line_items = current.line_items.map((item) =>
+      item.id === line_item
+        ? {
+            ...item,
+            received_quantity: item.received_quantity + 1,
+            remaining_quantity: item.remaining_quantity - 1,
+          }
+        : item,
+    );
+    const status = line_items.every((item) => item.remaining_quantity <= 0)
+      ? 'received'
+      : line_items.some((item) => item.received_quantity > 0)
+        ? 'partially_received'
+        : 'pending';
+    current = { ...current, line_items, status };
+    return Promise.resolve({ data: current });
+  });
+
+  return {
+    getCurrent: () => current,
+  };
+}
+
+async function selectReceiveLineItem(user: ReturnType<typeof userEvent.setup>, name: string) {
+  const dialog = screen.getByRole('dialog');
+  const combobox = within(dialog).getByRole('combobox');
+  await user.click(combobox);
+  const option = screen.getAllByTitle(name).at(-1);
+  if (!option) {
+    throw new Error(`No option found for ${name}`);
+  }
+  await user.click(option);
+}
+
+async function scanSerial(user: ReturnType<typeof userEvent.setup>, serialNumber: string) {
+  const input = screen.getByLabelText(/serial number|الرقم التسلسلي/i);
+  await user.clear(input);
+  await user.type(input, serialNumber);
+  await user.click(screen.getByRole('button', { name: /^scan$|^مسح$/i }));
 }
 
 function renderPurchaseOrdersPage() {
@@ -306,5 +390,158 @@ describe('PurchaseOrdersPage', () => {
     expect(
       await screen.findByText(/failed to load purchase orders|فشل تحميل أوامر الشراء/i),
     ).toBeInTheDocument();
+  });
+
+  it('fully receives a PO by scanning all expected serials', async () => {
+    // TC-01/AC-1
+    const purchaseOrder = makePurchaseOrder({
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          expected_quantity: 2,
+          received_quantity: 0,
+          remaining_quantity: 2,
+        },
+      ],
+    });
+    mockListEndpoints({ purchaseOrders: [purchaseOrder] });
+    mockReceiveEndpoint(purchaseOrder);
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderPurchaseOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /receive|استلام/i }));
+    await selectReceiveLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-1001');
+    await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
+    await scanSerial(user, 'SN-1002');
+    await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(2));
+
+    expect(mockedApiClient.post).toHaveBeenNthCalledWith(1, '/api/purchase-orders/1/receive/', {
+      line_item: 1,
+      serial_number: 'SN-1001',
+    });
+    const dialog = screen.getByRole('dialog');
+    const row = await within(dialog).findByRole('row', { name: /bar led model a/i });
+    const cells = within(row)
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent);
+    expect(cells).toEqual(['Bar LED Model A', '2', '2', '0']); // expected, received, remaining
+  });
+
+  it('shows partially_received status and remaining quantity after a partial scan', async () => {
+    // TC-03/AC-3
+    const purchaseOrder = makePurchaseOrder({
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          expected_quantity: 3,
+          received_quantity: 0,
+          remaining_quantity: 3,
+        },
+      ],
+    });
+    mockListEndpoints({ purchaseOrders: [purchaseOrder] });
+    mockReceiveEndpoint(purchaseOrder);
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderPurchaseOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /receive|استلام/i }));
+    await selectReceiveLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-P001');
+    await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole('button', { name: /done|تم/i }));
+
+    expect(await screen.findByText(/partially received|مستلم جزئيًا/i)).toBeInTheDocument();
+  });
+
+  it('completes a partial receipt on reopen', async () => {
+    // TC-04/AC-4
+    const purchaseOrder = makePurchaseOrder({
+      status: 'partially_received',
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          expected_quantity: 2,
+          received_quantity: 1,
+          remaining_quantity: 1,
+        },
+      ],
+    });
+    mockListEndpoints({ purchaseOrders: [purchaseOrder] });
+    mockReceiveEndpoint(purchaseOrder);
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderPurchaseOrdersPage();
+
+    expect(await screen.findByText(/partially received|مستلم جزئيًا/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /receive|استلام/i }));
+    await selectReceiveLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-C002');
+    await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole('button', { name: /done|تم/i }));
+
+    expect(await screen.findByText(/^received$|^تم الاستلام$/i)).toBeInTheDocument();
+  });
+
+  it('stays partially_received when one of two line items is fully scanned and the other is not', async () => {
+    // TC-05/AC-5
+    const purchaseOrder = makePurchaseOrder({
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          expected_quantity: 1,
+          received_quantity: 0,
+          remaining_quantity: 1,
+        },
+        {
+          id: 2,
+          product_type: 2,
+          product_type_name: 'Fog Machine',
+          expected_quantity: 2,
+          received_quantity: 0,
+          remaining_quantity: 2,
+        },
+      ],
+    });
+    mockListEndpoints({ purchaseOrders: [purchaseOrder] });
+    mockReceiveEndpoint(purchaseOrder);
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderPurchaseOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /receive|استلام/i }));
+    await selectReceiveLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-M001');
+    await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole('button', { name: /done|تم/i }));
+
+    expect(await screen.findByText(/partially received|مستلم جزئيًا/i)).toBeInTheDocument();
+  });
+
+  it('shows an inline error for a duplicate serial number scan', async () => {
+    const purchaseOrder = makePurchaseOrder();
+    mockListEndpoints({ purchaseOrders: [purchaseOrder] });
+    mockReceiveEndpoint(purchaseOrder);
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderPurchaseOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /receive|استلام/i }));
+    await selectReceiveLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-DUP');
+    await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
+    await scanSerial(user, 'SN-DUP');
+
+    expect(await screen.findByText(/already registered|مسجل بالفعل/i)).toBeInTheDocument();
   });
 });
