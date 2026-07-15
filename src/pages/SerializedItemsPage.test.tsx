@@ -208,6 +208,42 @@ describe('SerializedItemsPage', () => {
     openSpy.mockRestore();
   });
 
+  it('prints the QR label immediately after registering a new item (AC-4)', async () => {
+    // AC-4: the QR is generated on demand (see printLabel.ts / api.ts) rather
+    // than stored, so it's never "not ready yet" - printing right after
+    // registration must work exactly like printing any other row.
+    const serializedItems: SerializedItem[] = [];
+    mockListEndpoints({ serializedItems });
+    const newItem = makeSerializedItem({ id: 7, serial_number: 'SN-NEW' });
+    mockedApiClient.post.mockResolvedValueOnce({ data: newItem });
+    const fakePrintWindow = {
+      document: window.document.implementation.createHTMLDocument(),
+      focus: vi.fn(),
+      print: vi.fn(),
+    };
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(fakePrintWindow as never);
+
+    const user = userEvent.setup();
+    renderSerializedItemsPage();
+
+    await user.click(await screen.findByRole('button', { name: /register item|تسجيل وحدة/i }));
+    await user.type(screen.getByLabelText(/serial number|الرقم التسلسلي/i), 'SN-NEW');
+    await selectProductTypeInForm(user, 'Bar LED Model A');
+    serializedItems.push(newItem);
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+
+    await user.click(await screen.findByRole('button', { name: /print qr|طباعة رمز qr/i }));
+
+    expect(openSpy).toHaveBeenCalled();
+    const img = fakePrintWindow.document.querySelector('img');
+    expect(img?.getAttribute('src')).toBe('http://localhost:8000/api/serialized-items/7/qr-code/');
+    img?.dispatchEvent(new Event('load'));
+    expect(fakePrintWindow.print).toHaveBeenCalled();
+    expect(fakePrintWindow.document.body.textContent).not.toMatch(/qr not ready/i);
+
+    openSpy.mockRestore();
+  });
+
   it('shows a fallback message in the print window when the QR image fails to load', async () => {
     mockListEndpoints({ serializedItems: [makeSerializedItem()] });
     const fakePrintWindow = {
@@ -278,11 +314,11 @@ describe('SerializedItemsPage', () => {
     clickSpy.mockRestore();
   });
 
-  it('shows an error message when the QR labels PDF download fails', async () => {
+  it('shows a generic error message when the QR labels PDF download fails for a real error', async () => {
     mockListEndpoints({ serializedItems: [makeSerializedItem()] });
     mockedApiClient.get.mockImplementation((url: string) => {
       if (url === '/api/serialized-items/qr-pdf/') {
-        return Promise.reject({ isAxiosError: true, response: { status: 400, data: {} } });
+        return Promise.reject({ isAxiosError: true, response: { status: 500, data: {} } });
       }
       if (url === '/api/product-types/') {
         return Promise.resolve({ data: [makeProductType()] });
@@ -301,6 +337,70 @@ describe('SerializedItemsPage', () => {
 
     expect(
       await screen.findByText(/failed to download qr labels|فشل تنزيل ملصقات qr/i),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a "no items to export" message for a product type with zero items (AC-1)', async () => {
+    mockListEndpoints({
+      serializedItems: [makeSerializedItem()],
+      productTypes: [makeProductType(), makeProductType({ id: 2, name: 'Fog Machine' })],
+    });
+    mockedApiClient.get.mockImplementation((url: string) => {
+      if (url === '/api/serialized-items/qr-pdf/') {
+        return Promise.reject({ isAxiosError: true, response: { status: 400, data: {} } });
+      }
+      if (url === '/api/product-types/') {
+        return Promise.resolve({
+          data: [makeProductType(), makeProductType({ id: 2, name: 'Fog Machine' })],
+        });
+      }
+      if (url === '/api/serialized-items/') {
+        return Promise.resolve({ data: [makeSerializedItem()] });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    const user = userEvent.setup();
+    renderSerializedItemsPage();
+    await screen.findByText('SN-042');
+
+    await selectProductTypeFilter(user, 'Fog Machine');
+    await user.click(screen.getByRole('button', { name: /download qr pdf|تنزيل ملصقات qr/i }));
+
+    expect(
+      await screen.findByText(
+        /no items to export for this product type|لا توجد عناصر لتصديرها لهذا النوع من المنتجات/i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/failed to download qr labels|فشل تنزيل ملصقات qr/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a "no items to export" message for "All" when no items exist anywhere (AC-2)', async () => {
+    mockListEndpoints({ serializedItems: [] });
+    mockedApiClient.get.mockImplementation((url: string) => {
+      if (url === '/api/serialized-items/qr-pdf/') {
+        return Promise.reject({ isAxiosError: true, response: { status: 400, data: {} } });
+      }
+      if (url === '/api/product-types/') {
+        return Promise.resolve({ data: [makeProductType()] });
+      }
+      if (url === '/api/serialized-items/') {
+        return Promise.resolve({ data: [] });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    const user = userEvent.setup();
+    renderSerializedItemsPage();
+
+    await user.click(
+      await screen.findByRole('button', { name: /download qr pdf|تنزيل ملصقات qr/i }),
+    );
+
+    expect(
+      await screen.findByText(/^no items to export\.?$|^لا توجد عناصر لتصديرها\.?$/i),
     ).toBeInTheDocument();
   });
 

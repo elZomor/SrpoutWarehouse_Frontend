@@ -113,6 +113,8 @@
     "printQrLoadError": "فشل تحميل رمز QR.",
     "downloadQrPdfButton": "تنزيل ملصقات QR (PDF)",
     "downloadQrPdfError": "فشل تنزيل ملصقات QR. حاول مرة أخرى.",
+    "downloadQrPdfNoItemsForType": "لا توجد عناصر لتصديرها لهذا النوع من المنتجات.",
+    "downloadQrPdfNoItems": "لا توجد عناصر لتصديرها.",
     "searchPlaceholder": "البحث بالرقم التسلسلي",
     "emptyState": "لا توجد وحدات مسجلة",
     "loadError": "فشل تحميل الوحدات المسجلة. حاول مرة أخرى.",
