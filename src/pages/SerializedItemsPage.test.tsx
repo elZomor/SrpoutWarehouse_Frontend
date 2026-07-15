@@ -177,17 +177,105 @@ describe('SerializedItemsPage', () => {
     expect(screen.getByText(/available|متاح/i)).toBeInTheDocument();
   });
 
-  it('shows a QR code Print link for a registered item', async () => {
-    // TC-02
+  it('opens a print window with the QR image, serial number and product type when Print QR is clicked', async () => {
+    // TC-02/AC-1: the label is built via DOM APIs in a new window (not a
+    // raw QR-PNG link) so it carries serial number + product type name
+    // alongside the QR code, per AC-1's label content requirement.
     mockListEndpoints({ serializedItems: [makeSerializedItem()] });
+    const printSpy = vi.fn();
+    const fakePrintWindow = {
+      document: window.document.implementation.createHTMLDocument(),
+      focus: vi.fn(),
+      print: printSpy,
+    };
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(fakePrintWindow as never);
 
+    const user = userEvent.setup();
     renderSerializedItemsPage();
 
-    const printLink = await screen.findByRole('link', { name: /print qr|طباعة رمز qr/i });
-    expect(printLink).toHaveAttribute(
-      'href',
-      'http://localhost:8000/api/serialized-items/1/qr-code/',
+    await user.click(await screen.findByRole('button', { name: /print qr|طباعة رمز qr/i }));
+
+    expect(openSpy).toHaveBeenCalled();
+    const img = fakePrintWindow.document.querySelector('img');
+    expect(img?.getAttribute('src')).toBe('http://localhost:8000/api/serialized-items/1/qr-code/');
+    expect(fakePrintWindow.document.body.textContent).toContain('SN-042');
+    expect(fakePrintWindow.document.body.textContent).toContain('Bar LED Model A');
+
+    img?.dispatchEvent(new Event('load'));
+    expect(printSpy).toHaveBeenCalled();
+
+    openSpy.mockRestore();
+  });
+
+  it('downloads a QR labels PDF scoped to the selected product type filter', async () => {
+    // AC-4: "Download QR PDF" while a product type filter is selected only
+    // requests that product type's labels.
+    mockListEndpoints({
+      serializedItems: [makeSerializedItem()],
+      productTypes: [makeProductType(), makeProductType({ id: 2, name: 'Fog Machine' })],
+    });
+    const pdfBlob = new Blob(['%PDF-fake'], { type: 'application/pdf' });
+    mockedApiClient.get.mockImplementation(
+      (url: string, config?: { params?: { product_type?: number } }) => {
+        if (url === '/api/serialized-items/qr-pdf/') {
+          expect(config?.params?.product_type).toBe(1);
+          return Promise.resolve({ data: pdfBlob });
+        }
+        if (url === '/api/product-types/') {
+          return Promise.resolve({
+            data: [makeProductType(), makeProductType({ id: 2, name: 'Fog Machine' })],
+          });
+        }
+        if (url === '/api/serialized-items/') {
+          return Promise.resolve({ data: [makeSerializedItem()] });
+        }
+        return Promise.reject(new Error(`Unexpected GET ${url}`));
+      },
     );
+    const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
+    const revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    const user = userEvent.setup();
+    renderSerializedItemsPage();
+    await screen.findByText('SN-042');
+
+    await selectProductTypeFilter(user, 'Bar LED Model A');
+    await user.click(screen.getByRole('button', { name: /download qr pdf|تنزيل ملصقات qr/i }));
+
+    await waitFor(() => expect(createObjectURLSpy).toHaveBeenCalledWith(pdfBlob));
+    expect(clickSpy).toHaveBeenCalled();
+    expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:fake-url');
+
+    createObjectURLSpy.mockRestore();
+    revokeObjectURLSpy.mockRestore();
+    clickSpy.mockRestore();
+  });
+
+  it('shows an error message when the QR labels PDF download fails', async () => {
+    mockListEndpoints({ serializedItems: [makeSerializedItem()] });
+    mockedApiClient.get.mockImplementation((url: string) => {
+      if (url === '/api/serialized-items/qr-pdf/') {
+        return Promise.reject({ isAxiosError: true, response: { status: 400, data: {} } });
+      }
+      if (url === '/api/product-types/') {
+        return Promise.resolve({ data: [makeProductType()] });
+      }
+      if (url === '/api/serialized-items/') {
+        return Promise.resolve({ data: [makeSerializedItem()] });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    const user = userEvent.setup();
+    renderSerializedItemsPage();
+    await screen.findByText('SN-042');
+
+    await user.click(screen.getByRole('button', { name: /download qr pdf|تنزيل ملصقات qr/i }));
+
+    expect(
+      await screen.findByText(/failed to download qr labels|فشل تنزيل ملصقات qr/i),
+    ).toBeInTheDocument();
   });
 
   it('requires a serial number before submitting', async () => {

@@ -106,6 +106,8 @@
     "noWorkOrder": "—",
     "qrCodeLabel": "QR Code",
     "printQrButton": "Print QR",
+    "downloadQrPdfButton": "Download QR PDF",
+    "downloadQrPdfError": "Failed to download QR labels. Please try again.",
     "searchPlaceholder": "Search by serial number",
     "emptyState": "No serialized items found",
     "loadError": "Failed to load serialized items. Please try again.",
