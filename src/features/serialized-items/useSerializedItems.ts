@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createSerializedItem, deleteSerializedItem, listSerializedItems } from './api';
+import {
+  createSerializedItem,
+  deleteSerializedItem,
+  downloadSerializedItemsQrPdf,
+  listSerializedItems,
+} from './api';
 import type { SerializedItemFormValues } from './schema';
 
 const serializedItemsBaseKey = ['serialized-items'] as const;
@@ -29,5 +34,11 @@ export function useDeleteSerializedItem() {
   return useMutation({
     mutationFn: (id: number) => deleteSerializedItem(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: serializedItemsBaseKey }),
+  });
+}
+
+export function useDownloadSerializedItemsQrPdf() {
+  return useMutation({
+    mutationFn: (productType?: number) => downloadSerializedItemsQrPdf(productType),
   });
 }

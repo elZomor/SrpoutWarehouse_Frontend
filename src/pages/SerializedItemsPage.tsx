@@ -22,10 +22,11 @@ import {
   type SerializedItemFormValues,
 } from '../features/serialized-items/schema';
 import type { SerializedItem } from '../features/serialized-items/types';
-import { getSerializedItemQrCodeUrl } from '../features/serialized-items/api';
+import { printSerializedItemLabel } from '../features/serialized-items/printLabel';
 import {
   useCreateSerializedItem,
   useDeleteSerializedItem,
+  useDownloadSerializedItemsQrPdf,
   useSerializedItems,
 } from '../features/serialized-items/useSerializedItems';
 import { getFieldErrorMessages } from '../lib/apiErrors';
@@ -53,6 +54,7 @@ export function SerializedItemsPage() {
   } = useSerializedItems(search, productTypeFilter);
   const createMutation = useCreateSerializedItem();
   const deleteMutation = useDeleteSerializedItem();
+  const downloadQrPdfMutation = useDownloadSerializedItemsQrPdf();
   // Populates both the page-level product type filter and the registration
   // form's product type dropdown.
   const { data: productTypes, isError: isProductTypesError } = useProductTypes('');
@@ -113,6 +115,25 @@ export function SerializedItemsPage() {
     });
   };
 
+  const handleDownloadQrPdf = () => {
+    downloadQrPdfMutation.mutate(productTypeFilter, {
+      onSuccess: (blob) => {
+        // AC-4/AC-5: the same product type filter already on screen scopes
+        // the PDF - cleared (undefined) means "All".
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'qr-labels.pdf';
+        link.click();
+        // Deferred rather than revoked immediately after click(): the
+        // browser's actual blob read for the download isn't guaranteed to
+        // finish synchronously, and revoking too early can truncate it.
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      },
+      onError: () => message.error(t('serializedItems.downloadQrPdfError')),
+    });
+  };
+
   const productTypeOptions = (productTypes ?? []).map((productType) => ({
     value: productType.id,
     label: productType.name,
@@ -149,9 +170,18 @@ export function SerializedItemsPage() {
       title: t('serializedItems.qrCodeLabel'),
       key: 'qr_code',
       render: (_: unknown, record: SerializedItem) => (
-        <a href={getSerializedItemQrCodeUrl(record.id)} target="_blank" rel="noreferrer">
+        <Button
+          type="link"
+          size="small"
+          onClick={() =>
+            printSerializedItemLabel(record, {
+              qrAlt: t('serializedItems.qrCodeLabel'),
+              loadError: t('serializedItems.printQrLoadError'),
+            })
+          }
+        >
           {t('serializedItems.printQrButton')}
-        </a>
+        </Button>
       ),
     },
     {
@@ -198,9 +228,14 @@ export function SerializedItemsPage() {
             onChange={(value: number | undefined) => setProductTypeFilter(value)}
           />
         </div>
-        <Button type="primary" onClick={() => setIsModalOpen(true)}>
-          {t('serializedItems.newButton')}
-        </Button>
+        <Space>
+          <Button loading={downloadQrPdfMutation.isPending} onClick={handleDownloadQrPdf}>
+            {t('serializedItems.downloadQrPdfButton')}
+          </Button>
+          <Button type="primary" onClick={() => setIsModalOpen(true)}>
+            {t('serializedItems.newButton')}
+          </Button>
+        </Space>
       </div>
       {isListError ? (
         <Alert

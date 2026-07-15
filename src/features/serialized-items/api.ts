@@ -29,9 +29,16 @@ export async function deleteSerializedItem(id: number): Promise<void> {
 }
 
 // The QR code is generated on demand rather than stored (see SerializedItem's
-// backend model comment) - this is a plain URL, not an api.ts call, since the
-// Print QR link navigates the browser there directly instead of fetching it
-// through axios.
+// backend model comment) - this is a plain URL, not an api.ts call, so the
+// print label can embed it directly as an <img src>.
 export function getSerializedItemQrCodeUrl(id: number): string {
   return `${env.VITE_API_BASE_URL}/api/serialized-items/${id}/qr-code/`;
+}
+
+export async function downloadSerializedItemsQrPdf(productType?: number): Promise<Blob> {
+  const { data } = await apiClient.get<Blob>('/api/serialized-items/qr-pdf/', {
+    params: { product_type: productType },
+    responseType: 'blob',
+  });
+  return data;
 }

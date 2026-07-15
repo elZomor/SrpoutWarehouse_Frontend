@@ -121,12 +121,16 @@ test('registers a serialized item, prints its QR, then filters and searches for 
   await expect(page.getByText('SN-042')).toBeVisible();
   await expect(page.getByText(/available|متاح/i)).toBeVisible();
 
-  const printLink = page.getByRole('link', { name: /print qr|طباعة رمز qr/i });
-  await expect(printLink).toBeVisible();
-  await expect(printLink).toHaveAttribute(
-    'href',
+  const printButton = page.getByRole('button', { name: /print qr|طباعة رمز qr/i });
+  await expect(printButton).toBeVisible();
+  const [popup] = await Promise.all([page.waitForEvent('popup'), printButton.click()]);
+  await expect(popup.locator('img')).toHaveAttribute(
+    'src',
     'http://localhost:4173/api/serialized-items/1/qr-code/',
   );
+  await expect(popup.getByText('SN-042')).toBeVisible();
+  await expect(popup.getByText('Bar LED Model A')).toBeVisible();
+  await popup.close();
 
   await page.getByRole('button', { name: /register item|تسجيل وحدة/i }).click();
   await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('FOG-001');
@@ -156,6 +160,54 @@ test('registers a serialized item, prints its QR, then filters and searches for 
     .click();
   await expect(page.getByText('FOG-001')).toBeVisible();
   await expect(page.getByText('SN-042')).not.toBeVisible();
+});
+
+test('downloads a bulk QR labels PDF for the selected product type', async ({ page }) => {
+  // AC-4/AC-5
+  await page.route('**/api/auth/**', stubAuth);
+  await registerProductTypesRoute(page);
+  await page.route('**/api/serialized-items/qr-pdf/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/pdf',
+      body: Buffer.from('%PDF-fake-content'),
+    });
+  });
+  await page.route('**/api/serialized-items/**', async (route) => {
+    if (route.request().url().includes('qr-pdf')) {
+      await route.continue();
+      return;
+    }
+    if (route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        json: [
+          {
+            id: 1,
+            serial: '00000000-0000-0000-0000-000000000001',
+            serial_number: 'SN-042',
+            product_type: 1,
+            product_type_name: 'Bar LED Model A',
+            status: 'available',
+            last_work_order_reference: '',
+            notes: '',
+          },
+        ],
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto('/serialized-items');
+  await expect(page.getByText('SN-042')).toBeVisible();
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: /download qr pdf|تنزيل ملصقات qr/i }).click(),
+  ]);
+
+  expect(download.suggestedFilename()).toBe('qr-labels.pdf');
 });
 
 test('shows an inline error when registering a duplicate serial number', async ({ page }) => {
