@@ -210,16 +210,24 @@ test('receives a PO by scanning serials, showing partial then full receipt', asy
 
   await page.goto('/purchase-orders');
 
+  // Scoped to the submit button's type attribute rather than its accessible
+  // name: AntD prefixes the loading spinner's own "loading" label onto the
+  // button's name while a scan is in flight (briefly turning "Scan"/"مسح"
+  // into "loading Scan"/"loading مسح"), which can race an anchored
+  // name-based locator's retry window on a second scan fired right after
+  // the first one settles.
+  const scanButton = page.getByRole('dialog').locator('button[type="submit"]');
+
   await page.getByRole('button', { name: /receive|استلام/i }).click();
   await page.getByRole('dialog').getByRole('combobox').click();
   await page.getByTitle('Bar LED Model A').click();
   await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-1001');
-  await page.getByRole('button', { name: /^scan$|^مسح$/i }).click();
+  await scanButton.click();
 
   await expect(page.getByRole('dialog').getByRole('row').last()).toContainText('1');
 
   await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-1002');
-  await page.getByRole('button', { name: /^scan$|^مسح$/i }).click();
+  await scanButton.click();
   await page.getByRole('button', { name: /done|تم/i }).click();
 
   await expect(page.getByText(/^received$|^تم الاستلام$/i)).toBeVisible();

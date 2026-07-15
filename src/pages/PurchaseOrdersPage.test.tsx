@@ -431,6 +431,34 @@ describe('PurchaseOrdersPage', () => {
     expect(cells).toEqual(['Bar LED Model A', '2', '2', '0']); // expected, received, remaining
   });
 
+  it('deselects a line item once it is fully received, instead of leaving it silently selected', async () => {
+    const purchaseOrder = makePurchaseOrder({
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          expected_quantity: 1,
+          received_quantity: 0,
+          remaining_quantity: 1,
+        },
+      ],
+    });
+    mockListEndpoints({ purchaseOrders: [purchaseOrder] });
+    mockReceiveEndpoint(purchaseOrder);
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderPurchaseOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /receive|استلام/i }));
+    await selectReceiveLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-LAST-001');
+    await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/select a line item|اختر بند الطلب/i)).toBeInTheDocument();
+  });
+
   it('shows partially_received status and remaining quantity after a partial scan', async () => {
     // TC-03/AC-3
     const purchaseOrder = makePurchaseOrder({

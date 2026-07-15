@@ -14,7 +14,6 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import axios from 'axios';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
@@ -32,14 +31,10 @@ import {
   usePurchaseOrders,
   useReceivePurchaseOrderItem,
 } from '../features/purchase-orders/usePurchaseOrders';
+import { getFieldErrorMessages } from '../lib/apiErrors';
 
 const DATE_FORMAT = 'YYYY-MM-DD';
 const EMPTY_LINE_ITEM = { product_type: undefined, expected_quantity: undefined };
-
-function toMessageArray(value: string | string[] | undefined): string[] {
-  if (Array.isArray(value)) return value;
-  return value ? [value] : [];
-}
 
 export function PurchaseOrdersPage() {
   const { t } = useTranslation();
@@ -108,22 +103,32 @@ export function PurchaseOrdersPage() {
 
   const onReceiveSubmit = (values: ReceiveItemFormValues) => {
     receiveMutation.mutate(values, {
-      onSuccess: () => {
+      onSuccess: (updatedPurchaseOrder) => {
         // Keep the same line item selected - a scan gun typically fires many
         // scans against the same line item in a row - and clear+refocus the
-        // serial number field for the next one (AC-1/AC-3/AC-4).
-        resetReceiveForm({ line_item: values.line_item, serial_number: '' });
+        // serial number field for the next one (AC-1/AC-3/AC-4). But if that
+        // scan just completed the line item, it's no longer a valid option
+        // in receivableLineItemOptions - keeping it selected would leave the
+        // Select showing no matching option while still silently submitting
+        // against the now-exhausted line item on the next scan. Read the
+        // freshly returned PurchaseOrder (not the component's own
+        // receivingPurchaseOrder, which hasn't re-rendered with this
+        // response yet) to decide.
+        const scannedLineItem = updatedPurchaseOrder.line_items.find(
+          (item) => item.id === values.line_item,
+        );
+        resetReceiveForm({
+          line_item:
+            scannedLineItem && scannedLineItem.remaining_quantity > 0
+              ? values.line_item
+              : undefined,
+          serial_number: '',
+        });
         setReceiveFocus('serial_number');
       },
       onError: (error) => {
-        const responseData = axios.isAxiosError<{
-          serial_number?: string | string[];
-          line_item?: string | string[];
-        }>(error)
-          ? error.response?.data
-          : undefined;
-        const serialErrors = toMessageArray(responseData?.serial_number);
-        const lineItemErrors = toMessageArray(responseData?.line_item);
+        const serialErrors = getFieldErrorMessages(error, 'serial_number');
+        const lineItemErrors = getFieldErrorMessages(error, 'line_item');
 
         if (serialErrors.some((message) => message.includes('already registered'))) {
           setReceiveError('serial_number', {
