@@ -341,10 +341,6 @@ describe('SerializedItemsPage', () => {
   });
 
   it('shows a "no items to export" message for a product type with zero items (AC-1)', async () => {
-    mockListEndpoints({
-      serializedItems: [makeSerializedItem()],
-      productTypes: [makeProductType(), makeProductType({ id: 2, name: 'Fog Machine' })],
-    });
     mockedApiClient.get.mockImplementation((url: string) => {
       if (url === '/api/serialized-items/qr-pdf/') {
         return Promise.reject({ isAxiosError: true, response: { status: 400, data: {} } });
@@ -378,7 +374,6 @@ describe('SerializedItemsPage', () => {
   });
 
   it('shows a "no items to export" message for "All" when no items exist anywhere (AC-2)', async () => {
-    mockListEndpoints({ serializedItems: [] });
     mockedApiClient.get.mockImplementation((url: string) => {
       if (url === '/api/serialized-items/qr-pdf/') {
         return Promise.reject({ isAxiosError: true, response: { status: 400, data: {} } });
