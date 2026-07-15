@@ -678,6 +678,11 @@ describe('SerializedItemsPage', () => {
 
   it('deleting one item leaves a sibling item unaffected', async () => {
     // TC-02/AC-2
+    // Extended timeout: Popconfirm's rc-motion enter animation (see the
+    // pointerEventsCheck note above) can push userEvent's real click well
+    // past the 10s default on a loaded CI runner - a slow click here isn't a
+    // hang, but a timed-out one leaks a pending delete call into whichever
+    // test runs next (this file's mocks are only reset in afterEach).
     const serializedItems = [
       makeSerializedItem(),
       makeSerializedItem({ id: 2, serial_number: 'SN-043' }),
@@ -703,7 +708,7 @@ describe('SerializedItemsPage', () => {
     );
     await waitFor(() => expect(screen.queryByText('SN-042')).not.toBeInTheDocument());
     expect(screen.getByText('SN-043')).toBeInTheDocument();
-  });
+  }, 20000);
 
   it('leaves the item untouched when the delete confirmation is dismissed', async () => {
     // TC-03/AC-3
