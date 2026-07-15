@@ -14,6 +14,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
+import axios from 'axios';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useProductTypes } from '../features/product-types/useProductTypes';
@@ -130,7 +131,29 @@ export function SerializedItemsPage() {
         // finish synchronously, and revoking too early can truncate it.
         setTimeout(() => URL.revokeObjectURL(url), 0);
       },
-      onError: () => message.error(t('serializedItems.downloadQrPdfError')),
+      onError: (error) => {
+        // AC-1/AC-2: the backend rejects an empty export with a 400 (see
+        // qr_pdf's ValidationError) rather than a genuine failure status -
+        // that case gets its own "nothing to export" message instead of the
+        // generic failure banner. Distinguished by status, not by parsing
+        // the error body: the response is fetched with responseType: 'blob'
+        // (see downloadSerializedItemsQrPdf), so even an error response's
+        // body arrives as a Blob rather than parsed JSON, and re-deriving
+        // "was this the empty-result case" from productTypeFilter (already
+        // known client-side, and exactly what the backend itself branches
+        // on) is simpler than decoding it.
+        if (axios.isAxiosError(error) && error.response?.status === 400) {
+          message.warning(
+            t(
+              productTypeFilter
+                ? 'serializedItems.downloadQrPdfNoItemsForType'
+                : 'serializedItems.downloadQrPdfNoItems',
+            ),
+          );
+          return;
+        }
+        message.error(t('serializedItems.downloadQrPdfError'));
+      },
     });
   };
 
