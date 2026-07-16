@@ -8,6 +8,7 @@ import { LoginPage } from './pages/LoginPage';
 import { ProductTypesPage } from './pages/ProductTypesPage';
 import { PurchaseOrdersPage } from './pages/PurchaseOrdersPage';
 import { SerializedItemsPage } from './pages/SerializedItemsPage';
+import { WorkOrdersPage } from './pages/WorkOrdersPage';
 import { ROUTES } from './routes';
 
 function App() {
@@ -22,7 +23,7 @@ function App() {
           <Route path={ROUTES.serializedItems} element={<SerializedItemsPage />} />
           <Route path={ROUTES.boxes} element={<ComingSoonPage titleKey="nav.boxes" />} />
           <Route path={ROUTES.purchaseOrders} element={<PurchaseOrdersPage />} />
-          <Route path={ROUTES.workOrders} element={<ComingSoonPage titleKey="nav.workOrders" />} />
+          <Route path={ROUTES.workOrders} element={<WorkOrdersPage />} />
           <Route
             path={ROUTES.missingItems}
             element={<ComingSoonPage titleKey="nav.missingItems" />}
