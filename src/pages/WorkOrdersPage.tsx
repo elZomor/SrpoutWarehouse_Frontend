@@ -229,14 +229,25 @@ export function WorkOrdersPage() {
                 </Space>
               </div>
             ))}
-            {errors.line_items?.message && (
-              <Alert
-                type="error"
-                message={t(errors.line_items.message)}
-                showIcon
-                style={{ marginBottom: 8 }}
-              />
-            )}
+            {(() => {
+              // zodResolver puts a field array's own min()/max() error under
+              // .root, not .message directly - useFieldArray reserves
+              // errors.line_items.message for a (currently unused) error on
+              // the array field itself as a whole, distinct from .root
+              // which is what z.array(...).min(1) actually populates. See
+              // https://react-hook-form.com/docs/useform/formstate.
+              const arrayError = errors.line_items?.root?.message ?? errors.line_items?.message;
+              return (
+                arrayError && (
+                  <Alert
+                    type="error"
+                    message={t(arrayError)}
+                    showIcon
+                    style={{ marginBottom: 8 }}
+                  />
+                )
+              );
+            })()}
             <Button
               type="dashed"
               onClick={() => append(EMPTY_LINE_ITEM)}
