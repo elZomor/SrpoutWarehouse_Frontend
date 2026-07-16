@@ -179,5 +179,33 @@
       "addLineItemButton": "إضافة بند",
       "removeLineItemButton": "إزالة البند"
     }
+  },
+  "workOrders": {
+    "title": "أوامر العمل",
+    "newButton": "أمر عمل جديد",
+    "jobNameLabel": "اسم المهمة",
+    "clientNameLabel": "العميل",
+    "expectedDateOutLabel": "تاريخ الخروج المتوقع",
+    "statusLabel": "الحالة",
+    "status": {
+      "draft": "مسودة"
+    },
+    "createdByLabel": "أنشئ بواسطة",
+    "lineItemsLabel": "بنود الطلب",
+    "emptyState": "لا توجد أوامر عمل",
+    "loadError": "فشل تحميل أوامر العمل. حاول مرة أخرى.",
+    "createError": "فشل إنشاء أمر العمل. حاول مرة أخرى.",
+    "loadProductTypesError": "فشل تحميل أنواع المنتجات. حاول مرة أخرى.",
+    "form": {
+      "jobNameRequired": "اسم المهمة مطلوب",
+      "expectedDateOutRequired": "تاريخ الخروج المتوقع مطلوب",
+      "lineItemsRequired": "يجب إضافة بند واحد على الأقل",
+      "productTypePlaceholder": "اختر نوع المنتج",
+      "productTypeRequired": "نوع المنتج مطلوب",
+      "quantityPlaceholder": "الكمية",
+      "quantityRequired": "يجب أن تكون الكمية 1 على الأقل",
+      "addLineItemButton": "إضافة بند",
+      "removeLineItemButton": "إزالة البند"
+    }
   }
 }

@@ -175,5 +175,33 @@
       "addLineItemButton": "Add line item",
       "removeLineItemButton": "Remove line item"
     }
+  },
+  "workOrders": {
+    "title": "Work Orders",
+    "newButton": "New WO",
+    "jobNameLabel": "Job Name",
+    "clientNameLabel": "Client",
+    "expectedDateOutLabel": "Expected Date Out",
+    "statusLabel": "Status",
+    "status": {
+      "draft": "Draft"
+    },
+    "createdByLabel": "Created By",
+    "lineItemsLabel": "Line Items",
+    "emptyState": "No work orders found",
+    "loadError": "Failed to load work orders. Please try again.",
+    "createError": "Failed to create work order. Please try again.",
+    "loadProductTypesError": "Failed to load product types. Please try again.",
+    "form": {
+      "jobNameRequired": "Job name is required",
+      "expectedDateOutRequired": "Expected date out is required",
+      "lineItemsRequired": "At least one line item is required",
+      "productTypePlaceholder": "Select a product type",
+      "productTypeRequired": "Product type is required",
+      "quantityPlaceholder": "Qty",
+      "quantityRequired": "Quantity must be at least 1",
+      "addLineItemButton": "Add line item",
+      "removeLineItemButton": "Remove line item"
+    }
   }
 }
