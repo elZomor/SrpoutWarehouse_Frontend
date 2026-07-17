@@ -13,8 +13,14 @@ export default defineConfig({
     // Default 5000ms is tight for AntD Popconfirm/Modal rc-motion-heavy
     // tests under CI's slower runners - CategoriesPage's Popconfirm tests
     // intermittently timed out one at a time in CI (never locally) until
-    // this was raised.
-    testTimeout: 10000,
+    // this was raised. Raised again 10000 -> 20000 for WRH-55:
+    // WorkOrdersPage.test.tsx grew large enough (Tabs + 3 Table instances)
+    // that under `--coverage` instrumentation individual tests in that file
+    // (not just one specific one - varies run to run) intermittently cross
+    // 10s even with `--no-file-parallelism` (see test:coverage in
+    // package.json). Not a hang - the same tests pass in well under 1s
+    // without coverage.
+    testTimeout: 20000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
