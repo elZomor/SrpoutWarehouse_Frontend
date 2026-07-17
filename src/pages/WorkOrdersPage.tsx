@@ -11,7 +11,9 @@ import {
   Modal,
   Select,
   Space,
+  Spin,
   Table,
+  Tabs,
   Tag,
   Typography,
 } from 'antd';
@@ -26,18 +28,34 @@ import {
   type ScanItemFormValues,
   type WorkOrderFormValues,
 } from '../features/work-orders/schema';
-import type { WorkOrder } from '../features/work-orders/types';
+import type {
+  ActiveWorkOrder,
+  ActiveWorkOrderLineItem,
+  ActiveWorkOrderSupplementary,
+  WorkOrder,
+} from '../features/work-orders/types';
 import {
+  useActiveWorkOrders,
   useCompleteWorkOrder,
   useCreateWorkOrder,
   useScanWorkOrderItem,
   useStartWorkOrder,
+  useWorkOrderDetail,
   useWorkOrders,
 } from '../features/work-orders/useWorkOrders';
 import { getFieldErrorMessages } from '../lib/apiErrors';
 
 const DATE_FORMAT = 'YYYY-MM-DD';
 const EMPTY_LINE_ITEM = { product_type: undefined, quantity: undefined };
+// A Map (not a plain object) avoids eslint-plugin-security's
+// detect-object-injection warning on the dynamic-key lookup below, matching
+// SerializedItemsPage's identical STATUS_COLORS convention.
+const SERIALIZED_ITEM_STATUS_COLORS = new Map<string, string>([
+  ['available', 'green'],
+  ['reserved', 'gold'],
+  ['out', 'red'],
+]);
+const DEFAULT_STATUS_COLOR = 'default';
 
 export function WorkOrdersPage() {
   const { t } = useTranslation();
@@ -50,6 +68,17 @@ export function WorkOrdersPage() {
   const scanMutation = useScanWorkOrderItem(fulfillingWorkOrderId ?? 0);
   const completeMutation = useCompleteWorkOrder();
   const { data: productTypes, isError: isProductTypesError } = useProductTypes('');
+  const {
+    data: activeWorkOrders,
+    isLoading: isActiveLoading,
+    isError: isActiveError,
+  } = useActiveWorkOrders();
+  const [detailWorkOrderId, setDetailWorkOrderId] = useState<number | null>(null);
+  const {
+    data: workOrderDetail,
+    isLoading: isDetailLoading,
+    isError: isDetailError,
+  } = useWorkOrderDetail(detailWorkOrderId);
 
   // Derived (not a local snapshot) so the modal reflects each scan's
   // updated scanned/remaining counts as soon as useScanWorkOrderItem patches
@@ -296,30 +325,185 @@ export function WorkOrdersPage() {
     },
   ];
 
+  // Shared by the Primary row table and the nested supplementary table -
+  // both carry the same per-WO summary shape (see
+  // WorkOrderActiveSupplementarySerializer's backend comment: one level of
+  // nesting only, a supplementary never has its own supplementaries).
+  const activeColumns = [
+    {
+      title: t('workOrders.jobNameLabel'),
+      dataIndex: 'job_name',
+      key: 'job_name',
+    },
+    {
+      title: t('workOrders.clientNameLabel'),
+      dataIndex: 'client_name',
+      key: 'client_name',
+    },
+    {
+      title: t('workOrders.expectedDateOutLabel'),
+      dataIndex: 'expected_date_out',
+      key: 'expected_date_out',
+    },
+    {
+      title: t('workOrders.statusLabel'),
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => <Tag>{t(`workOrders.status.${status}`)}</Tag>,
+    },
+    {
+      title: t('workOrders.active.productTypesHeader'),
+      key: 'line_items',
+      render: (_: unknown, record: ActiveWorkOrder | ActiveWorkOrderSupplementary) => (
+        <Space direction="vertical" size={0}>
+          {record.line_items.map((item: ActiveWorkOrderLineItem) => (
+            <span key={item.id}>
+              {t('workOrders.active.productTypeSummary', {
+                productType: item.product_type_name,
+                returned: item.returned_quantity,
+                stillOut: item.still_out_quantity,
+              })}
+            </span>
+          ))}
+        </Space>
+      ),
+    },
+    {
+      title: t('workOrders.actionsLabel'),
+      key: 'actions',
+      render: (_: unknown, record: ActiveWorkOrder | ActiveWorkOrderSupplementary) => (
+        <Button size="small" onClick={() => setDetailWorkOrderId(record.id)}>
+          {t('workOrders.active.viewDetailsButton')}
+        </Button>
+      ),
+    },
+  ];
+
+  const detailRows = (workOrderDetail?.line_items ?? []).flatMap((lineItem) =>
+    lineItem.serialized_items.map((item) => ({
+      key: item.id,
+      product_type_name: lineItem.product_type_name,
+      serial_number: item.serial_number,
+      status: item.status,
+    })),
+  );
+
+  const detailColumns = [
+    {
+      title: t('workOrders.detail.productTypeHeader'),
+      dataIndex: 'product_type_name',
+      key: 'product_type_name',
+    },
+    {
+      title: t('workOrders.detail.serialNumberHeader'),
+      dataIndex: 'serial_number',
+      key: 'serial_number',
+    },
+    {
+      title: t('workOrders.detail.statusHeader'),
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => (
+        <Tag color={SERIALIZED_ITEM_STATUS_COLORS.get(status) ?? DEFAULT_STATUS_COLOR}>
+          {t(`serializedItems.status.${status}`)}
+        </Tag>
+      ),
+    },
+  ];
+
   return (
     <>
       <Typography.Title level={3}>{t('workOrders.title')}</Typography.Title>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <Button type="primary" onClick={() => setIsModalOpen(true)}>
-          {t('workOrders.newButton')}
-        </Button>
-      </div>
-      {isListError ? (
-        <Alert
-          type="error"
-          message={t('workOrders.loadError')}
-          showIcon
-          style={{ marginBottom: 16 }}
-        />
-      ) : (
-        <Table<WorkOrder>
-          rowKey="id"
-          columns={columns}
-          dataSource={workOrders}
-          loading={isLoading}
-          locale={{ emptyText: t('workOrders.emptyState') }}
-        />
-      )}
+      <Tabs
+        defaultActiveKey="active"
+        items={[
+          {
+            key: 'active',
+            label: t('workOrders.tabs.active'),
+            children: isActiveError ? (
+              <Alert type="error" message={t('workOrders.active.loadError')} showIcon />
+            ) : (
+              <Table<ActiveWorkOrder>
+                rowKey="id"
+                columns={activeColumns}
+                dataSource={activeWorkOrders}
+                loading={isActiveLoading}
+                locale={{ emptyText: t('workOrders.active.emptyState') }}
+                expandable={{
+                  rowExpandable: (record) => record.supplementaries.length > 0,
+                  expandedRowRender: (record) => (
+                    <Table<ActiveWorkOrderSupplementary>
+                      rowKey="id"
+                      size="small"
+                      pagination={false}
+                      showHeader={false}
+                      columns={activeColumns}
+                      dataSource={record.supplementaries}
+                    />
+                  ),
+                }}
+              />
+            ),
+          },
+          {
+            key: 'manage',
+            label: t('workOrders.tabs.manage'),
+            children: (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                  <Button type="primary" onClick={() => setIsModalOpen(true)}>
+                    {t('workOrders.newButton')}
+                  </Button>
+                </div>
+                {isListError ? (
+                  <Alert
+                    type="error"
+                    message={t('workOrders.loadError')}
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                  />
+                ) : (
+                  <Table<WorkOrder>
+                    rowKey="id"
+                    columns={columns}
+                    dataSource={workOrders}
+                    loading={isLoading}
+                    locale={{ emptyText: t('workOrders.emptyState') }}
+                  />
+                )}
+              </>
+            ),
+          },
+        ]}
+      />
+      <Modal
+        title={t('workOrders.detail.title', { jobName: workOrderDetail?.job_name ?? '' })}
+        open={detailWorkOrderId !== null}
+        onCancel={() => setDetailWorkOrderId(null)}
+        footer={[
+          <Button key="close" onClick={() => setDetailWorkOrderId(null)}>
+            {t('workOrders.detail.closeButton')}
+          </Button>,
+        ]}
+        width={640}
+      >
+        {isDetailLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
+            <Spin />
+          </div>
+        ) : isDetailError ? (
+          <Alert type="error" message={t('workOrders.detail.loadError')} showIcon />
+        ) : (
+          <Table
+            rowKey="key"
+            size="small"
+            pagination={false}
+            columns={detailColumns}
+            dataSource={detailRows}
+            locale={{ emptyText: t('workOrders.detail.emptyState') }}
+          />
+        )}
+      </Modal>
       <Modal
         title={t('workOrders.newButton')}
         open={isModalOpen}

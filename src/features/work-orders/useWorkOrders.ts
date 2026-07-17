@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   completeWorkOrder,
   createWorkOrder,
+  getWorkOrder,
+  listActiveWorkOrders,
   listWorkOrders,
   scanWorkOrderItem,
   startWorkOrder,
@@ -10,11 +12,28 @@ import type { ScanItemFormValues, WorkOrderFormValues } from './schema';
 import type { WorkOrder } from './types';
 
 const workOrdersBaseKey = ['work-orders'] as const;
+const activeWorkOrdersKey = ['work-orders', 'active'] as const;
+const workOrderDetailKey = (workOrderId: number) => ['work-orders', 'detail', workOrderId] as const;
 
 export function useWorkOrders() {
   return useQuery({
     queryKey: workOrdersBaseKey,
     queryFn: () => listWorkOrders(),
+  });
+}
+
+export function useActiveWorkOrders() {
+  return useQuery({
+    queryKey: activeWorkOrdersKey,
+    queryFn: () => listActiveWorkOrders(),
+  });
+}
+
+export function useWorkOrderDetail(workOrderId: number | null) {
+  return useQuery({
+    queryKey: workOrderDetailKey(workOrderId ?? 0),
+    queryFn: () => getWorkOrder(workOrderId as number),
+    enabled: workOrderId !== null,
   });
 }
 

@@ -100,7 +100,9 @@
     "filterByProductTypePlaceholder": "Filter by product type",
     "statusLabel": "Status",
     "status": {
-      "available": "Available"
+      "available": "Available",
+      "reserved": "Reserved",
+      "out": "Out"
     },
     "lastWorkOrderLabel": "Last Work Order",
     "noWorkOrder": "—",
@@ -230,6 +232,26 @@
       "overCapError": "This line item has already reached its requested quantity.",
       "genericError": "Failed to record this scan. Please try again.",
       "completeError": "Failed to complete fulfillment. Please try again."
+    },
+    "tabs": {
+      "active": "Active",
+      "manage": "Manage"
+    },
+    "active": {
+      "productTypesHeader": "Product Types",
+      "productTypeSummary": "{{productType}}: {{returned}} returned / {{stillOut}} still out",
+      "viewDetailsButton": "View Details",
+      "emptyState": "No active work orders found",
+      "loadError": "Failed to load active work orders. Please try again."
+    },
+    "detail": {
+      "title": "Work Order: {{jobName}}",
+      "productTypeHeader": "Product Type",
+      "serialNumberHeader": "Serial Number",
+      "statusHeader": "Status",
+      "closeButton": "Close",
+      "emptyState": "No serialized items found",
+      "loadError": "Failed to load work order details. Please try again."
     }
   }
 }

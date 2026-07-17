@@ -8,7 +8,7 @@ import { WorkOrdersPage } from './WorkOrdersPage';
 import { AppLayout } from '../components/AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
 import type { ProductType } from '../features/product-types/types';
-import type { WorkOrder } from '../features/work-orders/types';
+import type { ActiveWorkOrder, WorkOrder } from '../features/work-orders/types';
 import { apiClient } from '../lib/apiClient';
 import '../i18n';
 
@@ -56,21 +56,49 @@ function makeWorkOrder(overrides: Partial<WorkOrder> = {}): WorkOrder {
   };
 }
 
+function makeActiveWorkOrder(overrides: Partial<ActiveWorkOrder> = {}): ActiveWorkOrder {
+  return {
+    id: 1,
+    job_name: 'Summer Gala',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-01',
+    status: 'fulfilled',
+    line_items: [
+      {
+        id: 1,
+        product_type: 1,
+        product_type_name: 'Bar LED Model A',
+        quantity: 5,
+        returned_quantity: 1,
+        still_out_quantity: 4,
+      },
+    ],
+    supplementaries: [],
+    ...overrides,
+  };
+}
+
 // GET calls are routed by URL rather than call order, since the page fires
-// both the work-orders list query and the product-types dropdown query on
-// mount and the two aren't guaranteed to resolve in declaration order.
+// the work-orders list query, the active-work-orders query, and the
+// product-types dropdown query on mount and none are guaranteed to resolve
+// in declaration order.
 function mockListEndpoints({
   workOrders = [],
+  activeWorkOrders = [],
   productTypes = [makeProductType()],
   workOrdersError = false,
 }: {
   workOrders?: WorkOrder[];
+  activeWorkOrders?: ActiveWorkOrder[];
   productTypes?: ProductType[];
   workOrdersError?: boolean;
 }) {
   mockedApiClient.get.mockImplementation((url: string) => {
     if (url === '/api/product-types/') {
       return Promise.resolve({ data: productTypes });
+    }
+    if (url === '/api/work-orders/active/') {
+      return Promise.resolve({ data: activeWorkOrders });
     }
     if (url === '/api/work-orders/') {
       if (workOrdersError) {
@@ -82,7 +110,11 @@ function mockListEndpoints({
   });
 }
 
-function renderWorkOrdersPage() {
+// Active is the default tab (it's the story's intended entry point) - most
+// existing tests target the Manage tab's create/start/scan flows, so this
+// switches there by default. Active-tab tests pass `{ tab: 'active' }` to
+// skip the switch.
+async function renderWorkOrdersPage({ tab = 'manage' }: { tab?: 'active' | 'manage' } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -94,7 +126,7 @@ function renderWorkOrdersPage() {
     last_name: 'Doe',
   });
 
-  return render(
+  const result = render(
     <QueryClientProvider client={queryClient}>
       <AntApp>
         <MemoryRouter initialEntries={['/work-orders']}>
@@ -108,6 +140,12 @@ function renderWorkOrdersPage() {
       </AntApp>
     </QueryClientProvider>,
   );
+
+  if (tab === 'manage') {
+    await userEvent.setup().click(await screen.findByRole('tab', { name: /manage|الإدارة/i }));
+  }
+
+  return result;
 }
 
 async function fillExpectedDateOut(user: ReturnType<typeof userEvent.setup>, value: string) {
@@ -243,7 +281,7 @@ describe('WorkOrdersPage', () => {
     // TC-02/AC-1: job name, client, date, and line items all display.
     mockListEndpoints({ workOrders: [makeWorkOrder()] });
 
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     expect(await screen.findByText('Summer Gala')).toBeInTheDocument();
     expect(screen.getByText('Acme Events')).toBeInTheDocument();
@@ -264,7 +302,7 @@ describe('WorkOrdersPage', () => {
     // (which jsdom never actually does) - disable the check, matching
     // PurchaseOrdersPage's precedent.
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
     await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Summer Gala');
@@ -291,7 +329,7 @@ describe('WorkOrdersPage', () => {
     mockedApiClient.post.mockResolvedValueOnce({ data: makeWorkOrder({ client_name: '' }) });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
     await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Summer Gala');
@@ -315,7 +353,7 @@ describe('WorkOrdersPage', () => {
     mockedApiClient.post.mockResolvedValueOnce({ data: makeWorkOrder() });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
     await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Summer Gala');
@@ -345,7 +383,7 @@ describe('WorkOrdersPage', () => {
     mockListEndpoints({});
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
     await user.click(screen.getByRole('button', { name: 'OK' }));
@@ -358,7 +396,7 @@ describe('WorkOrdersPage', () => {
     mockListEndpoints({});
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
     await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Summer Gala');
@@ -376,7 +414,7 @@ describe('WorkOrdersPage', () => {
     mockListEndpoints({});
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
     await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Summer Gala');
@@ -396,7 +434,7 @@ describe('WorkOrdersPage', () => {
     mockListEndpoints({});
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
     await user.click(screen.getByRole('button', { name: /add line item|إضافة بند/i }));
@@ -417,7 +455,7 @@ describe('WorkOrdersPage', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
     await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Summer Gala');
@@ -434,7 +472,7 @@ describe('WorkOrdersPage', () => {
   it('shows an error banner when the list fails to load', async () => {
     mockListEndpoints({ workOrdersError: true });
 
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     expect(
       await screen.findByText(/failed to load work orders|فشل تحميل أوامر العمل/i),
@@ -447,7 +485,7 @@ describe('WorkOrdersPage', () => {
     mockListEndpoints({ workOrders: [workOrder] });
     mockFulfillmentEndpoints(workOrder);
 
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     await userEvent
       .setup()
@@ -468,7 +506,7 @@ describe('WorkOrdersPage', () => {
       },
     });
 
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     await userEvent
       .setup()
@@ -480,6 +518,12 @@ describe('WorkOrdersPage', () => {
     expect(screen.getByText(/^draft$|^مسودة$/i)).toBeInTheDocument();
   });
 
+  // Timeout bumped like the known Popconfirm/rc-motion flake (see
+  // LESSONS.md) - this page grew a Tabs + two extra Table instances for
+  // WRH-55, and under `--coverage` instrumentation this specific test's
+  // render + interaction cost reliably crosses Vitest's default 10s
+  // timeout (observed ~27-30s under coverage) even though it's not
+  // otherwise slow and passes well under 1s without coverage.
   it('does not show a loading state on other draft rows when starting one WO', async () => {
     // Efficiency/altitude regression: a shared mutation instance must not
     // spin every draft row's button when only one row's start is pending.
@@ -489,14 +533,14 @@ describe('WorkOrdersPage', () => {
     // Never resolves within this test - keeps workOrderA's start pending.
     mockedApiClient.post.mockImplementationOnce(() => new Promise(() => {}));
 
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     const rowA = await screen.findByRole('row', { name: /job a/i });
     await userEvent.setup().click(within(rowA).getByRole('button'));
 
     const rowB = screen.getByRole('row', { name: /job b/i });
     expect(within(rowB).getByRole('button')).toBeEnabled();
-  });
+  }, 45000);
 
   it('updates the live counter as items are scanned', async () => {
     // TC-02/AC-2
@@ -517,7 +561,7 @@ describe('WorkOrdersPage', () => {
     mockFulfillmentEndpoints(workOrder);
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
     await selectScanLineItem(user, 'Bar LED Model A');
@@ -557,7 +601,7 @@ describe('WorkOrdersPage', () => {
     mockFulfillmentEndpoints(workOrder);
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
     const completeButton = screen.getByRole('button', {
@@ -600,7 +644,7 @@ describe('WorkOrdersPage', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
     await user.click(screen.getByRole('button', { name: /complete fulfillment|إتمام التنفيذ/i }));
@@ -629,7 +673,7 @@ describe('WorkOrdersPage', () => {
     mockFulfillmentEndpoints(workOrder);
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWorkOrdersPage();
+    await renderWorkOrdersPage();
 
     await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
     await selectScanLineItem(user, 'Bar LED Model A');
@@ -638,5 +682,99 @@ describe('WorkOrdersPage', () => {
     await scanSerial(user, 'SN-DUP');
 
     expect(await screen.findByText(/not available to scan|غير متاح للمسح/i)).toBeInTheDocument();
+  });
+
+  it('shows an empty state on the Active tab when no active work orders exist', async () => {
+    // TC-04/AC-4
+    mockListEndpoints({});
+
+    await renderWorkOrdersPage({ tab: 'active' });
+
+    expect(
+      await screen.findByText(/no active work orders found|لا توجد أوامر عمل نشطة/i),
+    ).toBeInTheDocument();
+  });
+
+  it('renders an active work order with per-type returned/still-out counts', async () => {
+    // TC-02/AC-2
+    mockListEndpoints({ activeWorkOrders: [makeActiveWorkOrder()] });
+
+    await renderWorkOrdersPage({ tab: 'active' });
+
+    expect(await screen.findByText('Summer Gala')).toBeInTheDocument();
+    expect(screen.getByText('Acme Events')).toBeInTheDocument();
+    expect(screen.getByText('2026-08-01')).toBeInTheDocument();
+    expect(screen.getByText(/^fulfilled$|^تم التنفيذ$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Bar LED Model A: 1 (returned|تم إرجاعه) \/ 4 (still out|لا يزال خارجًا)/i),
+    ).toBeInTheDocument();
+  });
+
+  it('nests supplementaries beneath their Primary work order', async () => {
+    // TC-01/AC-1
+    const primary = makeActiveWorkOrder({
+      supplementaries: [
+        makeActiveWorkOrder({ id: 2, job_name: 'Supplementary A', supplementaries: [] }),
+        makeActiveWorkOrder({ id: 3, job_name: 'Supplementary B', supplementaries: [] }),
+      ],
+    });
+    mockListEndpoints({ activeWorkOrders: [primary] });
+
+    await renderWorkOrdersPage({ tab: 'active' });
+
+    await screen.findByText('Summer Gala');
+    expect(screen.queryByText('Supplementary A')).not.toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /expand row/i }));
+
+    expect(await screen.findByText('Supplementary A')).toBeInTheDocument();
+    expect(screen.getByText('Supplementary B')).toBeInTheDocument();
+  });
+
+  it('drills into a work order to show exact serials and their statuses', async () => {
+    // TC-03/AC-3
+    mockListEndpoints({ activeWorkOrders: [makeActiveWorkOrder()] });
+    mockedApiClient.get.mockImplementation((url: string) => {
+      if (url === '/api/work-orders/active/') {
+        return Promise.resolve({ data: [makeActiveWorkOrder()] });
+      }
+      if (url === '/api/product-types/') {
+        return Promise.resolve({ data: [makeProductType()] });
+      }
+      if (url === '/api/work-orders/1/') {
+        return Promise.resolve({
+          data: {
+            id: 1,
+            job_name: 'Summer Gala',
+            client_name: 'Acme Events',
+            expected_date_out: '2026-08-01',
+            status: 'fulfilled',
+            created_by: 1,
+            created_by_username: 'jane',
+            parent_work_order: null,
+            line_items: [
+              {
+                id: 1,
+                product_type: 1,
+                product_type_name: 'Bar LED Model A',
+                quantity: 1,
+                serialized_items: [{ id: 1, serial_number: 'SN-0001', status: 'out' }],
+              },
+            ],
+          },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    await renderWorkOrdersPage({ tab: 'active' });
+
+    await userEvent
+      .setup()
+      .click(await screen.findByRole('button', { name: /view details|عرض التفاصيل/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('SN-0001')).toBeInTheDocument();
+    expect(within(dialog).getByText(/^out$|^خارج$/i)).toBeInTheDocument();
   });
 });

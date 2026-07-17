@@ -104,7 +104,9 @@
     "filterByProductTypePlaceholder": "التصفية حسب نوع المنتج",
     "statusLabel": "الحالة",
     "status": {
-      "available": "متاح"
+      "available": "متاح",
+      "reserved": "محجوز",
+      "out": "خارج"
     },
     "lastWorkOrderLabel": "آخر أمر عمل",
     "noWorkOrder": "—",
@@ -234,6 +236,26 @@
       "overCapError": "استلم هذا البند بالفعل الكمية المطلوبة.",
       "genericError": "فشل تسجيل هذا المسح. حاول مرة أخرى.",
       "completeError": "فشل إتمام التنفيذ. حاول مرة أخرى."
+    },
+    "tabs": {
+      "active": "النشطة",
+      "manage": "الإدارة"
+    },
+    "active": {
+      "productTypesHeader": "أنواع المنتجات",
+      "productTypeSummary": "{{productType}}: {{returned}} تم إرجاعه / {{stillOut}} لا يزال خارجًا",
+      "viewDetailsButton": "عرض التفاصيل",
+      "emptyState": "لا توجد أوامر عمل نشطة",
+      "loadError": "فشل تحميل أوامر العمل النشطة. حاول مرة أخرى."
+    },
+    "detail": {
+      "title": "أمر العمل: {{jobName}}",
+      "productTypeHeader": "نوع المنتج",
+      "serialNumberHeader": "الرقم التسلسلي",
+      "statusHeader": "الحالة",
+      "closeButton": "إغلاق",
+      "emptyState": "لا توجد عناصر مسلسلة",
+      "loadError": "فشل تحميل تفاصيل أمر العمل. حاول مرة أخرى."
     }
   }
 }

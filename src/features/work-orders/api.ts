@@ -1,9 +1,19 @@
 import { apiClient } from '../../lib/apiClient';
 import type { ScanItemFormValues, WorkOrderFormValues } from './schema';
-import type { WorkOrder } from './types';
+import type { ActiveWorkOrder, WorkOrder, WorkOrderDetail } from './types';
 
 export async function listWorkOrders(): Promise<WorkOrder[]> {
   const { data } = await apiClient.get<WorkOrder[]>('/api/work-orders/');
+  return data;
+}
+
+export async function listActiveWorkOrders(): Promise<ActiveWorkOrder[]> {
+  const { data } = await apiClient.get<ActiveWorkOrder[]>('/api/work-orders/active/');
+  return data;
+}
+
+export async function getWorkOrder(workOrderId: number): Promise<WorkOrderDetail> {
+  const { data } = await apiClient.get<WorkOrderDetail>(`/api/work-orders/${workOrderId}/`);
   return data;
 }
 
