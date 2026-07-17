@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -48,6 +48,8 @@ function makeWorkOrder(overrides: Partial<WorkOrder> = {}): WorkOrder {
         product_type: 1,
         product_type_name: 'Bar LED Model A',
         quantity: 5,
+        scanned_quantity: 0,
+        remaining_quantity: 5,
       },
     ],
     ...overrides,
@@ -114,6 +116,100 @@ async function fillExpectedDateOut(user: ReturnType<typeof userEvent.setup>, val
   // since AntD's Modal also listens for Escape to cancel.
   const dateInput = screen.getByLabelText(/expected date out|تاريخ الخروج المتوقع/i);
   await user.type(dateInput, `${value}{Enter}`);
+}
+
+// Simulates the backend's start/scan/complete endpoints: each POST mutates
+// a shared in-memory WorkOrder and returns the freshly-recomputed object,
+// mirroring PurchaseOrdersPage.test.tsx's mockReceiveEndpoint precedent for
+// the same kind of scan-gun-driven flow.
+function mockFulfillmentEndpoints(initialWorkOrder: WorkOrder) {
+  let current: WorkOrder = structuredClone(initialWorkOrder);
+  const seenSerialNumbers = new Set<string>();
+
+  mockedApiClient.post.mockImplementation((url: string, body?: unknown) => {
+    if (url === `/api/work-orders/${current.id}/start/`) {
+      current = { ...current, status: 'in_progress' };
+      return Promise.resolve({ data: current });
+    }
+    if (url === `/api/work-orders/${current.id}/scan/`) {
+      const { line_item, serial_number } = body as {
+        line_item: number;
+        serial_number: string;
+      };
+      if (seenSerialNumbers.has(serial_number)) {
+        return Promise.reject({
+          isAxiosError: true,
+          response: {
+            status: 400,
+            data: { serial_number: ['This item is not available to scan.'] },
+          },
+        });
+      }
+      const targetLineItem = current.line_items.find((item) => item.id === line_item);
+      if (targetLineItem && targetLineItem.remaining_quantity <= 0) {
+        return Promise.reject({
+          isAxiosError: true,
+          response: {
+            status: 400,
+            data: { line_item: ['This line item has already reached its requested quantity.'] },
+          },
+        });
+      }
+      seenSerialNumbers.add(serial_number);
+      const line_items = current.line_items.map((item) =>
+        item.id === line_item
+          ? {
+              ...item,
+              scanned_quantity: item.scanned_quantity + 1,
+              remaining_quantity: item.remaining_quantity - 1,
+            }
+          : item,
+      );
+      current = { ...current, line_items };
+      return Promise.resolve({ data: current });
+    }
+    if (url === `/api/work-orders/${current.id}/complete/`) {
+      if (current.line_items.some((item) => item.remaining_quantity > 0)) {
+        return Promise.reject({
+          isAxiosError: true,
+          response: {
+            status: 400,
+            data: {
+              status: [
+                'All line items must reach their requested quantity before fulfillment can be completed.',
+              ],
+            },
+          },
+        });
+      }
+      current = { ...current, status: 'fulfilled' };
+      return Promise.resolve({ data: current });
+    }
+    return Promise.reject(new Error(`Unexpected POST ${url}`));
+  });
+
+  return {
+    getCurrent: () => current,
+  };
+}
+
+async function selectScanLineItem(user: ReturnType<typeof userEvent.setup>, name: string) {
+  const dialog = screen.getByRole('dialog');
+  const combobox = within(dialog).getByRole('combobox');
+  await user.click(combobox);
+  const option = screen.getAllByTitle(name).at(-1);
+  if (!option) {
+    throw new Error(`No option found for ${name}`);
+  }
+  await user.click(option);
+}
+
+async function scanSerial(user: ReturnType<typeof userEvent.setup>, serialNumber: string) {
+  const dialog = screen.getByRole('dialog');
+  const input = screen.getByLabelText(/serial number|الرقم التسلسلي/i);
+  await user.clear(input);
+  await user.type(input, serialNumber);
+  await user.click(within(dialog).getByRole('button', { name: /^scan$|^مسح$/i }));
 }
 
 async function selectProductTypeForLineItem(
@@ -343,5 +439,128 @@ describe('WorkOrdersPage', () => {
     expect(
       await screen.findByText(/failed to load work orders|فشل تحميل أوامر العمل/i),
     ).toBeInTheDocument();
+  });
+
+  it('starts fulfillment, moving a draft WO to in_progress', async () => {
+    // TC-01/AC-1
+    const workOrder = makeWorkOrder();
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockFulfillmentEndpoints(workOrder);
+
+    renderWorkOrdersPage();
+
+    await userEvent
+      .setup()
+      .click(await screen.findByRole('button', { name: /start fulfillment|بدء التنفيذ/i }));
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith(`/api/work-orders/${workOrder.id}/start/`);
+    expect(await screen.findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
+  });
+
+  it('updates the live counter as items are scanned', async () => {
+    // TC-02/AC-2
+    const workOrder = makeWorkOrder({
+      status: 'in_progress',
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          quantity: 3,
+          scanned_quantity: 0,
+          remaining_quantity: 3,
+        },
+      ],
+    });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockFulfillmentEndpoints(workOrder);
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-1001');
+    await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
+    await scanSerial(user, 'SN-1002');
+    await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(2));
+
+    expect(mockedApiClient.post).toHaveBeenNthCalledWith(1, `/api/work-orders/1/scan/`, {
+      line_item: 1,
+      serial_number: 'SN-1001',
+    });
+    const dialog = screen.getByRole('dialog');
+    const row = await within(dialog).findByRole('row', { name: /bar led model a/i });
+    const cells = within(row)
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent);
+    expect(cells).toEqual(['Bar LED Model A', '3', '2', '1']); // requested, scanned, remaining
+  });
+
+  it('disables Complete Fulfillment until every line item is fully scanned, then completes', async () => {
+    // TC-04/AC-4
+    const workOrder = makeWorkOrder({
+      status: 'in_progress',
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          quantity: 1,
+          scanned_quantity: 0,
+          remaining_quantity: 1,
+        },
+      ],
+    });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockFulfillmentEndpoints(workOrder);
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    const completeButton = screen.getByRole('button', {
+      name: /complete fulfillment|إتمام التنفيذ/i,
+    });
+    expect(completeButton).toBeDisabled();
+
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-2001');
+    await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
+
+    expect(completeButton).toBeEnabled();
+    await user.click(completeButton);
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith(`/api/work-orders/1/complete/`);
+    expect(await screen.findByText(/^fulfilled$|^تم التنفيذ$/i)).toBeInTheDocument();
+  });
+
+  it('shows an inline error for a duplicate/unavailable serial scan', async () => {
+    const workOrder = makeWorkOrder({
+      status: 'in_progress',
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          quantity: 2,
+          scanned_quantity: 0,
+          remaining_quantity: 2,
+        },
+      ],
+    });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockFulfillmentEndpoints(workOrder);
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-DUP');
+    await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
+    await scanSerial(user, 'SN-DUP');
+
+    expect(await screen.findByText(/not available to scan|غير متاح للمسح/i)).toBeInTheDocument();
   });
 });

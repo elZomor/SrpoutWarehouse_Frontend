@@ -1,10 +1,12 @@
-export type WorkOrderStatus = 'draft';
+export type WorkOrderStatus = 'draft' | 'in_progress' | 'fulfilled';
 
 export interface WorkOrderLineItem {
   id: number;
   product_type: number;
   product_type_name: string;
   quantity: number;
+  scanned_quantity: number;
+  remaining_quantity: number;
 }
 
 export interface WorkOrder {

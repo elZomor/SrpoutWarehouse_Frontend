@@ -184,7 +184,9 @@
     "expectedDateOutLabel": "Expected Date Out",
     "statusLabel": "Status",
     "status": {
-      "draft": "Draft"
+      "draft": "Draft",
+      "in_progress": "In Progress",
+      "fulfilled": "Fulfilled"
     },
     "createdByLabel": "Created By",
     "lineItemsLabel": "Line Items",
@@ -192,6 +194,9 @@
     "loadError": "Failed to load work orders. Please try again.",
     "createError": "Failed to create work order. Please try again.",
     "loadProductTypesError": "Failed to load product types. Please try again.",
+    "actionsLabel": "Actions",
+    "startButton": "Start Fulfillment",
+    "scanButton": "Scan",
     "form": {
       "jobNameRequired": "Job name is required",
       "expectedDateOutRequired": "Expected date out is required",
@@ -202,6 +207,27 @@
       "quantityRequired": "Quantity must be at least 1",
       "addLineItemButton": "Add line item",
       "removeLineItemButton": "Remove line item"
+    },
+    "scan": {
+      "title": "Fulfill: {{jobName}}",
+      "lineItemHeader": "Product",
+      "quantityHeader": "Requested",
+      "scannedHeader": "Scanned",
+      "remainingHeader": "Remaining",
+      "lineItemLabel": "Line Item",
+      "lineItemPlaceholder": "Select a line item",
+      "lineItemRequired": "Line item is required",
+      "serialNumberLabel": "Serial Number",
+      "serialNumberPlaceholder": "Scan or type a serial number",
+      "serialNumberRequired": "Serial number is required",
+      "scanButton": "Scan",
+      "completeButton": "Complete Fulfillment",
+      "doneButton": "Done",
+      "notFoundError": "No item found with this serial number.",
+      "productTypeMismatchError": "This item does not match the selected line item's product type.",
+      "notAvailableError": "This item is not available to scan.",
+      "overCapError": "This line item has already reached its requested quantity.",
+      "genericError": "Failed to record this scan. Please try again."
     }
   }
 }
