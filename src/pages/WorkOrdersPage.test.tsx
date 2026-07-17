@@ -1271,4 +1271,40 @@ describe('WorkOrdersPage', () => {
     // unconditionally in onSuccess).
     expect(screen.queryByText(/^partially returned$|^إرجاع جزئي$/i)).not.toBeInTheDocument();
   }, 40000);
+
+  it('does not apply a stale response after closing and reopening the same WO', async () => {
+    // Regression: a workOrderId-only staleness check can't tell a closed-
+    // then-reopened session for the SAME WO apart from the original one -
+    // this response belongs to the abandoned first session and must not
+    // overwrite the freshly reopened one, even though the id matches.
+    const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
+    mockListEndpoints({ activeWorkOrders: [workOrder] });
+    let resolvePost: ((value: { data: unknown }) => void) | undefined;
+    mockedApiClient.post.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePost = resolve;
+        }),
+    );
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openReturnModal(user);
+    await returnSerial(user, 'SN-8001');
+
+    await user.click(screen.getByRole('button', { name: /^done$|^تم$/i }));
+    await openReturnModal(user);
+
+    await act(async () => {
+      resolvePost?.({ data: { ...workOrder, status: 'partially_returned' } });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The reopened session must keep showing its own (fulfilled) status,
+    // not get silently overwritten by the abandoned first session's
+    // stale "partially_returned" response.
+    expect(screen.queryByText(/^partially returned$|^إرجاع جزئي$/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog').textContent).toMatch(/fulfilled|تم التنفيذ/i);
+  }, 40000);
 });

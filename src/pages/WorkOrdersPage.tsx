@@ -156,19 +156,19 @@ export function WorkOrdersPage() {
   // it's tracked as local state rather than patched into a query cache -
   // see useReturnWorkOrderItem's comment.
   const [returnSession, setReturnSession] = useState<WorkOrderReturnResult | null>(null);
-  // Tracks the CURRENTLY displayed session's id at all times, written only
-  // inside an effect (the sanctioned place per useRef's own docs — never
-  // touched by onReturnSubmit or anything it calls, since that's read
-  // during render via handleReturnSubmit(...) and would trip
-  // react-hooks/refs). Read inside the submission effect's settled-Promise
-  // callbacks below to detect a response that's no longer relevant - a
-  // stale response for a session the user has since closed or replaced
-  // with a different WO must not reopen the modal or overwrite the wrong
-  // WO's data.
-  const currentReturnSessionIdRef = useRef<number | null>(null);
-  useEffect(() => {
-    currentReturnSessionIdRef.current = returnSession?.id ?? null;
-  }, [returnSession]);
+  // Bumped on every open/close of the Return modal - a "generation" a
+  // submission effect below can compare itself against later, since a
+  // fresh open (even re-opening the *same* work order) starts a logically
+  // new session that any earlier in-flight submission's response no
+  // longer belongs to, and a workOrderId-only comparison can't tell that
+  // apart from the original session (WRH-38 review: closing a modal with
+  // a submission in flight, then reopening the same WO before that
+  // response lands, would otherwise still pass an id-only check).
+  // Written directly here since openReturnModal/closeReturnModal are
+  // plain event handlers (not reachable from handleReturnSubmit(...),
+  // evaluated during render, which is what react-hooks/refs actually
+  // objects to per useRef's own docs).
+  const returnSessionGenerationRef = useRef(0);
   const returnMutation = useReturnWorkOrderItem(returnSession?.id ?? 0);
   const {
     control: returnControl,
@@ -182,10 +182,8 @@ export function WorkOrdersPage() {
     defaultValues: { serial_number: '' },
   });
   const [returnErrorParams, setReturnErrorParams] = useState<{ workOrderId?: string }>({});
-  const [pendingReturnSubmission, setPendingReturnSubmission] = useState<{
-    workOrderId: number;
-    values: ReturnItemFormValues;
-  } | null>(null);
+  const [pendingReturnSubmission, setPendingReturnSubmission] =
+    useState<ReturnItemFormValues | null>(null);
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -337,6 +335,10 @@ export function WorkOrdersPage() {
   };
 
   const openReturnModal = (workOrder: ActiveWorkOrder | ActiveWorkOrderSupplementary) => {
+    // Starting a new session (even re-opening the same WO) invalidates
+    // any earlier in-flight submission - see returnSessionGenerationRef's
+    // comment.
+    returnSessionGenerationRef.current += 1;
     setReturnSession({
       id: workOrder.id,
       job_name: workOrder.job_name,
@@ -353,6 +355,7 @@ export function WorkOrdersPage() {
     // return_item call during this session only updated local state (see
     // returnSession's comment), so the Active tab's cache needs to catch up
     // now rather than on every single scan.
+    returnSessionGenerationRef.current += 1;
     if (returnSession !== null) {
       invalidateActiveWorkOrders(returnSession.id);
     }
@@ -363,24 +366,23 @@ export function WorkOrdersPage() {
   };
 
   const onReturnSubmit = (values: ReturnItemFormValues) => {
-    if (returnSession === null) {
-      return;
-    }
-    setPendingReturnSubmission({ workOrderId: returnSession.id, values });
+    setPendingReturnSubmission(values);
   };
 
-  // A response can land after the user has since closed the modal or
-  // opened a *different* WO's session - unlike scan/complete (whose modal
-  // visibility is derived from the query cache, so a late response can't
-  // reopen it), returnSession is local state that a stale response could
-  // otherwise overwrite or reopen directly (see returnSession's comment).
-  // onReturnSubmit itself must stay ref-free (react-hooks/refs fires on
-  // anything reachable from a function passed to handleReturnSubmit(...),
-  // evaluated during render) - this separate effect owns the actual
-  // mutateAsync() call and checks currentReturnSessionIdRef only inside the
-  // settled Promise's .then()/.catch() callbacks, mirroring React's
-  // documented "ignore flag" stale-response pattern (setState inside the
-  // callback, not the effect body itself - see
+  // A response can land after the user has since closed the modal, opened
+  // a *different* WO's session, or closed and re-opened the *same* WO's
+  // session while this submission was still in flight - unlike scan/
+  // complete (whose modal visibility is derived from the query cache, so
+  // a late response can't reopen it), returnSession is local state that a
+  // stale response could otherwise overwrite or reopen directly (see
+  // returnSession's comment). onReturnSubmit itself must stay ref-free
+  // (react-hooks/refs fires on anything reachable from a function passed
+  // to handleReturnSubmit(...), evaluated during render) - this separate
+  // effect owns the actual mutateAsync() call and captures the current
+  // returnSessionGenerationRef value up front, then re-checks it only
+  // inside the settled Promise's .then()/.catch() callbacks, mirroring
+  // React's documented "ignore flag" stale-response pattern (setState
+  // inside the callback, not the effect body itself - see
   // react.dev/learn/you-might-not-need-an-effect's "Fetching data"
   // section). returnMutation/resetReturnForm/setReturnError/setReturnFocus
   // are deliberately excluded from the dependency array: including
@@ -391,12 +393,13 @@ export function WorkOrdersPage() {
     if (!pendingReturnSubmission) {
       return;
     }
-    const { workOrderId, values } = pendingReturnSubmission;
+    const values = pendingReturnSubmission;
+    const generation = returnSessionGenerationRef.current;
     let ignore = false;
 
     returnMutation.mutateAsync(values).then(
       (updated) => {
-        if (ignore || currentReturnSessionIdRef.current !== workOrderId) {
+        if (ignore || returnSessionGenerationRef.current !== generation) {
           return;
         }
         setReturnSession(updated);
@@ -405,7 +408,7 @@ export function WorkOrdersPage() {
         setReturnFocus('serial_number');
       },
       (error) => {
-        if (ignore || currentReturnSessionIdRef.current !== workOrderId) {
+        if (ignore || returnSessionGenerationRef.current !== generation) {
           return;
         }
         const serialErrors = getFieldErrorMessages(error, 'serial_number');
