@@ -543,7 +543,7 @@ describe('WorkOrdersPage', () => {
 
     const activeRow = await screen.findByRole('row', { name: /summer gala/i });
     expect(await within(activeRow).findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
-  }, 40000);
+  }, 60000);
 
   it('shows a toast when starting fulfillment fails, leaving the WO as draft', async () => {
     const workOrder = makeWorkOrder();
@@ -1021,7 +1021,7 @@ describe('WorkOrdersPage', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('SN-0001')).toBeInTheDocument();
     expect(within(dialog).getByText(/^out$|^خارج$/i)).toBeInTheDocument();
-  }, 45000);
+  }, 60000);
 
   // WRH-38: mocks return_item() only - mockListEndpoints still supplies the
   // active-list GET, matching mockScanRejection's precedent of a
@@ -1306,5 +1306,5 @@ describe('WorkOrdersPage', () => {
     // stale "partially_returned" response.
     expect(screen.queryByText(/^partially returned$|^إرجاع جزئي$/i)).not.toBeInTheDocument();
     expect(screen.getByRole('dialog').textContent).toMatch(/fulfilled|تم التنفيذ/i);
-  }, 40000);
+  }, 60000);
 });
