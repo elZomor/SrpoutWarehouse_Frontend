@@ -734,6 +734,88 @@ describe('WorkOrdersPage', () => {
     expect(await screen.findByText(/not available to scan|غير متاح للمسح/i)).toBeInTheDocument();
   });
 
+  // AC-1/TC-01, AC-3/TC-03, AC-4/TC-04: each rejects with a distinct,
+  // status-specific serial_number error - mockScanRejection stands in for
+  // mockFulfillmentEndpoints' generic scan mock so each test can supply the
+  // exact message WorkOrderViewSet.scan() (WRH-33) returns for its case.
+  function mockScanRejection(workOrder: WorkOrder, message: string) {
+    mockedApiClient.post.mockImplementation((url: string) => {
+      if (url === `/api/work-orders/${workOrder.id}/scan/`) {
+        return Promise.reject({
+          isAxiosError: true,
+          response: { status: 400, data: { serial_number: [message] } },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected POST ${url}`));
+    });
+  }
+
+  it('shows "serial not found" for an unregistered serial', async () => {
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, 'Serial not found');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-NOPE');
+
+    expect(
+      await screen.findByText(/no item found with this serial number|لا يوجد عنصر/i),
+    ).toBeInTheDocument();
+  });
+
+  it('names the other work order when the scanned item is already out', async () => {
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, 'SN-042 is currently out on WO-17');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-042');
+
+    expect(await screen.findByText(/WO-17/)).toBeInTheDocument();
+  });
+
+  it('shows a damaged-specific error for a damaged item', async () => {
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, 'SN-099 is damaged and cannot be issued');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-099');
+
+    expect(
+      await screen.findByText(/is damaged and cannot be issued|تالف ولا يمكن صرفه/i),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a missing-specific error for a missing item', async () => {
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, 'SN-100 is missing and cannot be issued');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-100');
+
+    expect(
+      await screen.findByText(/is missing and cannot be issued|مفقود ولا يمكن صرفه/i),
+    ).toBeInTheDocument();
+  });
+
   it('shows an empty state on the Active tab when no active work orders exist', async () => {
     // TC-04/AC-4
     mockListEndpoints({});

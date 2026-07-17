@@ -57,6 +57,11 @@ const SERIALIZED_ITEM_STATUS_COLORS = new Map<string, string>([
   ['out', 'red'],
 ]);
 const DEFAULT_STATUS_COLOR = 'default';
+// WRH-33: scan() now names the *other* WO an out/reserved item is claimed
+// against in its rejection text (e.g. "... is currently out on WO-17") -
+// the frontend has no other way to learn that WO's id, so it's parsed back
+// out of the server's own message rather than duplicated client-side.
+const WORK_ORDER_ID_PATTERN = /WO-(\d+)/;
 
 export function WorkOrdersPage() {
   const { t } = useTranslation();
@@ -116,6 +121,12 @@ export function WorkOrdersPage() {
     resolver: zodResolver(scanItemSchema),
     defaultValues: { line_item: undefined, serial_number: '' },
   });
+  // scanErrors.serial_number.message only ever holds an i18n key (both the
+  // zod-resolver's built-in required-field keys and the server-driven keys
+  // set in onScanSubmit's onError below) - the WO-id a rejected out/reserved
+  // scan needs to interpolate lives here instead, alongside it rather than
+  // baked into the key itself.
+  const [scanErrorParams, setScanErrorParams] = useState<{ workOrderId?: string }>({});
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -130,6 +141,7 @@ export function WorkOrdersPage() {
   const openFulfillmentModal = (workOrder: WorkOrder) => {
     setFulfillingWorkOrderId(workOrder.id);
     resetScanForm({ line_item: undefined, serial_number: '' });
+    setScanErrorParams({});
     scanMutation.reset();
     completeMutation.reset();
   };
@@ -143,6 +155,7 @@ export function WorkOrdersPage() {
     }
     setFulfillingWorkOrderId(null);
     resetScanForm();
+    setScanErrorParams({});
     scanMutation.reset();
     completeMutation.reset();
   };
@@ -170,13 +183,16 @@ export function WorkOrdersPage() {
               : undefined,
           serial_number: '',
         });
+        setScanErrorParams({});
         setScanFocus('serial_number');
       },
       onError: (error) => {
         const serialErrors = getFieldErrorMessages(error, 'serial_number');
         const lineItemErrors = getFieldErrorMessages(error, 'line_item');
+        setScanErrorParams({});
 
-        if (serialErrors.some((message) => message.includes('No item found'))) {
+        // AC-4: exact backend text is "Serial not found".
+        if (serialErrors.some((message) => message === 'Serial not found')) {
           setScanError('serial_number', {
             type: 'server',
             message: 'workOrders.scan.notFoundError',
@@ -190,7 +206,43 @@ export function WorkOrdersPage() {
           });
           return;
         }
-        if (serialErrors.some((message) => message.includes('not available'))) {
+        // AC-1: item already out on another WO - name that WO.
+        const outMessage = serialErrors.find((message) => message.includes('is currently out on'));
+        if (outMessage) {
+          setScanErrorParams({ workOrderId: outMessage.match(WORK_ORDER_ID_PATTERN)?.[1] });
+          setScanError('serial_number', { type: 'server', message: 'workOrders.scan.outError' });
+          return;
+        }
+        // Same WO reference as above, but for a scan-in-progress double-tap
+        // (item already claimed, not yet confirmed out) rather than a fully
+        // fulfilled WO.
+        const reservedMessage = serialErrors.find((message) =>
+          message.includes('is already reserved on'),
+        );
+        if (reservedMessage) {
+          setScanErrorParams({ workOrderId: reservedMessage.match(WORK_ORDER_ID_PATTERN)?.[1] });
+          setScanError('serial_number', {
+            type: 'server',
+            message: 'workOrders.scan.reservedError',
+          });
+          return;
+        }
+        // AC-3: damaged/missing items.
+        if (serialErrors.some((message) => message.includes('is damaged and cannot be issued'))) {
+          setScanError('serial_number', {
+            type: 'server',
+            message: 'workOrders.scan.damagedError',
+          });
+          return;
+        }
+        if (serialErrors.some((message) => message.includes('is missing and cannot be issued'))) {
+          setScanError('serial_number', {
+            type: 'server',
+            message: 'workOrders.scan.missingError',
+          });
+          return;
+        }
+        if (serialErrors.length > 0) {
           setScanError('serial_number', {
             type: 'server',
             message: 'workOrders.scan.notAvailableError',
@@ -685,7 +737,9 @@ export function WorkOrdersPage() {
                 htmlFor="scan-serial_number"
                 validateStatus={scanErrors.serial_number ? 'error' : ''}
                 help={
-                  scanErrors.serial_number ? t(scanErrors.serial_number.message ?? '') : undefined
+                  scanErrors.serial_number
+                    ? t(scanErrors.serial_number.message ?? '', scanErrorParams)
+                    : undefined
                 }
               >
                 <Controller
