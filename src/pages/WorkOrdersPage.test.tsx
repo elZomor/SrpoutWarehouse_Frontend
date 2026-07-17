@@ -495,6 +495,49 @@ describe('WorkOrdersPage', () => {
     expect(await screen.findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
   });
 
+  it('refreshes the Active tab after starting a WO from the Manage tab', async () => {
+    // Regression: the Active tab's query is a separate cache from the flat
+    // work-orders list and doesn't remount on tab switch (AntD keeps an
+    // already-rendered pane mounted) - starting a WO on Manage must
+    // invalidate it or the Active tab keeps showing the pre-start status.
+    const workOrder = makeWorkOrder({ status: 'draft' });
+    let activeStatus: 'draft' | 'in_progress' = 'draft';
+    mockedApiClient.get.mockImplementation((url: string) => {
+      if (url === '/api/product-types/') {
+        return Promise.resolve({ data: [makeProductType()] });
+      }
+      if (url === '/api/work-orders/active/') {
+        return Promise.resolve({ data: [makeActiveWorkOrder({ status: activeStatus })] });
+      }
+      if (url === '/api/work-orders/') {
+        return Promise.resolve({ data: [workOrder] });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+    mockedApiClient.post.mockImplementation((url: string) => {
+      if (url === `/api/work-orders/${workOrder.id}/start/`) {
+        activeStatus = 'in_progress';
+        return Promise.resolve({ data: { ...workOrder, status: 'in_progress' } });
+      }
+      return Promise.reject(new Error(`Unexpected POST ${url}`));
+    });
+
+    await renderWorkOrdersPage();
+    await userEvent
+      .setup()
+      .click(await screen.findByRole('button', { name: /start fulfillment|بدء التنفيذ/i }));
+    // AntD keeps both tab panes mounted, so both the Manage row and the
+    // (still-stale, pre-invalidation) Active row for the same WO can be in
+    // the DOM at once - scope to the Manage table's own row.
+    const manageRow = await screen.findByRole('row', { name: /summer gala/i });
+    await within(manageRow).findByText(/^in progress$|^قيد التنفيذ$/i);
+
+    await userEvent.setup().click(screen.getByRole('tab', { name: /active|النشطة/i }));
+
+    const activeRow = await screen.findByRole('row', { name: /summer gala/i });
+    expect(await within(activeRow).findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
+  });
+
   it('shows a toast when starting fulfillment fails, leaving the WO as draft', async () => {
     const workOrder = makeWorkOrder();
     mockListEndpoints({ workOrders: [workOrder] });

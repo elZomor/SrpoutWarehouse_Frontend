@@ -38,6 +38,7 @@ import {
   useActiveWorkOrders,
   useCompleteWorkOrder,
   useCreateWorkOrder,
+  useInvalidateActiveWorkOrders,
   useScanWorkOrderItem,
   useStartWorkOrder,
   useWorkOrderDetail,
@@ -67,6 +68,7 @@ export function WorkOrdersPage() {
   const startMutation = useStartWorkOrder();
   const scanMutation = useScanWorkOrderItem(fulfillingWorkOrderId ?? 0);
   const completeMutation = useCompleteWorkOrder();
+  const invalidateActiveWorkOrders = useInvalidateActiveWorkOrders();
   const { data: productTypes, isError: isProductTypesError } = useProductTypes('');
   const {
     data: activeWorkOrders,
@@ -133,6 +135,12 @@ export function WorkOrdersPage() {
   };
 
   const closeFulfillmentModal = () => {
+    // Any scans made during this session only patched workOrdersBaseKey
+    // (see useScanWorkOrderItem's comment) - catch the Active tab's cache
+    // up now that the session's over, rather than on every single scan.
+    if (fulfillingWorkOrderId !== null) {
+      invalidateActiveWorkOrders(fulfillingWorkOrderId);
+    }
     setFulfillingWorkOrderId(null);
     resetScanForm();
     scanMutation.reset();
@@ -227,7 +235,11 @@ export function WorkOrdersPage() {
     (item) => item.remaining_quantity <= 0,
   );
 
-  const columns = [
+  // Shared by the Manage tab's table and the Active tab's (both primary and
+  // nested supplementary) tables - every WorkOrder/ActiveWorkOrder shape
+  // carries the same job_name/client_name/expected_date_out/status fields,
+  // and none of these four columns read anything beyond the cell value.
+  const baseWorkOrderColumns = [
     {
       title: t('workOrders.jobNameLabel'),
       dataIndex: 'job_name',
@@ -249,6 +261,10 @@ export function WorkOrdersPage() {
       key: 'status',
       render: (status: string) => <Tag>{t(`workOrders.status.${status}`)}</Tag>,
     },
+  ];
+
+  const columns = [
+    ...baseWorkOrderColumns,
     {
       title: t('workOrders.createdByLabel'),
       dataIndex: 'created_by_username',
@@ -330,27 +346,7 @@ export function WorkOrdersPage() {
   // WorkOrderActiveSupplementarySerializer's backend comment: one level of
   // nesting only, a supplementary never has its own supplementaries).
   const activeColumns = [
-    {
-      title: t('workOrders.jobNameLabel'),
-      dataIndex: 'job_name',
-      key: 'job_name',
-    },
-    {
-      title: t('workOrders.clientNameLabel'),
-      dataIndex: 'client_name',
-      key: 'client_name',
-    },
-    {
-      title: t('workOrders.expectedDateOutLabel'),
-      dataIndex: 'expected_date_out',
-      key: 'expected_date_out',
-    },
-    {
-      title: t('workOrders.statusLabel'),
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => <Tag>{t(`workOrders.status.${status}`)}</Tag>,
-    },
+    ...baseWorkOrderColumns,
     {
       title: t('workOrders.active.productTypesHeader'),
       key: 'line_items',
