@@ -818,6 +818,30 @@ describe('WorkOrdersPage', () => {
     expect(await screen.findByText(/WO-17/)).toBeInTheDocument();
   });
 
+  it("classifies a damaged item correctly even if its serial embeds another reason's phrase", async () => {
+    // Regression: the backend always appends the true reason last
+    // (`${serial_number} ${reason}`), so an unanchored .includes() check
+    // for one reason's phrase could match against text that's actually
+    // part of the *serial number*, not the real reason - misclassifying a
+    // damaged item as "out" (with an undefined WO id) if its serial
+    // happened to contain "is currently out on".
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, 'SN-is currently out on-77 is damaged and cannot be issued');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-is currently out on-77');
+
+    expect(
+      await screen.findByText(/is damaged and cannot be issued|تالف ولا يمكن صرفه/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/currently out on WO-undefined/)).not.toBeInTheDocument();
+  });
+
   it('shows a damaged-specific error for a damaged item', async () => {
     const workOrder = makeWorkOrder({ status: 'in_progress' });
     mockListEndpoints({ workOrders: [workOrder] });

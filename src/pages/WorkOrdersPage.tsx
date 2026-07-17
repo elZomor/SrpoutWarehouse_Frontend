@@ -57,17 +57,20 @@ const SERIALIZED_ITEM_STATUS_COLORS = new Map<string, string>([
   ['out', 'red'],
 ]);
 const DEFAULT_STATUS_COLOR = 'default';
-// WRH-33: scan() now names the *other* WO an out/reserved item is claimed
-// against in its rejection text (e.g. "... is currently out on WO-17") -
-// the frontend has no other way to learn that WO's id, so it's parsed back
-// out of the server's own message rather than duplicated client-side.
-// Anchored to the end of the string ($) rather than a bare /WO-(\d+)/ -
-// serial_number is an unconstrained free-text field (backend
-// SerializedItem.serial_number has no format restriction), so an
-// unanchored match could grab a "WO-<n>"-shaped substring out of the
-// scanned serial itself (e.g. serial "WO-99-BATT") instead of the real WO
-// reference the backend always appends last.
-const WORK_ORDER_ID_PATTERN = /WO-(\d+)$/;
+// WRH-33: scan()'s serial_number rejection messages are always
+// `${serial_number} ${reason}` - and serial_number is unconstrained free
+// text (backend SerializedItem.serial_number has no format restriction),
+// so every one of these has to be matched against the message's actual
+// *end*, not just checked with .includes() anywhere in the string. A serial
+// number that happens to contain another reason's phrase (e.g.
+// "SN is currently out on WO-5" scanned while genuinely damaged) would
+// otherwise misclassify: the backend always appends its real reason last,
+// so anchoring to $ is what makes the true reason unambiguous regardless of
+// what's in the serial itself.
+const OUT_PATTERN = /is currently out on WO-(\d+)$/;
+const RESERVED_PATTERN = /is already reserved on WO-(\d+)$/;
+const DAMAGED_PATTERN = /is damaged and cannot be issued$/;
+const MISSING_PATTERN = /is missing and cannot be issued$/;
 
 export function WorkOrdersPage() {
   const { t } = useTranslation();
@@ -213,20 +216,20 @@ export function WorkOrdersPage() {
           return;
         }
         // AC-1: item already out on another WO - name that WO.
-        const outMessage = serialErrors.find((message) => message.includes('is currently out on'));
-        if (outMessage) {
-          setScanErrorParams({ workOrderId: outMessage.match(WORK_ORDER_ID_PATTERN)?.[1] });
+        const outMatch = serialErrors.map((message) => message.match(OUT_PATTERN)).find(Boolean);
+        if (outMatch) {
+          setScanErrorParams({ workOrderId: outMatch[1] });
           setScanError('serial_number', { type: 'server', message: 'workOrders.scan.outError' });
           return;
         }
         // Same WO reference as above, but for a scan-in-progress double-tap
         // (item already claimed, not yet confirmed out) rather than a fully
         // fulfilled WO.
-        const reservedMessage = serialErrors.find((message) =>
-          message.includes('is already reserved on'),
-        );
-        if (reservedMessage) {
-          setScanErrorParams({ workOrderId: reservedMessage.match(WORK_ORDER_ID_PATTERN)?.[1] });
+        const reservedMatch = serialErrors
+          .map((message) => message.match(RESERVED_PATTERN))
+          .find(Boolean);
+        if (reservedMatch) {
+          setScanErrorParams({ workOrderId: reservedMatch[1] });
           setScanError('serial_number', {
             type: 'server',
             message: 'workOrders.scan.reservedError',
@@ -234,14 +237,14 @@ export function WorkOrdersPage() {
           return;
         }
         // AC-3: damaged/missing items.
-        if (serialErrors.some((message) => message.includes('is damaged and cannot be issued'))) {
+        if (serialErrors.some((message) => DAMAGED_PATTERN.test(message))) {
           setScanError('serial_number', {
             type: 'server',
             message: 'workOrders.scan.damagedError',
           });
           return;
         }
-        if (serialErrors.some((message) => message.includes('is missing and cannot be issued'))) {
+        if (serialErrors.some((message) => MISSING_PATTERN.test(message))) {
           setScanError('serial_number', {
             type: 'server',
             message: 'workOrders.scan.missingError',
