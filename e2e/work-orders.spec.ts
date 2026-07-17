@@ -175,7 +175,7 @@ test('requires a product type and quantity before submitting', async ({ page }) 
 
   await expect(page.getByText(/product type is required|نوع المنتج مطلوب/i)).toBeVisible();
   await expect(
-    page.getByText(/quantity must be at least 1|يجب أن تكون الكمية 1 على الأقل/i),
+    page.getByText(/quantity must be greater than zero|يجب أن تكون الكمية أكبر من صفر/i),
   ).toBeVisible();
 });
 
