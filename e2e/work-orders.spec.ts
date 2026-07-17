@@ -71,6 +71,14 @@ test('creates a work order with multiple line items and it appears in the list',
   await page.route('**/api/work-orders/**', async (route) => {
     const method = route.request().method();
 
+    // The page always fires the Active tab's own list query on mount too
+    // (it's the default tab) - stub it separately with an empty list since
+    // this spec exercises the Manage tab and its flat WorkOrder shape.
+    if (method === 'GET' && route.request().url().endsWith('/active/')) {
+      await route.fulfill({ status: 200, json: [] });
+      return;
+    }
+
     if (method === 'GET') {
       await route.fulfill({ status: 200, json: workOrders });
       return;
@@ -106,6 +114,7 @@ test('creates a work order with multiple line items and it appears in the list',
   });
 
   await page.goto('/work-orders');
+  await page.getByRole('tab', { name: /manage|الإدارة/i }).click();
 
   await page.getByRole('button', { name: /new wo|أمر عمل جديد/i }).click();
   await page.getByLabel(/job name|اسم المهمة/i).fill('Summer Gala');
@@ -156,6 +165,7 @@ test('requires a product type and quantity before submitting', async ({ page }) 
   });
 
   await page.goto('/work-orders');
+  await page.getByRole('tab', { name: /manage|الإدارة/i }).click();
 
   await page.getByRole('button', { name: /new wo|أمر عمل جديد/i }).click();
   await page.getByLabel(/job name|اسم المهمة/i).fill('Summer Gala');
@@ -232,6 +242,14 @@ test('fulfills a WO end-to-end: start, scan to completion, complete', async ({ p
       return;
     }
 
+    // The page always fires the Active tab's own list query on mount too
+    // (it's the default tab) - stub it separately with an empty list since
+    // this spec exercises the Manage tab and its flat WorkOrder shape.
+    if (method === 'GET' && url.endsWith('/active/')) {
+      await route.fulfill({ status: 200, json: [] });
+      return;
+    }
+
     if (method === 'GET') {
       await route.fulfill({ status: 200, json: [workOrder] });
       return;
@@ -241,6 +259,7 @@ test('fulfills a WO end-to-end: start, scan to completion, complete', async ({ p
   });
 
   await page.goto('/work-orders');
+  await page.getByRole('tab', { name: /manage|الإدارة/i }).click();
 
   // Scoped to the row's own action button rather than matching accessible
   // name text: AntD's Button loading-spinner fade-out animation (real
@@ -272,4 +291,94 @@ test('fulfills a WO end-to-end: start, scan to completion, complete', async ({ p
 
   await completeButton.click();
   await expect(page.getByText(/^fulfilled$|^تم التنفيذ$/i)).toBeVisible();
+});
+
+test('views the Active tab: nested supplementary and drill-down to exact serials', async ({
+  page,
+}) => {
+  // TC-01/TC-02/TC-03/AC-1/AC-2/AC-3
+  const primary = {
+    id: 1,
+    job_name: 'Summer Gala',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-01',
+    status: 'fulfilled',
+    line_items: [
+      {
+        id: 1,
+        product_type: 1,
+        product_type_name: 'Bar LED Model A',
+        quantity: 1,
+        returned_quantity: 0,
+        still_out_quantity: 1,
+      },
+    ],
+    supplementaries: [
+      {
+        id: 2,
+        job_name: 'Summer Gala (Supplementary)',
+        client_name: 'Acme Events',
+        expected_date_out: '2026-08-02',
+        status: 'draft',
+        line_items: [],
+      },
+    ],
+  };
+  const detail = {
+    id: 1,
+    job_name: 'Summer Gala',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-01',
+    status: 'fulfilled',
+    created_by: 1,
+    created_by_username: 'jane',
+    parent_work_order: null,
+    line_items: [
+      {
+        id: 1,
+        product_type: 1,
+        product_type_name: 'Bar LED Model A',
+        quantity: 1,
+        serialized_items: [{ id: 1, serial_number: 'SN-0001', status: 'out' }],
+      },
+    ],
+  };
+
+  await page.route('**/api/auth/**', stubAuth);
+  await registerProductTypesRoute(page);
+  await page.route('**/api/work-orders/**', async (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+
+    if (method === 'GET' && url.endsWith('/active/')) {
+      await route.fulfill({ status: 200, json: [primary] });
+      return;
+    }
+    if (method === 'GET' && /\/work-orders\/1\/$/.test(url)) {
+      await route.fulfill({ status: 200, json: detail });
+      return;
+    }
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, json: [] });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto('/work-orders');
+
+  await expect(page.getByText('Summer Gala').first()).toBeVisible();
+  await expect(page.getByText('Summer Gala (Supplementary)')).not.toBeVisible();
+
+  await page.getByRole('button', { name: /expand row/i }).click();
+  await expect(page.getByText('Summer Gala (Supplementary)')).toBeVisible();
+
+  await page
+    .getByRole('button', { name: /view details|عرض التفاصيل/i })
+    .first()
+    .click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('SN-0001')).toBeVisible();
+  await expect(dialog.getByText(/^out$|^خارج$/i)).toBeVisible();
 });
