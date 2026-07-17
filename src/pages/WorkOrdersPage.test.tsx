@@ -457,6 +457,47 @@ describe('WorkOrdersPage', () => {
     expect(await screen.findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
   });
 
+  it('shows a toast when starting fulfillment fails, leaving the WO as draft', async () => {
+    const workOrder = makeWorkOrder();
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: { status: ['Only a draft work order can start fulfillment.'] },
+      },
+    });
+
+    renderWorkOrdersPage();
+
+    await userEvent
+      .setup()
+      .click(await screen.findByRole('button', { name: /start fulfillment|بدء التنفيذ/i }));
+
+    expect(
+      await screen.findByText(/failed to start fulfillment|فشل بدء التنفيذ/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^draft$|^مسودة$/i)).toBeInTheDocument();
+  });
+
+  it('does not show a loading state on other draft rows when starting one WO', async () => {
+    // Efficiency/altitude regression: a shared mutation instance must not
+    // spin every draft row's button when only one row's start is pending.
+    const workOrderA = makeWorkOrder({ id: 1, job_name: 'Job A' });
+    const workOrderB = makeWorkOrder({ id: 2, job_name: 'Job B' });
+    mockListEndpoints({ workOrders: [workOrderA, workOrderB] });
+    // Never resolves within this test - keeps workOrderA's start pending.
+    mockedApiClient.post.mockImplementationOnce(() => new Promise(() => {}));
+
+    renderWorkOrdersPage();
+
+    const rowA = await screen.findByRole('row', { name: /job a/i });
+    await userEvent.setup().click(within(rowA).getByRole('button'));
+
+    const rowB = screen.getByRole('row', { name: /job b/i });
+    expect(within(rowB).getByRole('button')).toBeEnabled();
+  });
+
   it('updates the live counter as items are scanned', async () => {
     // TC-02/AC-2
     const workOrder = makeWorkOrder({
@@ -533,6 +574,41 @@ describe('WorkOrdersPage', () => {
 
     expect(mockedApiClient.post).toHaveBeenCalledWith(`/api/work-orders/1/complete/`);
     expect(await screen.findByText(/^fulfilled$|^تم التنفيذ$/i)).toBeInTheDocument();
+  });
+
+  it('shows a toast when completing fulfillment fails, keeping the modal open', async () => {
+    const workOrder = makeWorkOrder({
+      status: 'in_progress',
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          quantity: 1,
+          scanned_quantity: 1,
+          remaining_quantity: 0,
+        },
+      ],
+    });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: { status: ['All line items must reach their requested quantity...'] },
+      },
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await user.click(screen.getByRole('button', { name: /complete fulfillment|إتمام التنفيذ/i }));
+
+    expect(
+      await screen.findByText(/failed to complete fulfillment|فشل إتمام التنفيذ/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('shows an inline error for a duplicate/unavailable serial scan', async () => {

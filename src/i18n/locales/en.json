@@ -196,6 +196,7 @@
     "loadProductTypesError": "Failed to load product types. Please try again.",
     "actionsLabel": "Actions",
     "startButton": "Start Fulfillment",
+    "startError": "Failed to start fulfillment. Please try again.",
     "scanButton": "Scan",
     "form": {
       "jobNameRequired": "Job name is required",
@@ -227,7 +228,8 @@
       "productTypeMismatchError": "This item does not match the selected line item's product type.",
       "notAvailableError": "This item is not available to scan.",
       "overCapError": "This line item has already reached its requested quantity.",
-      "genericError": "Failed to record this scan. Please try again."
+      "genericError": "Failed to record this scan. Please try again.",
+      "completeError": "Failed to complete fulfillment. Please try again."
     }
   }
 }

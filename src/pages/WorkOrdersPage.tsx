@@ -2,6 +2,7 @@ import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
+  App,
   Button,
   DatePicker,
   Form,
@@ -40,6 +41,7 @@ const EMPTY_LINE_ITEM = { product_type: undefined, quantity: undefined };
 
 export function WorkOrdersPage() {
   const { t } = useTranslation();
+  const { message } = App.useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [fulfillingWorkOrderId, setFulfillingWorkOrderId] = useState<number | null>(null);
   const { data: workOrders, isLoading, isError: isListError } = useWorkOrders();
@@ -172,7 +174,10 @@ export function WorkOrdersPage() {
     if (!fulfillingWorkOrderId) {
       return;
     }
-    completeMutation.mutate(fulfillingWorkOrderId, { onSuccess: closeFulfillmentModal });
+    completeMutation.mutate(fulfillingWorkOrderId, {
+      onSuccess: closeFulfillmentModal,
+      onError: () => message.error(t('workOrders.scan.completeError')),
+    });
   };
 
   const productTypeOptions = (productTypes ?? []).map((productType) => ({
@@ -239,8 +244,18 @@ export function WorkOrdersPage() {
           return (
             <Button
               size="small"
-              loading={startMutation.isPending}
-              onClick={() => startMutation.mutate(record.id)}
+              // Scoped to this row's own id via the mutation's `variables`
+              // (the last id passed to mutate()) rather than the shared
+              // `startMutation.isPending` alone - otherwise starting one
+              // draft WO would show every other draft row's Start button
+              // as loading/disabled too, since they'd all read the same
+              // page-level mutation instance's pending flag.
+              loading={startMutation.isPending && startMutation.variables === record.id}
+              onClick={() =>
+                startMutation.mutate(record.id, {
+                  onError: () => message.error(t('workOrders.startError')),
+                })
+              }
             >
               {t('workOrders.startButton')}
             </Button>

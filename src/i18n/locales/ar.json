@@ -200,6 +200,7 @@
     "loadProductTypesError": "فشل تحميل أنواع المنتجات. حاول مرة أخرى.",
     "actionsLabel": "الإجراءات",
     "startButton": "بدء التنفيذ",
+    "startError": "فشل بدء التنفيذ. حاول مرة أخرى.",
     "scanButton": "مسح",
     "form": {
       "jobNameRequired": "اسم المهمة مطلوب",
@@ -231,7 +232,8 @@
       "productTypeMismatchError": "هذا العنصر لا يطابق نوع منتج البند المحدد.",
       "notAvailableError": "هذا العنصر غير متاح للمسح.",
       "overCapError": "استلم هذا البند بالفعل الكمية المطلوبة.",
-      "genericError": "فشل تسجيل هذا المسح. حاول مرة أخرى."
+      "genericError": "فشل تسجيل هذا المسح. حاول مرة أخرى.",
+      "completeError": "فشل إتمام التنفيذ. حاول مرة أخرى."
     }
   }
 }
