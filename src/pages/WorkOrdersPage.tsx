@@ -18,7 +18,7 @@ import {
   Typography,
 } from 'antd';
 import dayjs from 'dayjs';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useProductTypes } from '../features/product-types/useProductTypes';
@@ -156,6 +156,19 @@ export function WorkOrdersPage() {
   // it's tracked as local state rather than patched into a query cache -
   // see useReturnWorkOrderItem's comment.
   const [returnSession, setReturnSession] = useState<WorkOrderReturnResult | null>(null);
+  // Tracks the CURRENTLY displayed session's id at all times, written only
+  // inside an effect (the sanctioned place per useRef's own docs — never
+  // touched by onReturnSubmit or anything it calls, since that's read
+  // during render via handleReturnSubmit(...) and would trip
+  // react-hooks/refs). Read inside the submission effect's settled-Promise
+  // callbacks below to detect a response that's no longer relevant - a
+  // stale response for a session the user has since closed or replaced
+  // with a different WO must not reopen the modal or overwrite the wrong
+  // WO's data.
+  const currentReturnSessionIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    currentReturnSessionIdRef.current = returnSession?.id ?? null;
+  }, [returnSession]);
   const returnMutation = useReturnWorkOrderItem(returnSession?.id ?? 0);
   const {
     control: returnControl,
@@ -169,6 +182,10 @@ export function WorkOrdersPage() {
     defaultValues: { serial_number: '' },
   });
   const [returnErrorParams, setReturnErrorParams] = useState<{ workOrderId?: string }>({});
+  const [pendingReturnSubmission, setPendingReturnSubmission] = useState<{
+    workOrderId: number;
+    values: ReturnItemFormValues;
+  } | null>(null);
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -346,14 +363,51 @@ export function WorkOrdersPage() {
   };
 
   const onReturnSubmit = (values: ReturnItemFormValues) => {
-    returnMutation.mutate(values, {
-      onSuccess: (updated) => {
+    if (returnSession === null) {
+      return;
+    }
+    setPendingReturnSubmission({ workOrderId: returnSession.id, values });
+  };
+
+  // A response can land after the user has since closed the modal or
+  // opened a *different* WO's session - unlike scan/complete (whose modal
+  // visibility is derived from the query cache, so a late response can't
+  // reopen it), returnSession is local state that a stale response could
+  // otherwise overwrite or reopen directly (see returnSession's comment).
+  // onReturnSubmit itself must stay ref-free (react-hooks/refs fires on
+  // anything reachable from a function passed to handleReturnSubmit(...),
+  // evaluated during render) - this separate effect owns the actual
+  // mutateAsync() call and checks currentReturnSessionIdRef only inside the
+  // settled Promise's .then()/.catch() callbacks, mirroring React's
+  // documented "ignore flag" stale-response pattern (setState inside the
+  // callback, not the effect body itself - see
+  // react.dev/learn/you-might-not-need-an-effect's "Fetching data"
+  // section). returnMutation/resetReturnForm/setReturnError/setReturnFocus
+  // are deliberately excluded from the dependency array: including
+  // returnMutation (a new object identity every render) would refire
+  // mutateAsync on every unrelated re-render while a submission is still
+  // pending.
+  useEffect(() => {
+    if (!pendingReturnSubmission) {
+      return;
+    }
+    const { workOrderId, values } = pendingReturnSubmission;
+    let ignore = false;
+
+    returnMutation.mutateAsync(values).then(
+      (updated) => {
+        if (ignore || currentReturnSessionIdRef.current !== workOrderId) {
+          return;
+        }
         setReturnSession(updated);
         resetReturnForm({ serial_number: '' });
         setReturnErrorParams({});
         setReturnFocus('serial_number');
       },
-      onError: (error) => {
+      (error) => {
+        if (ignore || currentReturnSessionIdRef.current !== workOrderId) {
+          return;
+        }
         const serialErrors = getFieldErrorMessages(error, 'serial_number');
         const statusErrors = getFieldErrorMessages(error, 'status');
         setReturnErrorParams({});
@@ -390,8 +444,12 @@ export function WorkOrdersPage() {
           });
         }
       },
-    });
-  };
+    );
+
+    return () => {
+      ignore = true;
+    };
+  }, [pendingReturnSubmission]);
 
   const productTypeOptions = (productTypes ?? []).map((productType) => ({
     value: productType.id,

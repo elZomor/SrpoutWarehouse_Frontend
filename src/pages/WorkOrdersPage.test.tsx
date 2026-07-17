@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -1233,5 +1233,42 @@ describe('WorkOrdersPage', () => {
     await user.click(screen.getByRole('button', { name: /^done$|^تم$/i }));
 
     await waitFor(() => expect(getCallCount).toBeGreaterThan(countBeforeClose));
+  }, 40000);
+
+  it('does not reopen the Return modal if its response lands after the modal was closed', async () => {
+    // Regression: onReturnSubmit's onSuccess used to call setReturnSession
+    // unconditionally - a response that lands after the modal was already
+    // dismissed would reopen it with stale data.
+    const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
+    mockListEndpoints({ activeWorkOrders: [workOrder] });
+    let resolvePost: ((value: { data: unknown }) => void) | undefined;
+    mockedApiClient.post.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePost = resolve;
+        }),
+    );
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openReturnModal(user);
+    await returnSerial(user, 'SN-9001');
+
+    await user.click(screen.getByRole('button', { name: /^done$|^تم$/i }));
+
+    await act(async () => {
+      resolvePost?.({ data: { ...workOrder, status: 'partially_returned' } });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // AntD's Modal never truly unmounts in jsdom (rc-motion's "leave"
+    // transition classes linger forever since jsdom never fires
+    // transitionend), so asserting the dialog node itself is gone isn't a
+    // reliable signal here - checking that the stale response's content
+    // never rendered is the direct test of the actual regression (the old
+    // bug would show this text by calling setReturnSession(updated)
+    // unconditionally in onSuccess).
+    expect(screen.queryByText(/^partially returned$|^إرجاع جزئي$/i)).not.toBeInTheDocument();
   }, 40000);
 });
