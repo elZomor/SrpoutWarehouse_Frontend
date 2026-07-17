@@ -24,3 +24,15 @@ export const workOrderSchema = z.object({
 
 export type WorkOrderLineItemFormValues = z.infer<typeof workOrderLineItemSchema>;
 export type WorkOrderFormValues = z.infer<typeof workOrderSchema>;
+
+export const scanItemSchema = z.object({
+  line_item: z
+    .number()
+    .optional()
+    .refine((value): value is number => value !== undefined, {
+      message: 'workOrders.scan.lineItemRequired',
+    }),
+  serial_number: z.string().min(1, 'workOrders.scan.serialNumberRequired'),
+});
+
+export type ScanItemFormValues = z.infer<typeof scanItemSchema>;

@@ -188,7 +188,9 @@
     "expectedDateOutLabel": "تاريخ الخروج المتوقع",
     "statusLabel": "الحالة",
     "status": {
-      "draft": "مسودة"
+      "draft": "مسودة",
+      "in_progress": "قيد التنفيذ",
+      "fulfilled": "تم التنفيذ"
     },
     "createdByLabel": "أنشئ بواسطة",
     "lineItemsLabel": "بنود الطلب",
@@ -196,6 +198,10 @@
     "loadError": "فشل تحميل أوامر العمل. حاول مرة أخرى.",
     "createError": "فشل إنشاء أمر العمل. حاول مرة أخرى.",
     "loadProductTypesError": "فشل تحميل أنواع المنتجات. حاول مرة أخرى.",
+    "actionsLabel": "الإجراءات",
+    "startButton": "بدء التنفيذ",
+    "startError": "فشل بدء التنفيذ. حاول مرة أخرى.",
+    "scanButton": "مسح",
     "form": {
       "jobNameRequired": "اسم المهمة مطلوب",
       "expectedDateOutRequired": "تاريخ الخروج المتوقع مطلوب",
@@ -206,6 +212,28 @@
       "quantityRequired": "يجب أن تكون الكمية 1 على الأقل",
       "addLineItemButton": "إضافة بند",
       "removeLineItemButton": "إزالة البند"
+    },
+    "scan": {
+      "title": "تنفيذ: {{jobName}}",
+      "lineItemHeader": "المنتج",
+      "quantityHeader": "المطلوب",
+      "scannedHeader": "الممسوح",
+      "remainingHeader": "المتبقي",
+      "lineItemLabel": "بند الطلب",
+      "lineItemPlaceholder": "اختر بند الطلب",
+      "lineItemRequired": "بند الطلب مطلوب",
+      "serialNumberLabel": "الرقم التسلسلي",
+      "serialNumberPlaceholder": "امسح أو أدخل الرقم التسلسلي",
+      "serialNumberRequired": "الرقم التسلسلي مطلوب",
+      "scanButton": "مسح",
+      "completeButton": "إتمام التنفيذ",
+      "doneButton": "تم",
+      "notFoundError": "لا يوجد عنصر بهذا الرقم التسلسلي.",
+      "productTypeMismatchError": "هذا العنصر لا يطابق نوع منتج البند المحدد.",
+      "notAvailableError": "هذا العنصر غير متاح للمسح.",
+      "overCapError": "استلم هذا البند بالفعل الكمية المطلوبة.",
+      "genericError": "فشل تسجيل هذا المسح. حاول مرة أخرى.",
+      "completeError": "فشل إتمام التنفيذ. حاول مرة أخرى."
     }
   }
 }

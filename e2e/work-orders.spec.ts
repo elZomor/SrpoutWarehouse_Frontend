@@ -16,6 +16,8 @@ interface WorkOrderLineItem {
   product_type: number;
   product_type_name: string;
   quantity: number;
+  scanned_quantity: number;
+  remaining_quantity: number;
 }
 
 interface WorkOrder {
@@ -90,6 +92,8 @@ test('creates a work order with multiple line items and it appears in the list',
             product_type: item.product_type,
             product_type_name: productTypeNames[item.product_type] ?? '',
             quantity: item.quantity,
+            scanned_quantity: 0,
+            remaining_quantity: item.quantity,
           }),
         ),
       };
@@ -163,4 +167,109 @@ test('requires a product type and quantity before submitting', async ({ page }) 
   await expect(
     page.getByText(/quantity must be at least 1|يجب أن تكون الكمية 1 على الأقل/i),
   ).toBeVisible();
+});
+
+test('fulfills a WO end-to-end: start, scan to completion, complete', async ({ page }) => {
+  // TC-01/TC-02/TC-04/AC-1/AC-2/AC-4
+  const workOrder: WorkOrder = {
+    id: 1,
+    job_name: 'Summer Gala',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-01',
+    status: 'draft',
+    created_by: 1,
+    created_by_username: 'jane',
+    line_items: [
+      {
+        id: 1,
+        product_type: 1,
+        product_type_name: 'Bar LED Model A',
+        quantity: 2,
+        scanned_quantity: 0,
+        remaining_quantity: 2,
+      },
+    ],
+  };
+  const seenSerialNumbers = new Set<string>();
+
+  await page.route('**/api/auth/**', stubAuth);
+  await registerProductTypesRoute(page);
+  await page.route('**/api/work-orders/**', async (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+
+    if (method === 'POST' && url.endsWith('/start/')) {
+      workOrder.status = 'in_progress';
+      await route.fulfill({ status: 200, json: workOrder });
+      return;
+    }
+
+    if (method === 'POST' && url.endsWith('/scan/')) {
+      const body = route.request().postDataJSON() as {
+        line_item: number;
+        serial_number: string;
+      };
+      if (seenSerialNumbers.has(body.serial_number)) {
+        await route.fulfill({
+          status: 400,
+          json: { serial_number: ['This item is not available to scan.'] },
+        });
+        return;
+      }
+      seenSerialNumbers.add(body.serial_number);
+      const lineItem = workOrder.line_items.find((item) => item.id === body.line_item);
+      if (lineItem) {
+        lineItem.scanned_quantity += 1;
+        lineItem.remaining_quantity -= 1;
+      }
+      await route.fulfill({ status: 201, json: workOrder });
+      return;
+    }
+
+    if (method === 'POST' && url.endsWith('/complete/')) {
+      workOrder.status = 'fulfilled';
+      await route.fulfill({ status: 200, json: workOrder });
+      return;
+    }
+
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, json: [workOrder] });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto('/work-orders');
+
+  // Scoped to the row's own action button rather than matching accessible
+  // name text: AntD's Button loading-spinner fade-out animation (real
+  // browser only, unlike jsdom) can briefly prefix the next button's
+  // accessible name with "loading" right after the mutation settles, and
+  // the button's own label also changes ("Start Fulfillment" -> "Scan")
+  // once the row re-renders for the new status.
+  const row = page.getByRole('row', { name: /summer gala/i });
+  await row.getByRole('button').click();
+  await expect(page.getByText(/^in progress$|^قيد التنفيذ$/i)).toBeVisible();
+
+  const completeButton = page.getByRole('button', {
+    name: /complete fulfillment|إتمام التنفيذ/i,
+  });
+  await row.getByRole('button').click();
+  await expect(completeButton).toBeDisabled();
+
+  await page.getByRole('dialog').getByRole('combobox').click();
+  await page.getByTitle('Bar LED Model A').click();
+  const dialog = page.getByRole('dialog');
+  const scanButton = dialog.locator('button[type="submit"]');
+  await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-1001');
+  await scanButton.click();
+  await expect(dialog.getByRole('row', { name: /bar led model a/i })).toContainText('1');
+
+  await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-1002');
+  await scanButton.click();
+  await expect(completeButton).toBeEnabled();
+
+  await completeButton.click();
+  await expect(page.getByText(/^fulfilled$|^تم التنفيذ$/i)).toBeVisible();
 });
