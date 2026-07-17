@@ -23,8 +23,10 @@ import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
+  returnItemSchema,
   scanItemSchema,
   workOrderSchema,
+  type ReturnItemFormValues,
   type ScanItemFormValues,
   type WorkOrderFormValues,
 } from '../features/work-orders/schema';
@@ -33,12 +35,14 @@ import type {
   ActiveWorkOrderLineItem,
   ActiveWorkOrderSupplementary,
   WorkOrder,
+  WorkOrderReturnResult,
 } from '../features/work-orders/types';
 import {
   useActiveWorkOrders,
   useCompleteWorkOrder,
   useCreateWorkOrder,
   useInvalidateActiveWorkOrders,
+  useReturnWorkOrderItem,
   useScanWorkOrderItem,
   useStartWorkOrder,
   useWorkOrderDetail,
@@ -71,6 +75,13 @@ const OUT_PATTERN = /is currently out on WO-(\d+)$/;
 const RESERVED_PATTERN = /is already reserved on WO-(\d+)$/;
 const DAMAGED_PATTERN = /is damaged and cannot be issued$/;
 const MISSING_PATTERN = /is missing and cannot be issued$/;
+// WRH-38: return_item()'s serial_number rejections follow the same
+// `${serial_number} ${reason}` shape as scan()'s - anchored to the
+// message's end for the same reason as the OUT/RESERVED/DAMAGED/MISSING
+// patterns above.
+const NOT_ISSUED_PATTERN = /was not issued on WO-(\d+)$/;
+const NOT_OUT_PATTERN = /is not currently out on this work order$/;
+const RETURN_ELIGIBLE_STATUSES = new Set(['fulfilled', 'partially_returned']);
 
 export function WorkOrdersPage() {
   const { t } = useTranslation();
@@ -136,6 +147,28 @@ export function WorkOrdersPage() {
   // scan needs to interpolate lives here instead, alongside it rather than
   // baked into the key itself.
   const [scanErrorParams, setScanErrorParams] = useState<{ workOrderId?: string }>({});
+
+  // AC-1/AC-2/AC-4: returnSession holds the running return summary (status
+  // + per-line-item returned/still-out counts) - seeded from the clicked
+  // Active-tab row on open, then replaced by each return_item response.
+  // Its shape (WorkOrderReturnResult) doesn't match either cached list
+  // (WorkOrder's flat shape, ActiveWorkOrder's nested supplementaries), so
+  // it's tracked as local state rather than patched into a query cache -
+  // see useReturnWorkOrderItem's comment.
+  const [returnSession, setReturnSession] = useState<WorkOrderReturnResult | null>(null);
+  const returnMutation = useReturnWorkOrderItem(returnSession?.id ?? 0);
+  const {
+    control: returnControl,
+    handleSubmit: handleReturnSubmit,
+    reset: resetReturnForm,
+    setError: setReturnError,
+    setFocus: setReturnFocus,
+    formState: { errors: returnErrors },
+  } = useForm<ReturnItemFormValues>({
+    resolver: zodResolver(returnItemSchema),
+    defaultValues: { serial_number: '' },
+  });
+  const [returnErrorParams, setReturnErrorParams] = useState<{ workOrderId?: string }>({});
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -286,6 +319,80 @@ export function WorkOrdersPage() {
     });
   };
 
+  const openReturnModal = (workOrder: ActiveWorkOrder | ActiveWorkOrderSupplementary) => {
+    setReturnSession({
+      id: workOrder.id,
+      job_name: workOrder.job_name,
+      status: workOrder.status,
+      line_items: workOrder.line_items,
+    });
+    resetReturnForm({ serial_number: '' });
+    setReturnErrorParams({});
+    returnMutation.reset();
+  };
+
+  const closeReturnModal = () => {
+    // Mirrors closeFulfillmentModal's end-of-session invalidation - every
+    // return_item call during this session only updated local state (see
+    // returnSession's comment), so the Active tab's cache needs to catch up
+    // now rather than on every single scan.
+    if (returnSession !== null) {
+      invalidateActiveWorkOrders(returnSession.id);
+    }
+    setReturnSession(null);
+    resetReturnForm();
+    setReturnErrorParams({});
+    returnMutation.reset();
+  };
+
+  const onReturnSubmit = (values: ReturnItemFormValues) => {
+    returnMutation.mutate(values, {
+      onSuccess: (updated) => {
+        setReturnSession(updated);
+        resetReturnForm({ serial_number: '' });
+        setReturnErrorParams({});
+        setReturnFocus('serial_number');
+      },
+      onError: (error) => {
+        const serialErrors = getFieldErrorMessages(error, 'serial_number');
+        const statusErrors = getFieldErrorMessages(error, 'status');
+        setReturnErrorParams({});
+
+        if (serialErrors.some((message) => message === 'Serial not found')) {
+          setReturnError('serial_number', {
+            type: 'server',
+            message: 'workOrders.return.notFoundError',
+          });
+          return;
+        }
+        const notIssuedMatch = serialErrors
+          .map((message) => message.match(NOT_ISSUED_PATTERN))
+          .find(Boolean);
+        if (notIssuedMatch) {
+          setReturnErrorParams({ workOrderId: notIssuedMatch[1] });
+          setReturnError('serial_number', {
+            type: 'server',
+            message: 'workOrders.return.notIssuedError',
+          });
+          return;
+        }
+        if (serialErrors.some((message) => NOT_OUT_PATTERN.test(message))) {
+          setReturnError('serial_number', {
+            type: 'server',
+            message: 'workOrders.return.notOutError',
+          });
+          return;
+        }
+        if (statusErrors.length > 0) {
+          setReturnError('serial_number', {
+            type: 'server',
+            message: 'workOrders.return.statusError',
+          });
+        }
+      },
+    });
+  };
+
   const productTypeOptions = (productTypes ?? []).map((productType) => ({
     value: productType.id,
     label: productType.name,
@@ -410,6 +517,29 @@ export function WorkOrdersPage() {
     },
   ];
 
+  const returnLineItemColumns = [
+    {
+      title: t('workOrders.return.productHeader'),
+      dataIndex: 'product_type_name',
+      key: 'product_type_name',
+    },
+    {
+      title: t('workOrders.return.quantityHeader'),
+      dataIndex: 'quantity',
+      key: 'quantity',
+    },
+    {
+      title: t('workOrders.return.returnedHeader'),
+      dataIndex: 'returned_quantity',
+      key: 'returned_quantity',
+    },
+    {
+      title: t('workOrders.return.stillOutHeader'),
+      dataIndex: 'still_out_quantity',
+      key: 'still_out_quantity',
+    },
+  ];
+
   // Shared by the Primary row table and the nested supplementary table -
   // both carry the same per-WO summary shape (see
   // WorkOrderActiveSupplementarySerializer's backend comment: one level of
@@ -437,9 +567,16 @@ export function WorkOrdersPage() {
       title: t('workOrders.actionsLabel'),
       key: 'actions',
       render: (_: unknown, record: ActiveWorkOrder | ActiveWorkOrderSupplementary) => (
-        <Button size="small" onClick={() => setDetailWorkOrderId(record.id)}>
-          {t('workOrders.active.viewDetailsButton')}
-        </Button>
+        <Space size="small">
+          <Button size="small" onClick={() => setDetailWorkOrderId(record.id)}>
+            {t('workOrders.active.viewDetailsButton')}
+          </Button>
+          {RETURN_ELIGIBLE_STATUSES.has(record.status) && (
+            <Button size="small" onClick={() => openReturnModal(record)}>
+              {t('workOrders.return.button')}
+            </Button>
+          )}
+        </Space>
       ),
     },
   ];
@@ -781,6 +918,66 @@ export function WorkOrdersPage() {
               )}
               <Button type="primary" htmlType="submit" loading={scanMutation.isPending}>
                 {t('workOrders.scan.scanButton')}
+              </Button>
+            </Form>
+          </>
+        )}
+      </Modal>
+      <Modal
+        title={t('workOrders.return.title', { jobName: returnSession?.job_name ?? '' })}
+        open={returnSession !== null}
+        onCancel={closeReturnModal}
+        width={640}
+        footer={[
+          <Button key="done" onClick={closeReturnModal}>
+            {t('workOrders.return.doneButton')}
+          </Button>,
+        ]}
+      >
+        {returnSession && (
+          <>
+            <Tag style={{ marginBottom: 16 }}>{t(`workOrders.status.${returnSession.status}`)}</Tag>
+            <Table
+              size="small"
+              rowKey="id"
+              pagination={false}
+              dataSource={returnSession.line_items}
+              columns={returnLineItemColumns}
+              style={{ marginBottom: 16 }}
+            />
+            <Form layout="vertical" noValidate onFinish={handleReturnSubmit(onReturnSubmit)}>
+              <Form.Item
+                label={t('workOrders.return.serialNumberLabel')}
+                htmlFor="return-serial_number"
+                validateStatus={returnErrors.serial_number ? 'error' : ''}
+                help={
+                  returnErrors.serial_number
+                    ? t(returnErrors.serial_number.message ?? '', returnErrorParams)
+                    : undefined
+                }
+              >
+                <Controller
+                  name="serial_number"
+                  control={returnControl}
+                  render={({ field }) => (
+                    <Input
+                      {...field}
+                      id="return-serial_number"
+                      placeholder={t('workOrders.return.serialNumberPlaceholder')}
+                    />
+                  )}
+                />
+              </Form.Item>
+              {returnMutation.isError && !returnErrors.serial_number && (
+                <Alert
+                  type="error"
+                  message={t('workOrders.return.genericError')}
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                />
+              )}
+              <Button type="primary" htmlType="submit" loading={returnMutation.isPending}>
+                {t('workOrders.return.scanButton')}
               </Button>
             </Form>
           </>

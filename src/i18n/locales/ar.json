@@ -192,7 +192,9 @@
     "status": {
       "draft": "مسودة",
       "in_progress": "قيد التنفيذ",
-      "fulfilled": "تم التنفيذ"
+      "fulfilled": "تم التنفيذ",
+      "returned": "تم الإرجاع",
+      "partially_returned": "إرجاع جزئي"
     },
     "createdByLabel": "أنشئ بواسطة",
     "lineItemsLabel": "بنود الطلب",
@@ -260,6 +262,24 @@
       "closeButton": "إغلاق",
       "emptyState": "لا توجد عناصر مسلسلة",
       "loadError": "فشل تحميل تفاصيل أمر العمل. حاول مرة أخرى."
+    },
+    "return": {
+      "button": "إرجاع",
+      "title": "إرجاع: {{jobName}}",
+      "productHeader": "المنتج",
+      "quantityHeader": "المصروف",
+      "returnedHeader": "تم إرجاعه",
+      "stillOutHeader": "لا يزال مفقودًا",
+      "serialNumberLabel": "الرقم التسلسلي",
+      "serialNumberPlaceholder": "امسح أو أدخل الرقم التسلسلي",
+      "serialNumberRequired": "الرقم التسلسلي مطلوب",
+      "scanButton": "إرجاع",
+      "doneButton": "تم",
+      "notFoundError": "لا يوجد عنصر بهذا الرقم التسلسلي.",
+      "notIssuedError": "هذا العنصر لم يُصرف على أمر العمل WO-{{workOrderId}}.",
+      "notOutError": "هذا العنصر ليس مصروفًا حاليًا على أمر العمل هذا.",
+      "statusError": "أمر العمل هذا غير مؤهل للإرجاع.",
+      "genericError": "فشل تسجيل هذا الإرجاع. حاول مرة أخرى."
     }
   }
 }

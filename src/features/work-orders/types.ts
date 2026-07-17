@@ -1,4 +1,5 @@
-export type WorkOrderStatus = 'draft' | 'in_progress' | 'fulfilled';
+export type WorkOrderStatus =
+  'draft' | 'in_progress' | 'fulfilled' | 'returned' | 'partially_returned';
 
 export interface WorkOrderLineItem {
   id: number;
@@ -46,6 +47,16 @@ export interface ActiveWorkOrder {
   status: WorkOrderStatus;
   line_items: ActiveWorkOrderLineItem[];
   supplementaries: ActiveWorkOrderSupplementary[];
+}
+
+// WRH-38: return_item()'s response - same per-line-item returned/still-out
+// shape as ActiveWorkOrderLineItem (WRH-55), now populated for real once a
+// return session starts flipping items back to available.
+export interface WorkOrderReturnResult {
+  id: number;
+  job_name: string;
+  status: WorkOrderStatus;
+  line_items: ActiveWorkOrderLineItem[];
 }
 
 export type SerializedItemStatus = 'available' | 'reserved' | 'out';

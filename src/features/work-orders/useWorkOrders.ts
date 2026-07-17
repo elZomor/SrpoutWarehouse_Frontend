@@ -5,10 +5,11 @@ import {
   getWorkOrder,
   listActiveWorkOrders,
   listWorkOrders,
+  returnWorkOrderItem,
   scanWorkOrderItem,
   startWorkOrder,
 } from './api';
-import type { ScanItemFormValues, WorkOrderFormValues } from './schema';
+import type { ReturnItemFormValues, ScanItemFormValues, WorkOrderFormValues } from './schema';
 import type { WorkOrder } from './types';
 
 const workOrdersBaseKey = ['work-orders'] as const;
@@ -118,6 +119,20 @@ export function useCompleteWorkOrder() {
       patchWorkOrder(queryClient)(updatedWorkOrder);
       invalidateActiveWorkOrders(queryClient, updatedWorkOrder.id);
     },
+  });
+}
+
+export function useReturnWorkOrderItem(workOrderId: number) {
+  // Its response (WorkOrderReturnResult) doesn't match either cached
+  // shape (WorkOrder's flat list, ActiveWorkOrder's nested
+  // supplementaries) - the page keeps the running return session as local
+  // state instead (mirrors fulfillingWorkOrder's derivation, but return
+  // sessions are opened from the Active tab, which has no matching flat
+  // cache to patch). WorkOrdersPage invalidates the Active tab + detail
+  // caches once the session closes, matching closeFulfillmentModal's
+  // identical end-of-session invalidation.
+  return useMutation({
+    mutationFn: (input: ReturnItemFormValues) => returnWorkOrderItem(workOrderId, input),
   });
 }
 

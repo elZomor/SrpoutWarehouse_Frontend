@@ -382,3 +382,76 @@ test('views the Active tab: nested supplementary and drill-down to exact serials
   await expect(dialog.getByText('SN-0001')).toBeVisible();
   await expect(dialog.getByText(/^out$|^خارج$/i)).toBeVisible();
 });
+
+test('returns items against a fulfilled WO: partial then full return', async ({ page }) => {
+  // AC-1/AC-2/TC-01/TC-02
+  const workOrder = {
+    id: 1,
+    job_name: 'Summer Gala',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-01',
+    status: 'fulfilled',
+    line_items: [
+      {
+        id: 1,
+        product_type: 1,
+        product_type_name: 'Bar LED Model A',
+        quantity: 2,
+        returned_quantity: 0,
+        still_out_quantity: 2,
+      },
+    ],
+    supplementaries: [] as unknown[],
+  };
+  const returnedSerials = new Set<string>();
+
+  await page.route('**/api/auth/**', stubAuth);
+  await registerProductTypesRoute(page);
+  await page.route('**/api/work-orders/**', async (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+
+    if (method === 'POST' && url.endsWith('/return-item/')) {
+      const body = route.request().postDataJSON() as { serial_number: string };
+      returnedSerials.add(body.serial_number);
+      const returnedCount = returnedSerials.size;
+      workOrder.status = returnedCount >= 2 ? 'returned' : 'partially_returned';
+      workOrder.line_items = [
+        {
+          ...workOrder.line_items[0],
+          returned_quantity: returnedCount,
+          still_out_quantity: 2 - returnedCount,
+        },
+      ];
+      await route.fulfill({ status: 200, json: workOrder });
+      return;
+    }
+    if (method === 'GET' && url.endsWith('/active/')) {
+      await route.fulfill({ status: 200, json: [workOrder] });
+      return;
+    }
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, json: [] });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto('/work-orders');
+
+  await page
+    .getByRole('row', { name: /summer gala/i })
+    .getByRole('button', { name: /^return$|^إرجاع$/i })
+    .click();
+  const dialog = page.getByRole('dialog');
+  const returnButton = dialog.locator('button[type="submit"]');
+
+  await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-2001');
+  await returnButton.click();
+  await expect(dialog.getByText(/^partially returned$|^إرجاع جزئي$/i)).toBeVisible();
+
+  await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-2002');
+  await returnButton.click();
+  await expect(dialog.getByText(/^returned$|^تم الإرجاع$/i)).toBeVisible();
+});

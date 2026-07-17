@@ -188,7 +188,9 @@
     "status": {
       "draft": "Draft",
       "in_progress": "In Progress",
-      "fulfilled": "Fulfilled"
+      "fulfilled": "Fulfilled",
+      "returned": "Returned",
+      "partially_returned": "Partially Returned"
     },
     "createdByLabel": "Created By",
     "lineItemsLabel": "Line Items",
@@ -256,6 +258,24 @@
       "closeButton": "Close",
       "emptyState": "No serialized items found",
       "loadError": "Failed to load work order details. Please try again."
+    },
+    "return": {
+      "button": "Return",
+      "title": "Return: {{jobName}}",
+      "productHeader": "Product",
+      "quantityHeader": "Issued",
+      "returnedHeader": "Returned",
+      "stillOutHeader": "Still Missing",
+      "serialNumberLabel": "Serial Number",
+      "serialNumberPlaceholder": "Scan or type a serial number",
+      "serialNumberRequired": "Serial number is required",
+      "scanButton": "Return",
+      "doneButton": "Done",
+      "notFoundError": "No item found with this serial number.",
+      "notIssuedError": "This item was not issued on WO-{{workOrderId}}.",
+      "notOutError": "This item is not currently out on this work order.",
+      "statusError": "This work order is not eligible for return.",
+      "genericError": "Failed to record this return. Please try again."
     }
   }
 }
