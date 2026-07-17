@@ -61,7 +61,13 @@ const DEFAULT_STATUS_COLOR = 'default';
 // against in its rejection text (e.g. "... is currently out on WO-17") -
 // the frontend has no other way to learn that WO's id, so it's parsed back
 // out of the server's own message rather than duplicated client-side.
-const WORK_ORDER_ID_PATTERN = /WO-(\d+)/;
+// Anchored to the end of the string ($) rather than a bare /WO-(\d+)/ -
+// serial_number is an unconstrained free-text field (backend
+// SerializedItem.serial_number has no format restriction), so an
+// unanchored match could grab a "WO-<n>"-shaped substring out of the
+// scanned serial itself (e.g. serial "WO-99-BATT") instead of the real WO
+// reference the backend always appends last.
+const WORK_ORDER_ID_PATTERN = /WO-(\d+)$/;
 
 export function WorkOrdersPage() {
   const { t } = useTranslation();

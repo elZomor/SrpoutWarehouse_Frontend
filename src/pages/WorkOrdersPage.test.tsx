@@ -782,6 +782,42 @@ describe('WorkOrdersPage', () => {
     expect(await screen.findByText(/WO-17/)).toBeInTheDocument();
   });
 
+  it('names the other work order when the scanned item is already reserved there', async () => {
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, 'SN-043 is already reserved on WO-22');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-043');
+
+    expect(await screen.findByText(/WO-22/)).toBeInTheDocument();
+  });
+
+  it('parses the WO reference from the end of the message, not a WO-shaped serial number', async () => {
+    // Regression: serial_number is unconstrained free text - an unanchored
+    // WO-id regex could grab a "WO-<n>"-shaped substring from inside the
+    // scanned serial itself instead of the real reference the backend
+    // always appends last.
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, 'WO-99-BATT is currently out on WO-17');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'WO-99-BATT');
+
+    // If the WO-id regex weren't anchored to the message's end, it would
+    // grab "99" out of the serial itself instead of the real "17".
+    expect(await screen.findByText(/WO-17/)).toBeInTheDocument();
+  });
+
   it('shows a damaged-specific error for a damaged item', async () => {
     const workOrder = makeWorkOrder({ status: 'in_progress' });
     mockListEndpoints({ workOrders: [workOrder] });
