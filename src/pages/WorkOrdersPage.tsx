@@ -200,7 +200,11 @@ export function WorkOrdersPage() {
         const lineItemErrors = getFieldErrorMessages(error, 'line_item');
         setScanErrorParams({});
 
-        // AC-4: exact backend text is "Serial not found".
+        // AC-4/AC-2: both are fixed constants with no serial_number in
+        // them, unlike the four dynamic messages below - checked by exact
+        // equality (not .includes()) so a *different* rejection whose
+        // free-text serial_number happens to contain one of these phrases
+        // can't be swallowed by an earlier, looser check.
         if (serialErrors.some((message) => message === 'Serial not found')) {
           setScanError('serial_number', {
             type: 'server',
@@ -208,7 +212,11 @@ export function WorkOrdersPage() {
           });
           return;
         }
-        if (serialErrors.some((message) => message.includes('does not match'))) {
+        if (
+          serialErrors.some(
+            (message) => message === "Item does not match this line item's product type.",
+          )
+        ) {
           setScanError('serial_number', {
             type: 'server',
             message: 'workOrders.scan.productTypeMismatchError',

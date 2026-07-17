@@ -842,6 +842,31 @@ describe('WorkOrdersPage', () => {
     expect(screen.queryByText(/currently out on WO-undefined/)).not.toBeInTheDocument();
   });
 
+  it("doesn't misclassify an out item as a product-type mismatch when its serial embeds that phrase", async () => {
+    // Regression: productTypeMismatchError's real backend message is a
+    // fixed constant with no serial_number in it - but the pre-fix check
+    // did a substring search against the *whole* rejection message, which
+    // for out/reserved/damaged/missing does start with the free-text
+    // serial_number. A colliding serial could get swallowed by this
+    // earlier, unrelated check before ever reaching the real out/reserved/
+    // damaged/missing classification.
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(
+      workOrder,
+      "SN-does not match this line item's product type.-77 is currently out on WO-17",
+    );
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, "SN-does not match this line item's product type.-77");
+
+    expect(await screen.findByText(/WO-17/)).toBeInTheDocument();
+  });
+
   it('shows a damaged-specific error for a damaged item', async () => {
     const workOrder = makeWorkOrder({ status: 'in_progress' });
     mockListEndpoints({ workOrders: [workOrder] });
