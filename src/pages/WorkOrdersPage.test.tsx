@@ -425,7 +425,7 @@ describe('WorkOrdersPage', () => {
       await screen.findByText(/product type is required|نوع المنتج مطلوب/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/quantity must be at least 1|يجب أن تكون الكمية 1 على الأقل/i),
+      screen.getByText(/quantity must be greater than zero|يجب أن تكون الكمية أكبر من صفر/i),
     ).toBeInTheDocument();
     expect(mockedApiClient.post).not.toHaveBeenCalled();
   });

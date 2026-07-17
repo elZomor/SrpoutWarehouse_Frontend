@@ -207,7 +207,7 @@
       "productTypePlaceholder": "Select a product type",
       "productTypeRequired": "Product type is required",
       "quantityPlaceholder": "Qty",
-      "quantityRequired": "Quantity must be at least 1",
+      "quantityRequired": "Quantity must be greater than zero",
       "addLineItemButton": "Add line item",
       "removeLineItemButton": "Remove line item"
     },
