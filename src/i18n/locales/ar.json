@@ -211,7 +211,7 @@
       "productTypePlaceholder": "اختر نوع المنتج",
       "productTypeRequired": "نوع المنتج مطلوب",
       "quantityPlaceholder": "الكمية",
-      "quantityRequired": "يجب أن تكون الكمية 1 على الأقل",
+      "quantityRequired": "يجب أن تكون الكمية أكبر من صفر",
       "addLineItemButton": "إضافة بند",
       "removeLineItemButton": "إزالة البند"
     },
