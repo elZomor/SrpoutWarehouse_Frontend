@@ -867,6 +867,29 @@ describe('WorkOrdersPage', () => {
     expect(await screen.findByText(/WO-17/)).toBeInTheDocument();
   });
 
+  it('shows a product-type-mismatch error for a genuine mismatch', async () => {
+    // AC-2/TC-02: the positive case for productTypeMismatchError - the
+    // regression test above only covers a colliding serial resolving to a
+    // *different* classification, not this branch actually firing on its
+    // own real backend message.
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, "Item does not match this line item's product type.");
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-200');
+
+    expect(
+      await screen.findByText(
+        /does not match the selected line item's product type|لا يطابق نوع منتج البند المحدد/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('shows a damaged-specific error for a damaged item', async () => {
     const workOrder = makeWorkOrder({ status: 'in_progress' });
     mockListEndpoints({ workOrders: [workOrder] });
