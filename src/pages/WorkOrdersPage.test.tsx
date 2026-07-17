@@ -734,6 +734,196 @@ describe('WorkOrdersPage', () => {
     expect(await screen.findByText(/not available to scan|غير متاح للمسح/i)).toBeInTheDocument();
   });
 
+  // AC-1/TC-01, AC-3/TC-03, AC-4/TC-04: each rejects with a distinct,
+  // status-specific serial_number error - mockScanRejection stands in for
+  // mockFulfillmentEndpoints' generic scan mock so each test can supply the
+  // exact message WorkOrderViewSet.scan() (WRH-33) returns for its case.
+  function mockScanRejection(workOrder: WorkOrder, message: string) {
+    mockedApiClient.post.mockImplementation((url: string) => {
+      if (url === `/api/work-orders/${workOrder.id}/scan/`) {
+        return Promise.reject({
+          isAxiosError: true,
+          response: { status: 400, data: { serial_number: [message] } },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected POST ${url}`));
+    });
+  }
+
+  it('shows "serial not found" for an unregistered serial', async () => {
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, 'Serial not found');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-NOPE');
+
+    expect(
+      await screen.findByText(/no item found with this serial number|لا يوجد عنصر/i),
+    ).toBeInTheDocument();
+  });
+
+  it('names the other work order when the scanned item is already out', async () => {
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, 'SN-042 is currently out on WO-17');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-042');
+
+    expect(await screen.findByText(/WO-17/)).toBeInTheDocument();
+  });
+
+  it('names the other work order when the scanned item is already reserved there', async () => {
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, 'SN-043 is already reserved on WO-22');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-043');
+
+    expect(await screen.findByText(/WO-22/)).toBeInTheDocument();
+  });
+
+  it('parses the WO reference from the end of the message, not a WO-shaped serial number', async () => {
+    // Regression: serial_number is unconstrained free text - an unanchored
+    // WO-id regex could grab a "WO-<n>"-shaped substring from inside the
+    // scanned serial itself instead of the real reference the backend
+    // always appends last.
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, 'WO-99-BATT is currently out on WO-17');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'WO-99-BATT');
+
+    // If the WO-id regex weren't anchored to the message's end, it would
+    // grab "99" out of the serial itself instead of the real "17".
+    expect(await screen.findByText(/WO-17/)).toBeInTheDocument();
+  });
+
+  it("classifies a damaged item correctly even if its serial embeds another reason's phrase", async () => {
+    // Regression: the backend always appends the true reason last
+    // (`${serial_number} ${reason}`), so an unanchored .includes() check
+    // for one reason's phrase could match against text that's actually
+    // part of the *serial number*, not the real reason - misclassifying a
+    // damaged item as "out" (with an undefined WO id) if its serial
+    // happened to contain "is currently out on".
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, 'SN-is currently out on-77 is damaged and cannot be issued');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-is currently out on-77');
+
+    expect(
+      await screen.findByText(/is damaged and cannot be issued|تالف ولا يمكن صرفه/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/currently out on WO-undefined/)).not.toBeInTheDocument();
+  });
+
+  it("doesn't misclassify an out item as a product-type mismatch when its serial embeds that phrase", async () => {
+    // Regression: productTypeMismatchError's real backend message is a
+    // fixed constant with no serial_number in it - but the pre-fix check
+    // did a substring search against the *whole* rejection message, which
+    // for out/reserved/damaged/missing does start with the free-text
+    // serial_number. A colliding serial could get swallowed by this
+    // earlier, unrelated check before ever reaching the real out/reserved/
+    // damaged/missing classification.
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(
+      workOrder,
+      "SN-does not match this line item's product type.-77 is currently out on WO-17",
+    );
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, "SN-does not match this line item's product type.-77");
+
+    expect(await screen.findByText(/WO-17/)).toBeInTheDocument();
+  });
+
+  it('shows a product-type-mismatch error for a genuine mismatch', async () => {
+    // AC-2/TC-02: the positive case for productTypeMismatchError - the
+    // regression test above only covers a colliding serial resolving to a
+    // *different* classification, not this branch actually firing on its
+    // own real backend message.
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, "Item does not match this line item's product type.");
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-200');
+
+    expect(
+      await screen.findByText(
+        /does not match the selected line item's product type|لا يطابق نوع منتج البند المحدد/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a damaged-specific error for a damaged item', async () => {
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, 'SN-099 is damaged and cannot be issued');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-099');
+
+    expect(
+      await screen.findByText(/is damaged and cannot be issued|تالف ولا يمكن صرفه/i),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a missing-specific error for a missing item', async () => {
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints({ workOrders: [workOrder] });
+    mockScanRejection(workOrder, 'SN-100 is missing and cannot be issued');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await selectScanLineItem(user, 'Bar LED Model A');
+    await scanSerial(user, 'SN-100');
+
+    expect(
+      await screen.findByText(/is missing and cannot be issued|مفقود ولا يمكن صرفه/i),
+    ).toBeInTheDocument();
+  });
+
   it('shows an empty state on the Active tab when no active work orders exist', async () => {
     // TC-04/AC-4
     mockListEndpoints({});

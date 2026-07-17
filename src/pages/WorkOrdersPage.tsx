@@ -57,6 +57,20 @@ const SERIALIZED_ITEM_STATUS_COLORS = new Map<string, string>([
   ['out', 'red'],
 ]);
 const DEFAULT_STATUS_COLOR = 'default';
+// WRH-33: scan()'s serial_number rejection messages are always
+// `${serial_number} ${reason}` - and serial_number is unconstrained free
+// text (backend SerializedItem.serial_number has no format restriction),
+// so every one of these has to be matched against the message's actual
+// *end*, not just checked with .includes() anywhere in the string. A serial
+// number that happens to contain another reason's phrase (e.g.
+// "SN is currently out on WO-5" scanned while genuinely damaged) would
+// otherwise misclassify: the backend always appends its real reason last,
+// so anchoring to $ is what makes the true reason unambiguous regardless of
+// what's in the serial itself.
+const OUT_PATTERN = /is currently out on WO-(\d+)$/;
+const RESERVED_PATTERN = /is already reserved on WO-(\d+)$/;
+const DAMAGED_PATTERN = /is damaged and cannot be issued$/;
+const MISSING_PATTERN = /is missing and cannot be issued$/;
 
 export function WorkOrdersPage() {
   const { t } = useTranslation();
@@ -116,6 +130,12 @@ export function WorkOrdersPage() {
     resolver: zodResolver(scanItemSchema),
     defaultValues: { line_item: undefined, serial_number: '' },
   });
+  // scanErrors.serial_number.message only ever holds an i18n key (both the
+  // zod-resolver's built-in required-field keys and the server-driven keys
+  // set in onScanSubmit's onError below) - the WO-id a rejected out/reserved
+  // scan needs to interpolate lives here instead, alongside it rather than
+  // baked into the key itself.
+  const [scanErrorParams, setScanErrorParams] = useState<{ workOrderId?: string }>({});
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -130,6 +150,7 @@ export function WorkOrdersPage() {
   const openFulfillmentModal = (workOrder: WorkOrder) => {
     setFulfillingWorkOrderId(workOrder.id);
     resetScanForm({ line_item: undefined, serial_number: '' });
+    setScanErrorParams({});
     scanMutation.reset();
     completeMutation.reset();
   };
@@ -143,6 +164,7 @@ export function WorkOrdersPage() {
     }
     setFulfillingWorkOrderId(null);
     resetScanForm();
+    setScanErrorParams({});
     scanMutation.reset();
     completeMutation.reset();
   };
@@ -170,27 +192,74 @@ export function WorkOrdersPage() {
               : undefined,
           serial_number: '',
         });
+        setScanErrorParams({});
         setScanFocus('serial_number');
       },
       onError: (error) => {
         const serialErrors = getFieldErrorMessages(error, 'serial_number');
         const lineItemErrors = getFieldErrorMessages(error, 'line_item');
+        setScanErrorParams({});
 
-        if (serialErrors.some((message) => message.includes('No item found'))) {
+        // AC-4/AC-2: both are fixed constants with no serial_number in
+        // them, unlike the four dynamic messages below - checked by exact
+        // equality (not .includes()) so a *different* rejection whose
+        // free-text serial_number happens to contain one of these phrases
+        // can't be swallowed by an earlier, looser check.
+        if (serialErrors.some((message) => message === 'Serial not found')) {
           setScanError('serial_number', {
             type: 'server',
             message: 'workOrders.scan.notFoundError',
           });
           return;
         }
-        if (serialErrors.some((message) => message.includes('does not match'))) {
+        if (
+          serialErrors.some(
+            (message) => message === "Item does not match this line item's product type.",
+          )
+        ) {
           setScanError('serial_number', {
             type: 'server',
             message: 'workOrders.scan.productTypeMismatchError',
           });
           return;
         }
-        if (serialErrors.some((message) => message.includes('not available'))) {
+        // AC-1: item already out on another WO - name that WO.
+        const outMatch = serialErrors.map((message) => message.match(OUT_PATTERN)).find(Boolean);
+        if (outMatch) {
+          setScanErrorParams({ workOrderId: outMatch[1] });
+          setScanError('serial_number', { type: 'server', message: 'workOrders.scan.outError' });
+          return;
+        }
+        // Same WO reference as above, but for a scan-in-progress double-tap
+        // (item already claimed, not yet confirmed out) rather than a fully
+        // fulfilled WO.
+        const reservedMatch = serialErrors
+          .map((message) => message.match(RESERVED_PATTERN))
+          .find(Boolean);
+        if (reservedMatch) {
+          setScanErrorParams({ workOrderId: reservedMatch[1] });
+          setScanError('serial_number', {
+            type: 'server',
+            message: 'workOrders.scan.reservedError',
+          });
+          return;
+        }
+        // AC-3: damaged/missing items.
+        if (serialErrors.some((message) => DAMAGED_PATTERN.test(message))) {
+          setScanError('serial_number', {
+            type: 'server',
+            message: 'workOrders.scan.damagedError',
+          });
+          return;
+        }
+        if (serialErrors.some((message) => MISSING_PATTERN.test(message))) {
+          setScanError('serial_number', {
+            type: 'server',
+            message: 'workOrders.scan.missingError',
+          });
+          return;
+        }
+        if (serialErrors.length > 0) {
           setScanError('serial_number', {
             type: 'server',
             message: 'workOrders.scan.notAvailableError',
@@ -685,7 +754,9 @@ export function WorkOrdersPage() {
                 htmlFor="scan-serial_number"
                 validateStatus={scanErrors.serial_number ? 'error' : ''}
                 help={
-                  scanErrors.serial_number ? t(scanErrors.serial_number.message ?? '') : undefined
+                  scanErrors.serial_number
+                    ? t(scanErrors.serial_number.message ?? '', scanErrorParams)
+                    : undefined
                 }
               >
                 <Controller
