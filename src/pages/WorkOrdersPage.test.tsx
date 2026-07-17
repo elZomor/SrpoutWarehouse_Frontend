@@ -495,10 +495,14 @@ describe('WorkOrdersPage', () => {
     expect(await screen.findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
   });
 
+  // Timeout bumped for the same coverage-instrumentation reason as the
+  // "does not show a loading state..." test above (see LESSONS.md) - this
+  // test does two full render/interact cycles (start on Manage, then
+  // switch to Active), making it one of the heavier tests in this file.
   it('refreshes the Active tab after starting a WO from the Manage tab', async () => {
-    // Regression: the Active tab's query is a separate cache from the flat
-    // work-orders list and doesn't remount on tab switch (AntD keeps an
-    // already-rendered pane mounted) - starting a WO on Manage must
+    // Regression: the Active tab's query is a separate cache from the
+    // flat work-orders list and doesn't remount on tab switch (AntD keeps
+    // an already-rendered pane mounted) - starting a WO on Manage must
     // invalidate it or the Active tab keeps showing the pre-start status.
     const workOrder = makeWorkOrder({ status: 'draft' });
     let activeStatus: 'draft' | 'in_progress' = 'draft';
@@ -526,9 +530,12 @@ describe('WorkOrdersPage', () => {
     await userEvent
       .setup()
       .click(await screen.findByRole('button', { name: /start fulfillment|بدء التنفيذ/i }));
-    // AntD keeps both tab panes mounted, so both the Manage row and the
-    // (still-stale, pre-invalidation) Active row for the same WO can be in
-    // the DOM at once - scope to the Manage table's own row.
+    // AntD keeps both tab panes mounted (not unmounted) once rendered,
+    // but marks the inactive one `aria-hidden="true"`, which
+    // findByRole/getByRole exclude by default - so scoping to a row here
+    // isn't strictly required to disambiguate, but keeps the assertion
+    // pinned to the Manage table specifically rather than "wherever a
+    // matching row happens to be found".
     const manageRow = await screen.findByRole('row', { name: /summer gala/i });
     await within(manageRow).findByText(/^in progress$|^قيد التنفيذ$/i);
 
@@ -536,7 +543,7 @@ describe('WorkOrdersPage', () => {
 
     const activeRow = await screen.findByRole('row', { name: /summer gala/i });
     expect(await within(activeRow).findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
-  });
+  }, 40000);
 
   it('shows a toast when starting fulfillment fails, leaving the WO as draft', async () => {
     const workOrder = makeWorkOrder();
