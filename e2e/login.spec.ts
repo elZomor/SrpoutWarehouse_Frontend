@@ -54,6 +54,12 @@ test('user logs in, sees their name on the dashboard, then logs out', async ({ p
 
     await stubAuth(route, () => loggedIn);
   });
+  // Landing on "/" now also renders the WRH-48 stock dashboard, which fires
+  // its own GET on mount - stub it so this login/logout flow isn't affected
+  // by an unrelated, unmocked request.
+  await page.route('**/api/product-types/stock-summary/', (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
 
   await page.goto('/login');
 

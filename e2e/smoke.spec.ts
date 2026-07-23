@@ -9,6 +9,12 @@ test.beforeEach(async ({ page }) => {
       json: { user: { id: '1', name: 'Jane Doe', email: 'jane@example.com' } },
     }),
   );
+  // The dashboard also renders the WRH-48 stock summary, which fires its own
+  // GET on mount - stub it so these shell/i18n tests aren't affected by an
+  // unrelated, unmocked request.
+  await page.route('**/api/product-types/stock-summary/', (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
 });
 
 test('dashboard shell loads with default RTL locale', async ({ page }) => {

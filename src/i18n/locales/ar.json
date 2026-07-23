@@ -31,7 +31,27 @@
     "message": "ستتم إضافة هذه الشاشة في إصدار قادم."
   },
   "dashboard": {
-    "welcome": "مرحبًا بك في سبروت للمخازن"
+    "welcome": "مرحبًا بك في سبروت للمخازن",
+    "stockSummary": {
+      "title": "المخزون الحالي",
+      "refreshButton": "تحديث",
+      "productTypeHeader": "نوع المنتج",
+      "totalRegisteredHeader": "إجمالي المسجل",
+      "outHeader": "خارج",
+      "damagedHeader": "تالف",
+      "missingHeader": "مفقود",
+      "availableHeader": "متاح",
+      "emptyState": "لا توجد أنواع منتجات",
+      "loadError": "فشل تحميل ملخص المخزون. حاول مرة أخرى.",
+      "detail": {
+        "title": "{{productType}}",
+        "serialNumberHeader": "الرقم التسلسلي",
+        "statusHeader": "الحالة",
+        "closeButton": "إغلاق",
+        "emptyState": "لا توجد عناصر مسلسلة",
+        "loadError": "فشل تحميل العناصر المسلسلة. حاول مرة أخرى."
+      }
+    }
   },
   "auth": {
     "login": {
@@ -106,7 +126,10 @@
     "status": {
       "available": "متاح",
       "reserved": "محجوز",
-      "out": "خارج"
+      "out": "خارج",
+      "damaged": "تالف",
+      "missing": "مفقود",
+      "written_off": "شطب"
     },
     "lastWorkOrderLabel": "آخر أمر عمل",
     "noWorkOrder": "—",
