@@ -39,6 +39,10 @@ export type ScanItemFormValues = z.infer<typeof scanItemSchema>;
 
 export const returnItemSchema = z.object({
   serial_number: z.string().min(1, 'workOrders.return.serialNumberRequired'),
+  // WRH-57/AC-1: optional - omitted (not explicitly false) for a plain
+  // return, so the request body matches the pre-WRH-57 wire shape exactly
+  // when the "Mark as Damaged" action isn't the one used.
+  damaged: z.boolean().optional(),
 });
 
 export type ReturnItemFormValues = z.infer<typeof returnItemSchema>;

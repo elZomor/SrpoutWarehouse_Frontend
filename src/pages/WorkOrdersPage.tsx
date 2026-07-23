@@ -369,6 +369,13 @@ export function WorkOrdersPage() {
     setPendingReturnSubmission(values);
   };
 
+  // WRH-57/AC-1: a second submit path off the same form/validation - marks
+  // the scanned unit damaged instead of returning it to available stock.
+  // Both paths funnel into the same pendingReturnSubmission effect below.
+  const onMarkDamagedSubmit = (values: ReturnItemFormValues) => {
+    setPendingReturnSubmission({ ...values, damaged: true });
+  };
+
   // A response can land after the user has since closed the modal, opened
   // a *different* WO's session, or closed and re-opened the *same* WO's
   // session while this submission was still in flight - unlike scan/
@@ -595,6 +602,11 @@ export function WorkOrdersPage() {
       key: 'returned_quantity',
     },
     {
+      title: t('workOrders.return.damagedHeader'),
+      dataIndex: 'damaged_quantity',
+      key: 'damaged_quantity',
+    },
+    {
       title: t('workOrders.return.stillOutHeader'),
       dataIndex: 'still_out_quantity',
       key: 'still_out_quantity',
@@ -617,6 +629,7 @@ export function WorkOrdersPage() {
               {t('workOrders.active.productTypeSummary', {
                 productType: item.product_type_name,
                 returned: item.returned_quantity,
+                damaged: item.damaged_quantity,
                 stillOut: item.still_out_quantity,
               })}
             </span>
@@ -1037,9 +1050,22 @@ export function WorkOrdersPage() {
                   style={{ marginBottom: 16 }}
                 />
               )}
-              <Button type="primary" htmlType="submit" loading={returnMutation.isPending}>
-                {t('workOrders.return.scanButton')}
-              </Button>
+              <Space>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={returnMutation.isPending && !pendingReturnSubmission?.damaged}
+                >
+                  {t('workOrders.return.scanButton')}
+                </Button>
+                <Button
+                  danger
+                  onClick={handleReturnSubmit(onMarkDamagedSubmit)}
+                  loading={returnMutation.isPending && pendingReturnSubmission?.damaged === true}
+                >
+                  {t('workOrders.return.markDamagedButton')}
+                </Button>
+              </Space>
             </Form>
           </>
         )}

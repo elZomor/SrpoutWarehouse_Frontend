@@ -455,3 +455,92 @@ test('returns items against a fulfilled WO: partial then full return', async ({ 
   await returnButton.click();
   await expect(dialog.getByText(/^returned$|^تم الإرجاع$/i)).toBeVisible();
 });
+
+test('marks a returning unit as damaged: excluded from stock and its own summary category', async ({
+  page,
+}) => {
+  // WRH-57/AC-1/AC-2/AC-3/TC-01/TC-02/TC-03
+  const workOrder = {
+    id: 1,
+    job_name: 'Summer Gala',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-01',
+    status: 'fulfilled',
+    line_items: [
+      {
+        id: 1,
+        product_type: 1,
+        product_type_name: 'Bar LED Model A',
+        quantity: 2,
+        returned_quantity: 0,
+        damaged_quantity: 0,
+        still_out_quantity: 2,
+      },
+    ],
+    supplementaries: [] as unknown[],
+  };
+
+  await page.route('**/api/auth/**', stubAuth);
+  await registerProductTypesRoute(page);
+  await page.route('**/api/work-orders/**', async (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+
+    if (method === 'POST' && url.endsWith('/return-item/')) {
+      const body = route.request().postDataJSON() as {
+        serial_number: string;
+        damaged?: boolean;
+      };
+      if (body.damaged) {
+        workOrder.line_items = [
+          {
+            ...workOrder.line_items[0],
+            damaged_quantity: workOrder.line_items[0].damaged_quantity + 1,
+            still_out_quantity: workOrder.line_items[0].still_out_quantity - 1,
+          },
+        ];
+      } else {
+        workOrder.line_items = [
+          {
+            ...workOrder.line_items[0],
+            returned_quantity: workOrder.line_items[0].returned_quantity + 1,
+            still_out_quantity: workOrder.line_items[0].still_out_quantity - 1,
+          },
+        ];
+      }
+      workOrder.status =
+        workOrder.line_items[0].still_out_quantity <= 0 ? 'returned' : 'partially_returned';
+      await route.fulfill({ status: 200, json: workOrder });
+      return;
+    }
+    if (method === 'GET' && url.endsWith('/active/')) {
+      await route.fulfill({ status: 200, json: [workOrder] });
+      return;
+    }
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, json: [] });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto('/work-orders');
+
+  await page
+    .getByRole('row', { name: /summer gala/i })
+    .getByRole('button', { name: /^return$|^إرجاع$/i })
+    .click();
+  const dialog = page.getByRole('dialog');
+
+  await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-9001');
+  await dialog.getByRole('button', { name: /mark as damaged|وضع علامة كتالف/i }).click();
+  const row = dialog.getByRole('row', { name: /bar led model a/i });
+  await expect(row.locator('td')).toHaveText(['Bar LED Model A', '2', '0', '1', '1']);
+
+  await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-9002');
+  await dialog.locator('button[type="submit"]').click();
+  // AC-3: the damaged unit doesn't block the WO from reaching "returned"
+  // once the remaining unit is also accounted for.
+  await expect(dialog.getByText(/^returned$|^تم الإرجاع$/i)).toBeVisible();
+});
