@@ -277,5 +277,31 @@
       "statusError": "This work order is not eligible for return.",
       "genericError": "Failed to record this return. Please try again."
     }
+  },
+  "transactionLog": {
+    "title": "Transaction Log",
+    "serialNumberPlaceholder": "Filter by serial number",
+    "referenceNumberPlaceholder": "Filter by reference number (e.g. WO-17)",
+    "typePlaceholder": "Filter by type",
+    "typeLabel": "Type",
+    "referenceNumberLabel": "Reference #",
+    "serialNumberLabel": "Serial",
+    "productTypeLabel": "Product Type",
+    "dateLabel": "Date",
+    "userLabel": "User",
+    "noteLabel": "Note",
+    "noReference": "—",
+    "noNote": "—",
+    "type": {
+      "receive": "Receive",
+      "issue": "Issue",
+      "return": "Return",
+      "damaged": "Damaged",
+      "transfer": "Transfer",
+      "missing": "Missing",
+      "written_off": "Written Off"
+    },
+    "emptyState": "No transactions found",
+    "loadError": "Failed to load transaction log. Please try again."
   }
 }

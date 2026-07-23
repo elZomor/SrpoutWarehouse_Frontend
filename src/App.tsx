@@ -8,6 +8,7 @@ import { LoginPage } from './pages/LoginPage';
 import { ProductTypesPage } from './pages/ProductTypesPage';
 import { PurchaseOrdersPage } from './pages/PurchaseOrdersPage';
 import { SerializedItemsPage } from './pages/SerializedItemsPage';
+import { TransactionLogPage } from './pages/TransactionLogPage';
 import { WorkOrdersPage } from './pages/WorkOrdersPage';
 import { ROUTES } from './routes';
 
@@ -36,10 +37,7 @@ function App() {
             path={ROUTES.maintenanceOrders}
             element={<ComingSoonPage titleKey="nav.maintenanceOrders" />}
           />
-          <Route
-            path={ROUTES.transactionLog}
-            element={<ComingSoonPage titleKey="nav.transactionLog" />}
-          />
+          <Route path={ROUTES.transactionLog} element={<TransactionLogPage />} />
           <Route path={ROUTES.settings} element={<ComingSoonPage titleKey="nav.settings" />} />
         </Route>
       </Route>
