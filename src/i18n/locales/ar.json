@@ -281,5 +281,31 @@
       "statusError": "أمر العمل هذا غير مؤهل للإرجاع.",
       "genericError": "فشل تسجيل هذا الإرجاع. حاول مرة أخرى."
     }
+  },
+  "transactionLog": {
+    "title": "سجل المعاملات",
+    "serialNumberPlaceholder": "تصفية حسب الرقم التسلسلي",
+    "referenceNumberPlaceholder": "تصفية حسب رقم المرجع (مثال: WO-17)",
+    "typePlaceholder": "تصفية حسب النوع",
+    "typeLabel": "النوع",
+    "referenceNumberLabel": "رقم المرجع",
+    "serialNumberLabel": "الرقم التسلسلي",
+    "productTypeLabel": "نوع المنتج",
+    "dateLabel": "التاريخ",
+    "userLabel": "المستخدم",
+    "noteLabel": "ملاحظة",
+    "noReference": "—",
+    "noNote": "—",
+    "type": {
+      "receive": "استلام",
+      "issue": "صرف",
+      "return": "إرجاع",
+      "damaged": "تالف",
+      "transfer": "نقل",
+      "missing": "مفقود",
+      "written_off": "شطب"
+    },
+    "emptyState": "لا توجد معاملات",
+    "loadError": "فشل تحميل سجل المعاملات. حاول مرة أخرى."
   }
 }
