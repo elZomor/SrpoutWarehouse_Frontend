@@ -1,6 +1,6 @@
 import { apiClient } from '../../lib/apiClient';
-import type { ScanItemFormValues, WorkOrderFormValues } from './schema';
-import type { ActiveWorkOrder, WorkOrder, WorkOrderDetail } from './types';
+import type { ReturnItemFormValues, ScanItemFormValues, WorkOrderFormValues } from './schema';
+import type { ActiveWorkOrder, WorkOrder, WorkOrderDetail, WorkOrderReturnResult } from './types';
 
 export async function listWorkOrders(): Promise<WorkOrder[]> {
   const { data } = await apiClient.get<WorkOrder[]>('/api/work-orders/');
@@ -37,5 +37,16 @@ export async function scanWorkOrderItem(
 
 export async function completeWorkOrder(workOrderId: number): Promise<WorkOrder> {
   const { data } = await apiClient.post<WorkOrder>(`/api/work-orders/${workOrderId}/complete/`);
+  return data;
+}
+
+export async function returnWorkOrderItem(
+  workOrderId: number,
+  input: ReturnItemFormValues,
+): Promise<WorkOrderReturnResult> {
+  const { data } = await apiClient.post<WorkOrderReturnResult>(
+    `/api/work-orders/${workOrderId}/return-item/`,
+    input,
+  );
   return data;
 }

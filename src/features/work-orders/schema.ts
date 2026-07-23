@@ -36,3 +36,9 @@ export const scanItemSchema = z.object({
 });
 
 export type ScanItemFormValues = z.infer<typeof scanItemSchema>;
+
+export const returnItemSchema = z.object({
+  serial_number: z.string().min(1, 'workOrders.return.serialNumberRequired'),
+});
+
+export type ReturnItemFormValues = z.infer<typeof returnItemSchema>;

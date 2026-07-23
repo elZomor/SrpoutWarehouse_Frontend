@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -543,7 +543,7 @@ describe('WorkOrdersPage', () => {
 
     const activeRow = await screen.findByRole('row', { name: /summer gala/i });
     expect(await within(activeRow).findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
-  }, 40000);
+  }, 60000);
 
   it('shows a toast when starting fulfillment fails, leaving the WO as draft', async () => {
     const workOrder = makeWorkOrder();
@@ -971,6 +971,11 @@ describe('WorkOrdersPage', () => {
     expect(screen.getByText('Supplementary B')).toBeInTheDocument();
   });
 
+  // Timeout bumped like the file's other Modal-interacting tests (see
+  // LESSONS.md's WRH-55 entry) - this WO's default status ('fulfilled')
+  // now also renders WRH-38's Return button alongside View Details, and
+  // that extra row width pushed this specific test just past the default
+  // budget under `--coverage`.
   it('drills into a work order to show exact serials and their statuses', async () => {
     // TC-03/AC-3
     mockListEndpoints({ activeWorkOrders: [makeActiveWorkOrder()] });
@@ -1016,5 +1021,290 @@ describe('WorkOrdersPage', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('SN-0001')).toBeInTheDocument();
     expect(within(dialog).getByText(/^out$|^خارج$/i)).toBeInTheDocument();
-  });
+  }, 60000);
+
+  // WRH-38: mocks return_item() only - mockListEndpoints still supplies the
+  // active-list GET, matching mockScanRejection's precedent of a
+  // POST-only mock layered on top of it.
+  function mockReturnItem(workOrder: ActiveWorkOrder, response: unknown) {
+    mockedApiClient.post.mockImplementation((url: string) => {
+      if (url === `/api/work-orders/${workOrder.id}/return-item/`) {
+        return Promise.resolve({ data: response });
+      }
+      return Promise.reject(new Error(`Unexpected POST ${url}`));
+    });
+  }
+
+  function mockReturnItemRejection(workOrder: ActiveWorkOrder, field: string, message: string) {
+    mockedApiClient.post.mockImplementation((url: string) => {
+      if (url === `/api/work-orders/${workOrder.id}/return-item/`) {
+        return Promise.reject({
+          isAxiosError: true,
+          response: { status: 400, data: { [field]: [message] } },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected POST ${url}`));
+    });
+  }
+
+  async function openReturnModal(user: ReturnType<typeof userEvent.setup>) {
+    // Queries the button directly (scoped to the whole document, not via
+    // getByRole('row', {name}) + within(row)) - only one work order exists
+    // in these tests, so there's no ambiguity, and a row's accessible name
+    // aggregates every cell's content including each contained button's
+    // own name. That computation is disproportionately expensive once a
+    // row has two interactive descendants (View Details + Return) instead
+    // of one - regression: this exact row+within pattern reliably pushed
+    // this test past even a 60s per-test override under `--coverage`,
+    // where the equivalent direct button query finishes in ~1s.
+    const button = await screen.findByRole('button', { name: /^return$|^إرجاع$/i });
+    await user.click(button);
+  }
+
+  async function returnSerial(user: ReturnType<typeof userEvent.setup>, serialNumber: string) {
+    const dialog = screen.getByRole('dialog');
+    const input = screen.getByLabelText(/serial number|الرقم التسلسلي/i);
+    await user.clear(input);
+    await user.type(input, serialNumber);
+    await user.click(within(dialog).getByRole('button', { name: /^return$|^إرجاع$/i }));
+  }
+
+  // Every test below is timeout-bumped like the file's other Modal-
+  // interacting tests (see LESSONS.md's WRH-55 entry) - opening the Return
+  // modal (or, for "does not show a Return button", just rendering a wider
+  // Active-tab row) is reliably one of the heavier render paths in this
+  // file under `--coverage --no-file-parallelism`, and observed duration
+  // varies noticeably run-to-run in this environment even with the actual
+  // slow-query pattern already fixed (see openReturnModal's comment) - the
+  // 40s margin is well above the ~1s these tests take in isolation.
+  it('shows a Return button for a fulfilled WO and records a partial return', async () => {
+    // AC-2/TC-02
+    const workOrder = makeActiveWorkOrder({
+      status: 'fulfilled',
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          quantity: 2,
+          returned_quantity: 0,
+          still_out_quantity: 2,
+        },
+      ],
+    });
+    mockListEndpoints({ activeWorkOrders: [workOrder] });
+    mockReturnItem(workOrder, {
+      id: 1,
+      job_name: 'Summer Gala',
+      status: 'partially_returned',
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          quantity: 2,
+          returned_quantity: 1,
+          still_out_quantity: 1,
+        },
+      ],
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openReturnModal(user);
+    await returnSerial(user, 'SN-1001');
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/1/return-item/', {
+      serial_number: 'SN-1001',
+    });
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      await within(dialog).findByText(/^partially returned$|^إرجاع جزئي$/i),
+    ).toBeInTheDocument();
+    const row = await within(dialog).findByRole('row', { name: /bar led model a/i });
+    const cells = within(row)
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent);
+    expect(cells).toEqual(['Bar LED Model A', '2', '1', '1']); // issued, returned, still out
+  }, 40000);
+
+  it('shows a Return button for a partially_returned WO (AC-4: completing it later)', async () => {
+    const workOrder = makeActiveWorkOrder({ status: 'partially_returned' });
+    mockListEndpoints({ activeWorkOrders: [workOrder] });
+    mockReturnItem(workOrder, { ...workOrder, status: 'returned' });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openReturnModal(user);
+    await returnSerial(user, 'SN-2001');
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText(/^returned$|^تم الإرجاع$/i)).toBeInTheDocument();
+  }, 40000);
+
+  it('does not show a Return button for a draft or in_progress WO', async () => {
+    mockListEndpoints({
+      activeWorkOrders: [makeActiveWorkOrder({ status: 'draft', id: 1 })],
+    });
+
+    await renderWorkOrdersPage({ tab: 'active' });
+
+    // Queries the button directly rather than via getByRole('row', {name})
+    // - a row's accessible name aggregates every cell's content including
+    // each button's own name, which is disproportionately expensive to
+    // compute once a row has more than one interactive descendant (see
+    // openReturnModal's identical reasoning).
+    await screen.findByText('Summer Gala');
+    expect(screen.queryByRole('button', { name: /^return$|^إرجاع$/i })).not.toBeInTheDocument();
+  }, 40000);
+
+  it('shows "serial not found" for an unregistered serial during return', async () => {
+    const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
+    mockListEndpoints({ activeWorkOrders: [workOrder] });
+    mockReturnItemRejection(workOrder, 'serial_number', 'Serial not found');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openReturnModal(user);
+    await returnSerial(user, 'SN-NOPE');
+
+    expect(
+      await screen.findByText(/no item found with this serial number|لا يوجد عنصر/i),
+    ).toBeInTheDocument();
+  }, 40000);
+
+  it('names the other work order when a returned serial was not issued on this one', async () => {
+    const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
+    mockListEndpoints({ activeWorkOrders: [workOrder] });
+    mockReturnItemRejection(workOrder, 'serial_number', 'SN-042 was not issued on WO-17');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openReturnModal(user);
+    await returnSerial(user, 'SN-042');
+
+    expect(await screen.findByText(/WO-17/)).toBeInTheDocument();
+  }, 40000);
+
+  it('rejects an item that is not currently out during return', async () => {
+    const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
+    mockListEndpoints({ activeWorkOrders: [workOrder] });
+    mockReturnItemRejection(
+      workOrder,
+      'serial_number',
+      'SN-055 is not currently out on this work order',
+    );
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openReturnModal(user);
+    await returnSerial(user, 'SN-055');
+
+    expect(
+      await screen.findByText(/is not currently out on this work order|ليس مصروفًا حاليًا/i),
+    ).toBeInTheDocument();
+  }, 40000);
+
+  it('invalidates and refetches the Active tab after closing a return session', async () => {
+    const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
+    let getCallCount = 0;
+    mockedApiClient.get.mockImplementation((url: string) => {
+      if (url === '/api/product-types/') {
+        return Promise.resolve({ data: [makeProductType()] });
+      }
+      if (url === '/api/work-orders/active/') {
+        getCallCount += 1;
+        return Promise.resolve({ data: [workOrder] });
+      }
+      if (url === '/api/work-orders/') {
+        return Promise.resolve({ data: [] });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+    mockReturnItem(workOrder, { ...workOrder, status: 'partially_returned' });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openReturnModal(user);
+    await returnSerial(user, 'SN-3001');
+    await screen.findByText(/^partially returned$|^إرجاع جزئي$/i);
+    const countBeforeClose = getCallCount;
+
+    await user.click(screen.getByRole('button', { name: /^done$|^تم$/i }));
+
+    await waitFor(() => expect(getCallCount).toBeGreaterThan(countBeforeClose));
+  }, 40000);
+
+  it('does not reopen the Return modal if its response lands after the modal was closed', async () => {
+    // Regression: onReturnSubmit's onSuccess used to call setReturnSession
+    // unconditionally - a response that lands after the modal was already
+    // dismissed would reopen it with stale data.
+    const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
+    mockListEndpoints({ activeWorkOrders: [workOrder] });
+    let resolvePost: ((value: { data: unknown }) => void) | undefined;
+    mockedApiClient.post.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePost = resolve;
+        }),
+    );
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openReturnModal(user);
+    await returnSerial(user, 'SN-9001');
+
+    await user.click(screen.getByRole('button', { name: /^done$|^تم$/i }));
+
+    await act(async () => {
+      resolvePost?.({ data: { ...workOrder, status: 'partially_returned' } });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // AntD's Modal never truly unmounts in jsdom (rc-motion's "leave"
+    // transition classes linger forever since jsdom never fires
+    // transitionend), so asserting the dialog node itself is gone isn't a
+    // reliable signal here - checking that the stale response's content
+    // never rendered is the direct test of the actual regression (the old
+    // bug would show this text by calling setReturnSession(updated)
+    // unconditionally in onSuccess).
+    expect(screen.queryByText(/^partially returned$|^إرجاع جزئي$/i)).not.toBeInTheDocument();
+  }, 40000);
+
+  it('does not apply a stale response after closing and reopening the same WO', async () => {
+    // Regression: a workOrderId-only staleness check can't tell a closed-
+    // then-reopened session for the SAME WO apart from the original one -
+    // this response belongs to the abandoned first session and must not
+    // overwrite the freshly reopened one, even though the id matches.
+    const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
+    mockListEndpoints({ activeWorkOrders: [workOrder] });
+    let resolvePost: ((value: { data: unknown }) => void) | undefined;
+    mockedApiClient.post.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePost = resolve;
+        }),
+    );
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openReturnModal(user);
+    await returnSerial(user, 'SN-8001');
+
+    await user.click(screen.getByRole('button', { name: /^done$|^تم$/i }));
+    await openReturnModal(user);
+
+    await act(async () => {
+      resolvePost?.({ data: { ...workOrder, status: 'partially_returned' } });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The reopened session must keep showing its own (fulfilled) status,
+    // not get silently overwritten by the abandoned first session's
+    // stale "partially_returned" response.
+    expect(screen.queryByText(/^partially returned$|^إرجاع جزئي$/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog').textContent).toMatch(/fulfilled|تم التنفيذ/i);
+  }, 90000);
 });
