@@ -12,10 +12,11 @@ const serializedItemsBaseKey = ['serialized-items'] as const;
 const serializedItemsQueryKey = (search: string, productType?: number) =>
   [...serializedItemsBaseKey, search, productType] as const;
 
-export function useSerializedItems(search: string, productType?: number) {
+export function useSerializedItems(search: string, productType?: number, enabled = true) {
   return useQuery({
     queryKey: serializedItemsQueryKey(search, productType),
     queryFn: () => listSerializedItems({ search: search || undefined, product_type: productType }),
+    enabled,
   });
 }
 

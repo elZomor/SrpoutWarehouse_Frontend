@@ -31,7 +31,27 @@
     "message": "This screen will be added in a future build."
   },
   "dashboard": {
-    "welcome": "Welcome to Sprout Warehouse"
+    "welcome": "Welcome to Sprout Warehouse",
+    "stockSummary": {
+      "title": "Current Stock",
+      "refreshButton": "Refresh",
+      "productTypeHeader": "Product Type",
+      "totalRegisteredHeader": "Total Registered",
+      "outHeader": "Out",
+      "damagedHeader": "Damaged",
+      "missingHeader": "Missing",
+      "availableHeader": "Available",
+      "emptyState": "No product types found",
+      "loadError": "Failed to load stock summary. Please try again.",
+      "detail": {
+        "title": "{{productType}}",
+        "serialNumberHeader": "Serial Number",
+        "statusHeader": "Status",
+        "closeButton": "Close",
+        "emptyState": "No serialized items found",
+        "loadError": "Failed to load serialized items. Please try again."
+      }
+    }
   },
   "auth": {
     "login": {
@@ -102,7 +122,10 @@
     "status": {
       "available": "Available",
       "reserved": "Reserved",
-      "out": "Out"
+      "out": "Out",
+      "damaged": "Damaged",
+      "missing": "Missing",
+      "written_off": "Written off"
     },
     "lastWorkOrderLabel": "Last Work Order",
     "noWorkOrder": "—",
