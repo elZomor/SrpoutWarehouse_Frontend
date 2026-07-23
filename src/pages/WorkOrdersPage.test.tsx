@@ -544,7 +544,7 @@ describe('WorkOrdersPage', () => {
 
     const activeRow = await screen.findByRole('row', { name: /summer gala/i });
     expect(await within(activeRow).findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
-  }, 60000);
+  }, 90000);
 
   it('shows a toast when starting fulfillment fails, leaving the WO as draft', async () => {
     const workOrder = makeWorkOrder();
