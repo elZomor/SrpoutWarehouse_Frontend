@@ -353,6 +353,26 @@ describe('TransactionLogPage', () => {
     expect(screen.getByText(/no transactions found|لا توجد معاملات/i)).toBeInTheDocument();
   });
 
+  it('renders no edit or delete action on any transaction row (WRH-50/AC-1,AC-2/TC-01,TC-02)', async () => {
+    // TransactionLogPage's columns array (see TransactionLogPage.tsx) has
+    // no actions column at all, and useTransactions/api.ts expose no
+    // update/delete operation to wire one up to - this asserts that
+    // negative directly against the rendered table rather than just
+    // trusting the columns array stays that way.
+    mockTransactionsEndpoint([
+      makeTransaction({ id: 1 }),
+      makeTransaction({ id: 2, transaction_type: 'issue' }),
+    ]);
+
+    renderTransactionLogPage();
+    expect(await screen.findAllByText('SN-042')).toHaveLength(2);
+
+    expect(screen.queryByRole('button', { name: /edit|تعديل/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /delete|حذف/i })).not.toBeInTheDocument();
+    const headerCells = screen.getAllByRole('columnheader');
+    expect(headerCells.some((cell) => /actions|إجراءات/i.test(cell.textContent ?? ''))).toBe(false);
+  });
+
   it('shows an error banner when the transactions request fails', async () => {
     mockedApiClient.get.mockRejectedValue({
       isAxiosError: true,
