@@ -70,6 +70,7 @@ function makeActiveWorkOrder(overrides: Partial<ActiveWorkOrder> = {}): ActiveWo
         product_type_name: 'Bar LED Model A',
         quantity: 5,
         returned_quantity: 1,
+        damaged_quantity: 0,
         still_out_quantity: 4,
       },
     ],
@@ -946,7 +947,9 @@ describe('WorkOrdersPage', () => {
     expect(screen.getByText('2026-08-01')).toBeInTheDocument();
     expect(screen.getByText(/^fulfilled$|^تم التنفيذ$/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/Bar LED Model A: 1 (returned|تم إرجاعه) \/ 4 (still out|لا يزال خارجًا)/i),
+      screen.getByText(
+        /Bar LED Model A: 1 (returned|تم إرجاعه) \/ 0 (damaged|تالف) \/ 4 (still out|لا يزال خارجًا)/i,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -1069,6 +1072,16 @@ describe('WorkOrdersPage', () => {
     await user.click(within(dialog).getByRole('button', { name: /^return$|^إرجاع$/i }));
   }
 
+  async function markSerialDamaged(user: ReturnType<typeof userEvent.setup>, serialNumber: string) {
+    const dialog = screen.getByRole('dialog');
+    const input = screen.getByLabelText(/serial number|الرقم التسلسلي/i);
+    await user.clear(input);
+    await user.type(input, serialNumber);
+    await user.click(
+      within(dialog).getByRole('button', { name: /mark as damaged|وضع علامة كتالف/i }),
+    );
+  }
+
   // Every test below is timeout-bumped like the file's other Modal-
   // interacting tests (see LESSONS.md's WRH-55 entry) - opening the Return
   // modal (or, for "does not show a Return button", just rendering a wider
@@ -1088,6 +1101,7 @@ describe('WorkOrdersPage', () => {
           product_type_name: 'Bar LED Model A',
           quantity: 2,
           returned_quantity: 0,
+          damaged_quantity: 0,
           still_out_quantity: 2,
         },
       ],
@@ -1104,6 +1118,7 @@ describe('WorkOrdersPage', () => {
           product_type_name: 'Bar LED Model A',
           quantity: 2,
           returned_quantity: 1,
+          damaged_quantity: 0,
           still_out_quantity: 1,
         },
       ],
@@ -1125,7 +1140,61 @@ describe('WorkOrdersPage', () => {
     const cells = within(row)
       .getAllByRole('cell')
       .map((cell) => cell.textContent);
-    expect(cells).toEqual(['Bar LED Model A', '2', '1', '1']); // issued, returned, still out
+    expect(cells).toEqual(['Bar LED Model A', '2', '1', '0', '1']); // issued, returned, damaged, still out
+  }, 40000);
+
+  it('marks a scanned unit as damaged instead of returning it, and reflects it as its own category', async () => {
+    // WRH-57/AC-1/AC-2/AC-3/TC-01/TC-03
+    const workOrder = makeActiveWorkOrder({
+      status: 'fulfilled',
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          quantity: 2,
+          returned_quantity: 1,
+          damaged_quantity: 0,
+          still_out_quantity: 1,
+        },
+      ],
+    });
+    mockListEndpoints({ activeWorkOrders: [workOrder] });
+    mockReturnItem(workOrder, {
+      id: 1,
+      job_name: 'Summer Gala',
+      status: 'returned',
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          quantity: 2,
+          returned_quantity: 1,
+          damaged_quantity: 1,
+          still_out_quantity: 0,
+        },
+      ],
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openReturnModal(user);
+    await markSerialDamaged(user, 'SN-9001');
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/1/return-item/', {
+      serial_number: 'SN-9001',
+      damaged: true,
+    });
+    const dialog = await screen.findByRole('dialog');
+    // AC-3: a WO with a damaged item still reaches "returned" once every
+    // other item is accounted for.
+    expect(await within(dialog).findByText(/^returned$|^تم الإرجاع$/i)).toBeInTheDocument();
+    const row = await within(dialog).findByRole('row', { name: /bar led model a/i });
+    const cells = within(row)
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent);
+    expect(cells).toEqual(['Bar LED Model A', '2', '1', '1', '0']); // issued, returned, damaged, still out
   }, 40000);
 
   it('shows a Return button for a partially_returned WO (AC-4: completing it later)', async () => {

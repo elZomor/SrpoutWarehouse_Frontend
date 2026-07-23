@@ -27,6 +27,9 @@ export interface ActiveWorkOrderLineItem {
   product_type_name: string;
   quantity: number;
   returned_quantity: number;
+  // WRH-57/AC-2/AC-3: its own category, excluded from still_out_quantity -
+  // a damaged item counts neither as still missing nor as returned.
+  damaged_quantity: number;
   still_out_quantity: number;
 }
 

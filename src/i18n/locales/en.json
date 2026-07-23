@@ -245,7 +245,7 @@
     },
     "active": {
       "productTypesHeader": "Product Types",
-      "productTypeSummary": "{{productType}}: {{returned}} returned / {{stillOut}} still out",
+      "productTypeSummary": "{{productType}}: {{returned}} returned / {{damaged}} damaged / {{stillOut}} still out",
       "viewDetailsButton": "View Details",
       "emptyState": "No active work orders found",
       "loadError": "Failed to load active work orders. Please try again."
@@ -265,11 +265,13 @@
       "productHeader": "Product",
       "quantityHeader": "Issued",
       "returnedHeader": "Returned",
+      "damagedHeader": "Damaged",
       "stillOutHeader": "Still Missing",
       "serialNumberLabel": "Serial Number",
       "serialNumberPlaceholder": "Scan or type a serial number",
       "serialNumberRequired": "Serial number is required",
       "scanButton": "Return",
+      "markDamagedButton": "Mark as Damaged",
       "doneButton": "Done",
       "notFoundError": "No item found with this serial number.",
       "notIssuedError": "This item was not issued on WO-{{workOrderId}}.",

@@ -249,7 +249,7 @@
     },
     "active": {
       "productTypesHeader": "أنواع المنتجات",
-      "productTypeSummary": "{{productType}}: {{returned}} تم إرجاعه / {{stillOut}} لا يزال خارجًا",
+      "productTypeSummary": "{{productType}}: {{returned}} تم إرجاعه / {{damaged}} تالف / {{stillOut}} لا يزال خارجًا",
       "viewDetailsButton": "عرض التفاصيل",
       "emptyState": "لا توجد أوامر عمل نشطة",
       "loadError": "فشل تحميل أوامر العمل النشطة. حاول مرة أخرى."
@@ -269,11 +269,13 @@
       "productHeader": "المنتج",
       "quantityHeader": "المصروف",
       "returnedHeader": "تم إرجاعه",
+      "damagedHeader": "تالف",
       "stillOutHeader": "لا يزال مفقودًا",
       "serialNumberLabel": "الرقم التسلسلي",
       "serialNumberPlaceholder": "امسح أو أدخل الرقم التسلسلي",
       "serialNumberRequired": "الرقم التسلسلي مطلوب",
       "scanButton": "إرجاع",
+      "markDamagedButton": "وضع علامة كتالف",
       "doneButton": "تم",
       "notFoundError": "لا يوجد عنصر بهذا الرقم التسلسلي.",
       "notIssuedError": "هذا العنصر لم يُصرف على أمر العمل WO-{{workOrderId}}.",
