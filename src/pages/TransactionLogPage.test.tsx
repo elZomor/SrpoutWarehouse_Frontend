@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -149,6 +149,49 @@ describe('TransactionLogPage', () => {
     );
     expect(screen.getByText('SN-042')).toBeInTheDocument();
     expect(screen.queryByText('SN-099')).not.toBeInTheDocument();
+  });
+
+  it("renders a serial's filtered transactions in chronological order (AC-2)", async () => {
+    // AC-2/TC-02 explicitly require chronological order. The page does no
+    // client-side sorting (see TransactionLogPage.tsx's Table dataSource) -
+    // it trusts the backend's ordering - so this asserts the page renders
+    // whatever order the API returns without silently reordering it.
+    mockTransactionsEndpoint([
+      makeTransaction({
+        id: 1,
+        serial_number: 'SN-042',
+        reference_number: 'PO-1',
+        created_at: '2026-01-01T00:00:00Z',
+      }),
+      makeTransaction({
+        id: 2,
+        serial_number: 'SN-042',
+        reference_number: 'WO-1',
+        created_at: '2026-01-02T00:00:00Z',
+      }),
+    ]);
+
+    const user = userEvent.setup();
+    renderTransactionLogPage();
+    expect(await screen.findByText('PO-1')).toBeInTheDocument();
+
+    await user.type(
+      screen.getByPlaceholderText(/filter by serial number|تصفية حسب الرقم التسلسلي/i),
+      'SN-042',
+    );
+    await waitFor(() =>
+      expect(mockedApiClient.get).toHaveBeenLastCalledWith('/api/transactions/', {
+        params: expect.objectContaining({ serial_number: 'SN-042' }),
+      }),
+    );
+
+    // Column order is type(0)/reference_number(1)/serial_number(2)/... -
+    // see TransactionLogPage.tsx's columns array.
+    const dataRows = screen.getAllByRole('row').slice(1);
+    const referenceCellOrder = dataRows.map(
+      (row) => within(row).getAllByRole('cell')[1]?.textContent,
+    );
+    expect(referenceCellOrder).toEqual(['PO-1', 'WO-1']);
   });
 
   it('filters by work order reference (TC-03/AC-3)', async () => {
