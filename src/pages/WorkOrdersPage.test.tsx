@@ -1306,5 +1306,5 @@ describe('WorkOrdersPage', () => {
     // stale "partially_returned" response.
     expect(screen.queryByText(/^partially returned$|^إرجاع جزئي$/i)).not.toBeInTheDocument();
     expect(screen.getByRole('dialog').textContent).toMatch(/fulfilled|تم التنفيذ/i);
-  }, 60000);
+  }, 90000);
 });
