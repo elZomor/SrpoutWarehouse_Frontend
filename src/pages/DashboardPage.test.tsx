@@ -18,6 +18,17 @@ vi.mock('../lib/apiClient', () => ({
   },
 }));
 
+// The drill-down modal pulls in useSerializedItems -> serialized-items/api.ts,
+// which reads env directly (not through apiClient) for
+// getSerializedItemQrCodeUrl - needs its own mock, matching
+// SerializedItemsPage.test.tsx's identical precedent: CI has no
+// VITE_API_BASE_URL, and env.ts throws at import time without it.
+vi.mock('../config/env', () => ({
+  env: {
+    VITE_API_BASE_URL: 'http://localhost:8000',
+  },
+}));
+
 const mockedApiClient = vi.mocked(apiClient, true);
 
 function makeStockSummaryRow(
