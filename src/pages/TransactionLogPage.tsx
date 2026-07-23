@@ -69,6 +69,8 @@ export function TransactionLogPage() {
     label: t(`transactionLog.type.${type}`),
   }));
 
+  // WRH-50/AC-1,AC-2: no actions column - the log is append-only, so there
+  // is deliberately no Edit/Delete action anywhere on a transaction row.
   const columns = [
     {
       title: t('transactionLog.typeLabel'),
