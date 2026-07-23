@@ -196,7 +196,7 @@ describe('TransactionLogPage', () => {
     expect(screen.queryByText('PO-1')).not.toBeInTheDocument();
   });
 
-  it('combines serial number and type filters (TC-06/AC-6)', async () => {
+  it('combines serial number and type filters (AC-6)', async () => {
     mockTransactionsEndpoint([
       makeTransaction({ id: 1, serial_number: 'SN-042', transaction_type: 'receive' }),
       makeTransaction({ id: 2, serial_number: 'SN-042', transaction_type: 'issue' }),
@@ -219,6 +219,71 @@ describe('TransactionLogPage', () => {
         params: expect.objectContaining({
           serial_number: 'SN-042',
           transaction_type: 'receive',
+        }),
+      }),
+    );
+  });
+
+  it('filters by date range (TC-04/AC-4)', async () => {
+    mockTransactionsEndpoint([
+      makeTransaction({ id: 1, serial_number: 'SN-IN', created_at: '2026-02-15T10:00:00Z' }),
+      makeTransaction({ id: 2, serial_number: 'SN-BEFORE', created_at: '2026-01-01T10:00:00Z' }),
+      makeTransaction({ id: 3, serial_number: 'SN-AFTER', created_at: '2026-03-01T10:00:00Z' }),
+    ]);
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderTransactionLogPage();
+    expect(await screen.findByText('SN-IN')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('Start date'), '2026-02-01{Enter}');
+    await user.type(screen.getByPlaceholderText('End date'), '2026-02-28{Enter}');
+
+    await waitFor(() =>
+      expect(mockedApiClient.get).toHaveBeenLastCalledWith('/api/transactions/', {
+        params: expect.objectContaining({ date_from: '2026-02-01', date_to: '2026-02-28' }),
+      }),
+    );
+    expect(screen.getByText('SN-IN')).toBeInTheDocument();
+    expect(screen.queryByText('SN-BEFORE')).not.toBeInTheDocument();
+    expect(screen.queryByText('SN-AFTER')).not.toBeInTheDocument();
+  });
+
+  it('combines serial number and date range filters (TC-06/AC-6)', async () => {
+    mockTransactionsEndpoint([
+      makeTransaction({
+        id: 1,
+        serial_number: 'SN-042',
+        created_at: '2026-02-15T10:00:00Z',
+      }),
+      makeTransaction({
+        id: 2,
+        serial_number: 'SN-042',
+        created_at: '2026-03-15T10:00:00Z',
+      }),
+      makeTransaction({
+        id: 3,
+        serial_number: 'SN-099',
+        created_at: '2026-02-15T10:00:00Z',
+      }),
+    ]);
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderTransactionLogPage();
+    expect(await screen.findAllByText(/SN-0/)).toHaveLength(3);
+
+    await user.type(
+      screen.getByPlaceholderText(/filter by serial number|تصفية حسب الرقم التسلسلي/i),
+      'SN-042',
+    );
+    await user.type(screen.getByPlaceholderText('Start date'), '2026-02-01{Enter}');
+    await user.type(screen.getByPlaceholderText('End date'), '2026-02-28{Enter}');
+
+    await waitFor(() =>
+      expect(mockedApiClient.get).toHaveBeenLastCalledWith('/api/transactions/', {
+        params: expect.objectContaining({
+          serial_number: 'SN-042',
+          date_from: '2026-02-01',
+          date_to: '2026-02-28',
         }),
       }),
     );
