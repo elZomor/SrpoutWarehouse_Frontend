@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { Alert, DatePicker, Input, Select, Table, Tag, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useTranslation } from 'react-i18next';
+import { buildTransactionListParams } from '../features/transactions/logic';
 import type { Transaction } from '../features/transactions/types';
 import { useTransactions } from '../features/transactions/useTransactions';
 
 const SEARCH_DEBOUNCE_MS = 300;
-const DATE_FORMAT = 'YYYY-MM-DD';
 const TRANSACTION_TYPES = [
   'receive',
   'issue',
@@ -56,13 +56,9 @@ export function TransactionLogPage() {
     data: transactions,
     isLoading,
     isError,
-  } = useTransactions({
-    serial_number: serialNumber || undefined,
-    reference_number: referenceNumber || undefined,
-    transaction_type: transactionType,
-    date_from: dateRange?.[0] ? dateRange[0].format(DATE_FORMAT) : undefined,
-    date_to: dateRange?.[1] ? dateRange[1].format(DATE_FORMAT) : undefined,
-  });
+  } = useTransactions(
+    buildTransactionListParams({ serialNumber, referenceNumber, transactionType, dateRange }),
+  );
 
   const typeOptions = TRANSACTION_TYPES.map((type) => ({
     value: type,

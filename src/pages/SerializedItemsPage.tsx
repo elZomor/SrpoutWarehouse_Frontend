@@ -19,27 +19,24 @@ import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
+  getSerializedItemStatusColor,
+  isDuplicateSerialError,
+  resolveQrDownloadErrorMessageKey,
+} from '../features/serialized-items/logic';
+import { printSerializedItemLabel } from '../features/serialized-items/printLabel';
+import {
   serializedItemSchema,
   type SerializedItemFormValues,
 } from '../features/serialized-items/schema';
 import type { SerializedItem } from '../features/serialized-items/types';
-import { printSerializedItemLabel } from '../features/serialized-items/printLabel';
 import {
   useCreateSerializedItem,
   useDeleteSerializedItem,
   useDownloadSerializedItemsQrPdf,
   useSerializedItems,
 } from '../features/serialized-items/useSerializedItems';
-import { getFieldErrorMessages } from '../lib/apiErrors';
 
 const SEARCH_DEBOUNCE_MS = 300;
-// Only "available" exists today, but the backend's STATUS_CHOICES is an
-// extensible list - keyed by status so a future value (e.g. "issued",
-// "missing") doesn't silently inherit this color instead of getting its own.
-// A Map (not a plain object) avoids eslint-plugin-security's
-// detect-object-injection warning on the dynamic-key lookup below.
-const STATUS_COLORS = new Map<string, string>([['available', 'green']]);
-const DEFAULT_STATUS_COLOR = 'default';
 
 export function SerializedItemsPage() {
   const { t } = useTranslation();
@@ -86,20 +83,7 @@ export function SerializedItemsPage() {
     createMutation.mutate(values, {
       onSuccess: closeModal,
       onError: (error) => {
-        // AC-1/AC-2: a raced/duplicate serial number gets its own inline
-        // message rather than the generic create-failed banner. The
-        // backend embeds the submitted serial number in its duplicate
-        // message ("Serial number SN-042 is already registered."), so an
-        // exact-text match can't work - match on the stable
-        // "already registered" phrase instead. This deliberately does NOT
-        // match on the serial_number field's mere presence: a
-        // whitespace-only or over-length serial number also returns a
-        // serial_number error (required/max-length), and that must still
-        // fall through to the generic banner rather than being mislabeled
-        // as a duplicate.
-        const serialErrors = getFieldErrorMessages(error, 'serial_number');
-        const isDuplicate = serialErrors.some((message) => message.includes('already registered'));
-        if (isDuplicate) {
+        if (isDuplicateSerialError(error)) {
           setError('serial_number', {
             type: 'server',
             message: 'serializedItems.form.serialNumberDuplicate',
@@ -132,27 +116,13 @@ export function SerializedItemsPage() {
         setTimeout(() => URL.revokeObjectURL(url), 0);
       },
       onError: (error) => {
-        // AC-1/AC-2: the backend rejects an empty export with a 400 (see
-        // qr_pdf's ValidationError) rather than a genuine failure status -
-        // that case gets its own "nothing to export" message instead of the
-        // generic failure banner. Distinguished by status, not by parsing
-        // the error body: the response is fetched with responseType: 'blob'
-        // (see downloadSerializedItemsQrPdf), so even an error response's
-        // body arrives as a Blob rather than parsed JSON, and re-deriving
-        // "was this the empty-result case" from productTypeFilter (already
-        // known client-side, and exactly what the backend itself branches
-        // on) is simpler than decoding it.
-        if (axios.isAxiosError(error) && error.response?.status === 400) {
-          message.warning(
-            t(
-              productTypeFilter
-                ? 'serializedItems.downloadQrPdfNoItemsForType'
-                : 'serializedItems.downloadQrPdfNoItems',
-            ),
-          );
-          return;
+        const messageKey = resolveQrDownloadErrorMessageKey(error, productTypeFilter !== undefined);
+        const isEmptyExport = axios.isAxiosError(error) && error.response?.status === 400;
+        if (isEmptyExport) {
+          message.warning(t(messageKey));
+        } else {
+          message.error(t(messageKey));
         }
-        message.error(t('serializedItems.downloadQrPdfError'));
       },
     });
   };
@@ -178,7 +148,7 @@ export function SerializedItemsPage() {
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => (
-        <Tag color={STATUS_COLORS.get(status) ?? DEFAULT_STATUS_COLOR}>
+        <Tag color={getSerializedItemStatusColor(status)}>
           {t(`serializedItems.status.${status}`)}
         </Tag>
       ),

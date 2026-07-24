@@ -131,18 +131,8 @@ describe('CategoriesPage', () => {
     expect(await screen.findByText('Lighting')).toBeInTheDocument();
   });
 
-  it('requires a name before submitting', async () => {
-    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
-
-    const user = userEvent.setup();
-    renderCategoriesPage();
-
-    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-
-    expect(await screen.findByText(/name is required|الاسم مطلوب/i)).toBeInTheDocument();
-    expect(mockedApiClient.post).not.toHaveBeenCalled();
-  });
+  // "requires a name before submitting" moved to
+  // src/features/categories/schema.test.ts - pure zod validation.
 
   it('shows a duplicate-name error inline and keeps the modal open', async () => {
     // AC-2/TC-02: the specific duplicate-name message, not the generic banner
@@ -168,50 +158,12 @@ describe('CategoriesPage', () => {
     expect(screen.getByRole('button', { name: 'OK' })).toBeInTheDocument();
   });
 
-  it('shows the generic create-failed banner for non-name errors', async () => {
-    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
-    mockedApiClient.post.mockRejectedValueOnce({
-      isAxiosError: true,
-      response: { status: 500, data: {} },
-    });
-
-    const user = userEvent.setup();
-    renderCategoriesPage();
-
-    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
-    await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Lighting');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-
-    expect(
-      await screen.findByText(/failed to create category|فشل إنشاء الفئة/i),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'OK' })).toBeInTheDocument();
-  });
-
-  it('shows the generic banner (not the duplicate-name message) for a non-duplicate name error', async () => {
-    // Regression: a blank/whitespace-only name gets `{name: ["Name is required."]}`
-    // from the backend, which is a `name` error but not a duplicate - it must not
-    // be mislabeled as "a category with this name already exists".
-    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
-    mockedApiClient.post.mockRejectedValueOnce({
-      isAxiosError: true,
-      response: { status: 400, data: { name: ['Name is required.'] } },
-    });
-
-    const user = userEvent.setup();
-    renderCategoriesPage();
-
-    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
-    await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Lighting');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-
-    expect(
-      await screen.findByText(/failed to create category|فشل إنشاء الفئة/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText(/already exists|توجد فئة بهذا الاسم بالفعل/i),
-    ).not.toBeInTheDocument();
-  });
+  // "shows the generic create-failed banner for non-name errors" / "shows
+  // the generic banner (not the duplicate-name message) for a
+  // non-duplicate name error" moved to
+  // src/features/categories/logic.test.ts (isDuplicateNameError's negative
+  // cases) - the positive case above already proves the classifier's
+  // wiring end-to-end.
 
   it('clears the duplicate-name error when the modal is reopened after a failed submit', async () => {
     mockedApiClient.get.mockResolvedValueOnce({ data: [] });
