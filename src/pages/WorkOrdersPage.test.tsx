@@ -1091,6 +1091,129 @@ describe('WorkOrdersPage', () => {
     });
   }, 40000);
 
+  // WRH-34/AC-1/AC-2: mirrors the "Add Supplementary only on Primary rows"
+  // test above, including its same fix - the nested supplementary is a
+  // plain ActiveWorkOrderSupplementary literal (no `supplementaries` key),
+  // matching the real backend contract, rather than built via
+  // makeActiveWorkOrder() which would spuriously satisfy 'supplementaries'
+  // in record for the nested row too.
+  it('shows "Download Packing List" only on Primary rows, not nested supplementaries', async () => {
+    const primary = makeActiveWorkOrder({
+      supplementaries: [
+        {
+          id: 2,
+          reference: 'WO-1-S1',
+          job_name: 'Existing Supplementary',
+          client_name: 'Acme Events',
+          expected_date_out: '2026-08-01',
+          status: 'fulfilled',
+          line_items: [],
+        },
+      ],
+    });
+    mockListEndpoints({ activeWorkOrders: [primary] });
+
+    await renderWorkOrdersPage({ tab: 'active' });
+    await screen.findByText('Summer Gala');
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /expand row/i }));
+    await screen.findByText('Existing Supplementary');
+
+    expect(
+      screen.getAllByRole('button', { name: /download packing list|تحميل قائمة التعبئة/i }),
+    ).toHaveLength(1);
+  }, 60000);
+
+  it('does not show "Download Packing List" on a draft Primary WO', async () => {
+    // AC-3: only available once fulfillment has started - a draft WO
+    // hasn't reached "in_progress" yet.
+    mockListEndpoints({ activeWorkOrders: [makeActiveWorkOrder({ status: 'draft' })] });
+
+    await renderWorkOrdersPage({ tab: 'active' });
+    await screen.findByText('Summer Gala');
+
+    expect(
+      screen.queryByRole('button', { name: /download packing list|تحميل قائمة التعبئة/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  // Timeout bumped like the file's other mutation-interaction tests (see
+  // LESSONS.md's WRH-55 entry) - this is already one of the heaviest test
+  // files in the suite.
+  it('downloads the packing list PDF when the button is clicked', async () => {
+    // AC-1: clicking "Download Packing List" on a Primary WO triggers a
+    // browser download of the PDF the backend returns.
+    const primary = makeActiveWorkOrder();
+    mockListEndpoints({ activeWorkOrders: [primary] });
+    const pdfBlob = new Blob(['%PDF-fake'], { type: 'application/pdf' });
+    mockedApiClient.get.mockImplementation((url: string) => {
+      if (url === '/api/work-orders/1/packing-list/') {
+        return Promise.resolve({ data: pdfBlob });
+      }
+      if (url === '/api/work-orders/active/') {
+        return Promise.resolve({ data: [primary] });
+      }
+      if (url === '/api/product-types/') {
+        return Promise.resolve({ data: [makeProductType()] });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+    const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
+    const revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    const user = userEvent.setup();
+    await renderWorkOrdersPage({ tab: 'active' });
+    await screen.findByText('Summer Gala');
+
+    await user.click(
+      screen.getByRole('button', { name: /download packing list|تحميل قائمة التعبئة/i }),
+    );
+
+    await waitFor(() => expect(createObjectURLSpy).toHaveBeenCalledWith(pdfBlob));
+    expect(clickSpy).toHaveBeenCalled();
+    expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:fake-url');
+
+    createObjectURLSpy.mockRestore();
+    revokeObjectURLSpy.mockRestore();
+    clickSpy.mockRestore();
+  }, 40000);
+
+  // Timeout bumped like the file's other mutation-interaction tests (see
+  // LESSONS.md's WRH-55 entry) - this is already one of the heaviest test
+  // files in the suite.
+  it('shows a generic error message when the packing list download fails', async () => {
+    const primary = makeActiveWorkOrder();
+    mockListEndpoints({ activeWorkOrders: [primary] });
+    mockedApiClient.get.mockImplementation((url: string) => {
+      if (url === '/api/work-orders/1/packing-list/') {
+        return Promise.reject({
+          isAxiosError: true,
+          response: { status: 400, data: new Blob([]) },
+        });
+      }
+      if (url === '/api/work-orders/active/') {
+        return Promise.resolve({ data: [primary] });
+      }
+      if (url === '/api/product-types/') {
+        return Promise.resolve({ data: [makeProductType()] });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    const user = userEvent.setup();
+    await renderWorkOrdersPage({ tab: 'active' });
+    await screen.findByText('Summer Gala');
+
+    await user.click(
+      screen.getByRole('button', { name: /download packing list|تحميل قائمة التعبئة/i }),
+    );
+
+    expect(
+      await screen.findByText(/failed to download the packing list|فشل تحميل قائمة التعبئة/i),
+    ).toBeInTheDocument();
+  }, 40000);
+
   // Timeout bumped like the file's other Modal-interacting tests (see
   // LESSONS.md's WRH-55 entry) - this WO's default status ('fulfilled')
   // now also renders WRH-38's Return button alongside View Details, and
