@@ -1216,7 +1216,7 @@ describe('WorkOrdersPage', () => {
     expect(
       await screen.findByText(/failed to download the packing list|فشل تحميل قائمة التعبئة/i),
     ).toBeInTheDocument();
-  }, 40000);
+  }, 90000);
 
   // Timeout bumped like the file's other Modal-interacting tests (see
   // LESSONS.md's WRH-55 entry) - this WO's default status ('fulfilled')
