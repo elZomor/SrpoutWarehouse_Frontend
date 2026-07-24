@@ -204,6 +204,7 @@
   "workOrders": {
     "title": "Work Orders",
     "newButton": "New WO",
+    "referenceLabel": "Reference",
     "jobNameLabel": "Job Name",
     "clientNameLabel": "Client",
     "expectedDateOutLabel": "Expected Date Out",
@@ -234,7 +235,8 @@
       "quantityPlaceholder": "Qty",
       "quantityRequired": "Quantity must be greater than zero",
       "addLineItemButton": "Add line item",
-      "removeLineItemButton": "Remove line item"
+      "removeLineItemButton": "Remove line item",
+      "supplementaryTitle": "Add Supplementary: {{reference}}"
     },
     "scan": {
       "title": "Fulfill: {{jobName}}",
@@ -270,11 +272,12 @@
       "productTypesHeader": "Product Types",
       "productTypeSummary": "{{productType}}: {{returned}} returned / {{damaged}} damaged / {{stillOut}} still out",
       "viewDetailsButton": "View Details",
+      "addSupplementaryButton": "Add Supplementary",
       "emptyState": "No active work orders found",
       "loadError": "Failed to load active work orders. Please try again."
     },
     "detail": {
-      "title": "Work Order: {{jobName}}",
+      "title": "{{reference}} — {{jobName}}",
       "productTypeHeader": "Product Type",
       "serialNumberHeader": "Serial Number",
       "statusHeader": "Status",

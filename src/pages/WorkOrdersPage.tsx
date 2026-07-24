@@ -87,6 +87,16 @@ export function WorkOrdersPage() {
   const { t } = useTranslation();
   const { message } = App.useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // WRH-53/AC-1/AC-2: set when the create modal was opened via a Primary
+  // row's "Add Supplementary" action rather than the Manage tab's plain
+  // "New WO" button - holds just enough of that Primary to merge
+  // parent_work_order into the submitted payload and to name it in the
+  // modal title, without needing a separate parent-picker field (the row
+  // the user clicked already *is* the parent selection - see TC-01).
+  const [supplementaryParent, setSupplementaryParent] = useState<{
+    id: number;
+    reference: string;
+  } | null>(null);
   const [fulfillingWorkOrderId, setFulfillingWorkOrderId] = useState<number | null>(null);
   const { data: workOrders, isLoading, isError: isListError } = useWorkOrders();
   const createMutation = useCreateWorkOrder();
@@ -187,12 +197,29 @@ export function WorkOrdersPage() {
 
   const closeModal = () => {
     setIsModalOpen(false);
+    setSupplementaryParent(null);
     reset();
     createMutation.reset();
   };
 
+  const openCreateModal = () => {
+    setSupplementaryParent(null);
+    setIsModalOpen(true);
+  };
+
+  // WRH-53/AC-1/AC-2: entry point for creating a supplementary - clicking
+  // this on a Primary row both opens the (otherwise identical) create modal
+  // and records which Primary it's linked to.
+  const openSupplementaryModal = (primary: ActiveWorkOrder) => {
+    setSupplementaryParent({ id: primary.id, reference: primary.reference });
+    setIsModalOpen(true);
+  };
+
   const onSubmit = (values: WorkOrderFormValues) => {
-    createMutation.mutate(values, { onSuccess: closeModal });
+    const payload = supplementaryParent
+      ? { ...values, parent_work_order: supplementaryParent.id }
+      : values;
+    createMutation.mutate(payload, { onSuccess: closeModal });
   };
 
   const openFulfillmentModal = (workOrder: WorkOrder) => {
@@ -481,9 +508,17 @@ export function WorkOrdersPage() {
 
   // Shared by the Manage tab's table and the Active tab's (both primary and
   // nested supplementary) tables - every WorkOrder/ActiveWorkOrder shape
-  // carries the same job_name/client_name/expected_date_out/status fields,
-  // and none of these four columns read anything beyond the cell value.
+  // carries the same reference/job_name/client_name/expected_date_out/
+  // status fields, and none of these five columns read anything beyond the
+  // cell value.
   const baseWorkOrderColumns = [
+    {
+      // WRH-53/AC-1/AC-2: "WO-0042"/"WO-0042-S1" - server-computed, see
+      // WorkOrder.reference's own comment.
+      title: t('workOrders.referenceLabel'),
+      dataIndex: 'reference',
+      key: 'reference',
+    },
     {
       title: t('workOrders.jobNameLabel'),
       dataIndex: 'job_name',
@@ -645,6 +680,17 @@ export function WorkOrdersPage() {
           <Button size="small" onClick={() => setDetailWorkOrderId(record.id)}>
             {t('workOrders.active.viewDetailsButton')}
           </Button>
+          {/* WRH-53/AC-1/AC-2: only a Primary can be a supplementary's
+              parent (see the backend's parent_work_order queryset
+              restriction) - `supplementaries` only exists on
+              ActiveWorkOrder, never on ActiveWorkOrderSupplementary, so
+              this also narrows `record` for openSupplementaryModal's
+              ActiveWorkOrder-only parameter. */}
+          {'supplementaries' in record && (
+            <Button size="small" onClick={() => openSupplementaryModal(record)}>
+              {t('workOrders.active.addSupplementaryButton')}
+            </Button>
+          )}
           {RETURN_ELIGIBLE_STATUSES.has(record.status) && (
             <Button size="small" onClick={() => openReturnModal(record)}>
               {t('workOrders.return.button')}
@@ -727,7 +773,7 @@ export function WorkOrdersPage() {
             children: (
               <>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-                  <Button type="primary" onClick={() => setIsModalOpen(true)}>
+                  <Button type="primary" onClick={openCreateModal}>
                     {t('workOrders.newButton')}
                   </Button>
                 </div>
@@ -753,7 +799,10 @@ export function WorkOrdersPage() {
         ]}
       />
       <Modal
-        title={t('workOrders.detail.title', { jobName: workOrderDetail?.job_name ?? '' })}
+        title={t('workOrders.detail.title', {
+          reference: workOrderDetail?.reference ?? '',
+          jobName: workOrderDetail?.job_name ?? '',
+        })}
         open={detailWorkOrderId !== null}
         onCancel={() => setDetailWorkOrderId(null)}
         footer={[
@@ -781,7 +830,11 @@ export function WorkOrdersPage() {
         )}
       </Modal>
       <Modal
-        title={t('workOrders.newButton')}
+        title={
+          supplementaryParent
+            ? t('workOrders.form.supplementaryTitle', { reference: supplementaryParent.reference })
+            : t('workOrders.newButton')
+        }
         open={isModalOpen}
         onCancel={closeModal}
         onOk={handleSubmit(onSubmit)}

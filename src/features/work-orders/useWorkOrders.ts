@@ -62,9 +62,12 @@ export function useCreateWorkOrder() {
     mutationFn: (input: WorkOrderFormValues) => createWorkOrder(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workOrdersBaseKey });
-      // A new WO has no way to be created as a supplementary yet (see
-      // WorkOrderActiveSupplementarySerializer's backend comment) - it's
-      // always a new Primary row on the Active tab.
+      // WRH-53: a new WO can now be a supplementary nested under an
+      // existing Primary (WorkOrdersPage merges parent_work_order into the
+      // payload when created via a Primary row's "Add Supplementary"
+      // action) as well as a brand-new Primary - either way the Active
+      // tab's nested list needs a refetch, so this stays a blanket
+      // invalidation rather than trying to patch the nested shape locally.
       invalidateActiveWorkOrders(queryClient);
     },
   });

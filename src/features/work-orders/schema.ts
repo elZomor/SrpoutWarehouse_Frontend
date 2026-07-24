@@ -20,6 +20,12 @@ export const workOrderSchema = z.object({
   client_name: z.string(),
   expected_date_out: z.string().min(1, 'workOrders.form.expectedDateOutRequired'),
   line_items: z.array(workOrderLineItemSchema).min(1, 'workOrders.form.lineItemsRequired'),
+  // WRH-53/AC-1/AC-2: optional - set only when the create modal was opened
+  // from a Primary row's "Add Supplementary" action (WorkOrdersPage merges
+  // it into the submitted payload; it's never a directly-edited form
+  // field), matching the backend's identically-optional
+  // WorkOrderSerializer.parent_work_order.
+  parent_work_order: z.number().optional(),
 });
 
 export type WorkOrderLineItemFormValues = z.infer<typeof workOrderLineItemSchema>;

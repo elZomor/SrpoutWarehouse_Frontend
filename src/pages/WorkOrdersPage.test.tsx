@@ -36,6 +36,7 @@ function makeProductType(overrides: Partial<ProductType> = {}): ProductType {
 function makeWorkOrder(overrides: Partial<WorkOrder> = {}): WorkOrder {
   return {
     id: 1,
+    reference: 'WO-1',
     job_name: 'Summer Gala',
     client_name: 'Acme Events',
     expected_date_out: '2026-08-01',
@@ -59,6 +60,7 @@ function makeWorkOrder(overrides: Partial<WorkOrder> = {}): WorkOrder {
 function makeActiveWorkOrder(overrides: Partial<ActiveWorkOrder> = {}): ActiveWorkOrder {
   return {
     id: 1,
+    reference: 'WO-1',
     job_name: 'Summer Gala',
     client_name: 'Acme Events',
     expected_date_out: '2026-08-01',
@@ -279,12 +281,14 @@ describe('WorkOrdersPage', () => {
   });
 
   it('renders work orders returned from the API', async () => {
-    // TC-02/AC-1: job name, client, date, and line items all display.
+    // TC-02/AC-1: reference, job name, client, date, and line items all
+    // display.
     mockListEndpoints({ workOrders: [makeWorkOrder()] });
 
     await renderWorkOrdersPage();
 
     expect(await screen.findByText('Summer Gala')).toBeInTheDocument();
+    expect(screen.getByText('WO-1')).toBeInTheDocument();
     expect(screen.getByText('Acme Events')).toBeInTheDocument();
     expect(screen.getByText('2026-08-01')).toBeInTheDocument();
     expect(screen.getByText(/^draft$|^مسودة$/i)).toBeInTheDocument();
@@ -974,6 +978,119 @@ describe('WorkOrdersPage', () => {
     expect(screen.getByText('Supplementary B')).toBeInTheDocument();
   });
 
+  // Timeout heavily bumped like the file's other Modal/expand-row-
+  // interacting tests (see LESSONS.md's WRH-55 entry) - this file is
+  // already one of the heaviest in the suite. This test in particular
+  // originally hung for ~45s (well past even a 40000ms override) when its
+  // nested-item mock was built via makeActiveWorkOrder(): that factory
+  // always includes a `supplementaries: []` key, which made
+  // `'supplementaries' in record` spuriously true for the nested row too
+  // and rendered a *second* "Add Supplementary" button inside the expanded
+  // nested table - something the real backend response never produces
+  // (WorkOrderActiveSupplementarySerializer has no `supplementaries`
+  // field). That duplicate button, appearing only once the expand-row click
+  // resolves, is what triggered the pathological slowdown in this jsdom
+  // environment. Building the nested item as a plain
+  // ActiveWorkOrderSupplementary literal instead (matching the real
+  // contract exactly, no stray field) removes the duplicate button and the
+  // hang along with it.
+  it('shows "Add Supplementary" only on Primary rows, not nested supplementaries', async () => {
+    // WRH-53: a supplementary cannot itself be a parent (WRH-33/AC-6) - the
+    // entry point only exists where ActiveWorkOrder's own `supplementaries`
+    // field does (openSupplementaryModal's 'supplementaries' in record
+    // narrowing).
+    const primary = makeActiveWorkOrder({
+      supplementaries: [
+        {
+          id: 2,
+          reference: 'WO-1-S1',
+          job_name: 'Existing Supplementary',
+          client_name: 'Acme Events',
+          expected_date_out: '2026-08-01',
+          status: 'fulfilled',
+          line_items: [],
+        },
+      ],
+    });
+    mockListEndpoints({ activeWorkOrders: [primary] });
+
+    await renderWorkOrdersPage({ tab: 'active' });
+    await screen.findByText('Summer Gala');
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /expand row/i }));
+    await screen.findByText('Existing Supplementary');
+
+    expect(
+      screen.getAllByRole('button', { name: /add supplementary|إضافة أمر تكميلي/i }),
+    ).toHaveLength(1);
+  }, 60000);
+
+  it('creates a supplementary WO linked to the chosen Primary', async () => {
+    // TC-01/AC-1: the create modal opened via a Primary row's "Add
+    // Supplementary" action posts parent_work_order, and titles itself
+    // with the Primary's own reference.
+    const primary = makeActiveWorkOrder({ reference: 'WO-1' });
+    mockListEndpoints({ activeWorkOrders: [primary] });
+    mockedApiClient.post.mockResolvedValueOnce({
+      data: makeWorkOrder({ id: 2, reference: 'WO-1-S1', job_name: 'Extra Lighting' }),
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await screen.findByText('Summer Gala');
+
+    await user.click(screen.getByRole('button', { name: /add supplementary|إضافة أمر تكميلي/i }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('WO-1');
+
+    await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Extra Lighting');
+    await fillExpectedDateOut(user, '2026-08-02');
+    await selectProductTypeForLineItem(user, 0, 'Bar LED Model A');
+    await user.type(screen.getByPlaceholderText(/qty|الكمية/i), '3');
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/', {
+      job_name: 'Extra Lighting',
+      client_name: '',
+      expected_date_out: '2026-08-02',
+      line_items: [{ product_type: 1, quantity: 3 }],
+      parent_work_order: 1,
+    });
+  }, 40000);
+
+  // Timeout bumped like the test above - opens the create modal from a
+  // Primary row, cancels, switches tabs, then runs a full second create
+  // flow, making it one of the heavier interaction sequences in this file.
+  it('does not send parent_work_order when creating a plain Primary WO', async () => {
+    // Regression: supplementaryParent must reset on close - the Manage
+    // tab's plain "New WO" button must never inherit a stale parent from
+    // an earlier, abandoned supplementary-create session.
+    const workOrders: WorkOrder[] = [];
+    mockListEndpoints({ workOrders, activeWorkOrders: [makeActiveWorkOrder()] });
+    mockedApiClient.post.mockResolvedValueOnce({ data: makeWorkOrder() });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await screen.findByText('Summer Gala');
+
+    await user.click(screen.getByRole('button', { name: /add supplementary|إضافة أمر تكميلي/i }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await user.click(screen.getByRole('tab', { name: /manage|الإدارة/i }));
+    await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
+    await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Summer Gala');
+    await fillExpectedDateOut(user, '2026-08-01');
+    await selectProductTypeForLineItem(user, 0, 'Bar LED Model A');
+    await user.type(screen.getByPlaceholderText(/qty|الكمية/i), '5');
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/', {
+      job_name: 'Summer Gala',
+      client_name: '',
+      expected_date_out: '2026-08-01',
+      line_items: [{ product_type: 1, quantity: 5 }],
+    });
+  }, 40000);
+
   // Timeout bumped like the file's other Modal-interacting tests (see
   // LESSONS.md's WRH-55 entry) - this WO's default status ('fulfilled')
   // now also renders WRH-38's Return button alongside View Details, and
@@ -993,6 +1110,7 @@ describe('WorkOrdersPage', () => {
         return Promise.resolve({
           data: {
             id: 1,
+            reference: 'WO-1',
             job_name: 'Summer Gala',
             client_name: 'Acme Events',
             expected_date_out: '2026-08-01',
