@@ -12,6 +12,10 @@ export interface WorkOrderLineItem {
 
 export interface WorkOrder {
   id: number;
+  // WRH-53/AC-1/AC-2: the display identifier - "WO-<id>" for a Primary,
+  // "WO-<primary id>-S<n>" for a supplementary - computed server-side, see
+  // the backend's _work_order_reference().
+  reference: string;
   job_name: string;
   client_name: string;
   expected_date_out: string;
@@ -35,6 +39,7 @@ export interface ActiveWorkOrderLineItem {
 
 export interface ActiveWorkOrderSupplementary {
   id: number;
+  reference: string;
   job_name: string;
   client_name: string;
   expected_date_out: string;
@@ -44,6 +49,7 @@ export interface ActiveWorkOrderSupplementary {
 
 export interface ActiveWorkOrder {
   id: number;
+  reference: string;
   job_name: string;
   client_name: string;
   expected_date_out: string;
@@ -80,6 +86,7 @@ export interface WorkOrderDetailLineItem {
 
 export interface WorkOrderDetail {
   id: number;
+  reference: string;
   job_name: string;
   client_name: string;
   expected_date_out: string;

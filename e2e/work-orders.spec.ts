@@ -456,6 +456,105 @@ test('returns items against a fulfilled WO: partial then full return', async ({ 
   await expect(dialog.getByText(/^returned$|^تم الإرجاع$/i)).toBeVisible();
 });
 
+test('creates a supplementary work order linked to a Primary and it appears nested with its own reference', async ({
+  page,
+}) => {
+  // WRH-53/AC-1/AC-2/TC-01
+  let nextId = 2;
+  const primary = {
+    id: 1,
+    reference: 'WO-1',
+    job_name: 'Summer Gala',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-01',
+    status: 'fulfilled',
+    line_items: [
+      {
+        id: 1,
+        product_type: 1,
+        product_type_name: 'Bar LED Model A',
+        quantity: 1,
+        returned_quantity: 0,
+        damaged_quantity: 0,
+        still_out_quantity: 1,
+      },
+    ],
+    supplementaries: [] as unknown[],
+  };
+
+  await page.route('**/api/auth/**', stubAuth);
+  await registerProductTypesRoute(page);
+  await page.route('**/api/work-orders/**', async (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+
+    if (method === 'POST' && url.endsWith('/api/work-orders/')) {
+      const body = route.request().postDataJSON() as {
+        job_name: string;
+        client_name: string;
+        expected_date_out: string;
+        parent_work_order?: number;
+        line_items: { product_type: number; quantity: number }[];
+      };
+      const sequence = primary.supplementaries.length + 1;
+      const created = {
+        id: nextId++,
+        reference: `WO-${primary.id}-S${sequence}`,
+        job_name: body.job_name,
+        client_name: body.client_name,
+        expected_date_out: body.expected_date_out,
+        status: 'draft',
+        line_items: body.line_items.map((item, index) => ({
+          id: index + 1,
+          product_type: item.product_type,
+          product_type_name: 'Bar LED Model A',
+          quantity: item.quantity,
+          returned_quantity: 0,
+          damaged_quantity: 0,
+          still_out_quantity: 0,
+        })),
+      };
+      primary.supplementaries.push(created);
+      await route.fulfill({ status: 201, json: created });
+      return;
+    }
+    if (method === 'GET' && url.endsWith('/active/')) {
+      await route.fulfill({ status: 200, json: [primary] });
+      return;
+    }
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, json: [] });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto('/work-orders');
+
+  await page
+    .getByRole('row', { name: /summer gala/i })
+    .getByRole('button', { name: /add supplementary|إضافة أمر تكميلي/i })
+    .click();
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('WO-1');
+
+  await page.getByLabel(/job name|اسم المهمة/i).fill('Extra Lighting');
+  await page.getByLabel(/expected date out|تاريخ الخروج المتوقع/i).fill('2026-08-02');
+  await page.getByLabel(/expected date out|تاريخ الخروج المتوقع/i).press('Enter');
+  await dialog.getByRole('combobox').click();
+  await page.getByTitle('Bar LED Model A').click();
+  await page.getByPlaceholder(/qty|الكمية/i).fill('3');
+
+  await page.getByRole('button', { name: 'OK' }).click();
+
+  await expect(page.getByText('WO-1').first()).toBeVisible();
+  await page.getByRole('button', { name: /expand row/i }).click();
+  await expect(page.getByText('WO-1-S1')).toBeVisible();
+  await expect(page.getByText('Extra Lighting')).toBeVisible();
+});
+
 test('marks a returning unit as damaged: excluded from stock and its own summary category', async ({
   page,
 }) => {

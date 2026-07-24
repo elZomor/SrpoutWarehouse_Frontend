@@ -208,6 +208,7 @@
   "workOrders": {
     "title": "أوامر العمل",
     "newButton": "أمر عمل جديد",
+    "referenceLabel": "المرجع",
     "jobNameLabel": "اسم المهمة",
     "clientNameLabel": "العميل",
     "expectedDateOutLabel": "تاريخ الخروج المتوقع",
@@ -238,7 +239,8 @@
       "quantityPlaceholder": "الكمية",
       "quantityRequired": "يجب أن تكون الكمية أكبر من صفر",
       "addLineItemButton": "إضافة بند",
-      "removeLineItemButton": "إزالة البند"
+      "removeLineItemButton": "إزالة البند",
+      "supplementaryTitle": "إضافة أمر تكميلي: {{reference}}"
     },
     "scan": {
       "title": "تنفيذ: {{jobName}}",
@@ -274,11 +276,12 @@
       "productTypesHeader": "أنواع المنتجات",
       "productTypeSummary": "{{productType}}: {{returned}} تم إرجاعه / {{damaged}} تالف / {{stillOut}} لا يزال خارجًا",
       "viewDetailsButton": "عرض التفاصيل",
+      "addSupplementaryButton": "إضافة أمر تكميلي",
       "emptyState": "لا توجد أوامر عمل نشطة",
       "loadError": "فشل تحميل أوامر العمل النشطة. حاول مرة أخرى."
     },
     "detail": {
-      "title": "أمر العمل: {{jobName}}",
+      "title": "{{reference}} — {{jobName}}",
       "productTypeHeader": "نوع المنتج",
       "serialNumberHeader": "الرقم التسلسلي",
       "statusHeader": "الحالة",
