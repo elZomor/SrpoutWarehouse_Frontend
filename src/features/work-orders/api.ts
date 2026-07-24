@@ -50,3 +50,10 @@ export async function returnWorkOrderItem(
   );
   return data;
 }
+
+export async function downloadWorkOrderPackingList(workOrderId: number): Promise<Blob> {
+  const { data } = await apiClient.get<Blob>(`/api/work-orders/${workOrderId}/packing-list/`, {
+    responseType: 'blob',
+  });
+  return data;
+}

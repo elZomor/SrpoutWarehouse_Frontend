@@ -41,6 +41,7 @@ import {
   useActiveWorkOrders,
   useCompleteWorkOrder,
   useCreateWorkOrder,
+  useDownloadWorkOrderPackingList,
   useInvalidateActiveWorkOrders,
   useReturnWorkOrderItem,
   useScanWorkOrderItem,
@@ -103,6 +104,7 @@ export function WorkOrdersPage() {
   const startMutation = useStartWorkOrder();
   const scanMutation = useScanWorkOrderItem(fulfillingWorkOrderId ?? 0);
   const completeMutation = useCompleteWorkOrder();
+  const downloadPackingListMutation = useDownloadWorkOrderPackingList();
   const invalidateActiveWorkOrders = useInvalidateActiveWorkOrders();
   const { data: productTypes, isError: isProductTypesError } = useProductTypes('');
   const {
@@ -213,6 +215,25 @@ export function WorkOrdersPage() {
   const openSupplementaryModal = (primary: ActiveWorkOrder) => {
     setSupplementaryParent({ id: primary.id, reference: primary.reference });
     setIsModalOpen(true);
+  };
+
+  // WRH-34/AC-1/AC-2: only ever called from a Primary row (the button
+  // itself only renders for Primary rows - see activeColumns below), so
+  // the backend's consolidated-PDF-from-Primary rule is already satisfied
+  // by the time this fires. Mirrors SerializedItemsPage's
+  // handleDownloadQrPdf blob-download pattern.
+  const handleDownloadPackingList = (record: ActiveWorkOrder) => {
+    downloadPackingListMutation.mutate(record.id, {
+      onSuccess: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `packing-list-${record.reference}.pdf`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      },
+      onError: () => message.error(t('workOrders.active.downloadPackingListError')),
+    });
   };
 
   const onSubmit = (values: WorkOrderFormValues) => {
@@ -689,6 +710,24 @@ export function WorkOrdersPage() {
           {'supplementaries' in record && (
             <Button size="small" onClick={() => openSupplementaryModal(record)}>
               {t('workOrders.active.addSupplementaryButton')}
+            </Button>
+          )}
+          {/* WRH-34/AC-1/AC-2: same Primary-only narrowing as Add
+              Supplementary above (the backend only accepts this request
+              from a Primary WO, never a supplementary), plus "not draft" -
+              matching the backend's "in_progress or later" availability
+              gate (see WorkOrderViewSet.packing_list's own comment: there
+              is no STATUS_CLOSED yet, so "not draft" is the real rule). */}
+          {'supplementaries' in record && record.status !== 'draft' && (
+            <Button
+              size="small"
+              loading={
+                downloadPackingListMutation.isPending &&
+                downloadPackingListMutation.variables === record.id
+              }
+              onClick={() => handleDownloadPackingList(record)}
+            >
+              {t('workOrders.active.downloadPackingListButton')}
             </Button>
           )}
           {RETURN_ELIGIBLE_STATUSES.has(record.status) && (
