@@ -504,6 +504,10 @@ describe('WorkOrdersPage', () => {
   // "does not show a loading state..." test above (see LESSONS.md) - this
   // test does two full render/interact cycles (start on Manage, then
   // switch to Active), making it one of the heavier tests in this file.
+  // WRH-34: this file grew further (4 new tests) and CI's coverage-
+  // instrumented run started blowing past the previous 90000ms budget too
+  // (LESSONS.md's WRH-55 entry: a bigger file raises per-test overhead for
+  // every test in it, not just the new ones) - bumped again.
   it('refreshes the Active tab after starting a WO from the Manage tab', async () => {
     // Regression: the Active tab's query is a separate cache from the
     // flat work-orders list and doesn't remount on tab switch (AntD keeps
@@ -548,7 +552,7 @@ describe('WorkOrdersPage', () => {
 
     const activeRow = await screen.findByRole('row', { name: /summer gala/i });
     expect(await within(activeRow).findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
-  }, 90000);
+  }, 150000);
 
   it('shows a toast when starting fulfillment fails, leaving the WO as draft', async () => {
     const workOrder = makeWorkOrder();
@@ -1177,7 +1181,7 @@ describe('WorkOrdersPage', () => {
     createObjectURLSpy.mockRestore();
     revokeObjectURLSpy.mockRestore();
     clickSpy.mockRestore();
-  }, 40000);
+  }, 90000);
 
   // Timeout bumped like the file's other mutation-interaction tests (see
   // LESSONS.md's WRH-55 entry) - this is already one of the heaviest test
