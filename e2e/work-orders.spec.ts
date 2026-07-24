@@ -643,3 +643,70 @@ test('marks a returning unit as damaged: excluded from stock and its own summary
   // once the remaining unit is also accounted for.
   await expect(dialog.getByText(/^returned$|^تم الإرجاع$/i)).toBeVisible();
 });
+
+test('downloads a packing list PDF from a Primary WO on the Active tab', async ({ page }) => {
+  // WRH-34/AC-1: mirrors serialized-items.spec.ts's "downloads a bulk QR
+  // labels PDF" pattern - page.route stubs the PDF endpoint with a fake
+  // binary body, then the actual browser download is asserted via
+  // page.waitForEvent('download') + suggestedFilename().
+  const primary = {
+    id: 1,
+    reference: 'WO-1',
+    job_name: 'Summer Gala',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-01',
+    status: 'fulfilled',
+    line_items: [
+      {
+        id: 1,
+        product_type: 1,
+        product_type_name: 'Bar LED Model A',
+        quantity: 1,
+        returned_quantity: 0,
+        damaged_quantity: 0,
+        still_out_quantity: 1,
+      },
+    ],
+    supplementaries: [] as unknown[],
+  };
+
+  await page.route('**/api/auth/**', stubAuth);
+  await registerProductTypesRoute(page);
+  await page.route('**/api/work-orders/1/packing-list/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/pdf',
+      headers: { 'Content-Disposition': 'attachment; filename="packing-list-WO-1.pdf"' },
+      body: Buffer.from('%PDF-fake-content'),
+    });
+  });
+  await page.route('**/api/work-orders/**', async (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+
+    if (url.includes('packing-list')) {
+      await route.continue();
+      return;
+    }
+    if (method === 'GET' && url.endsWith('/active/')) {
+      await route.fulfill({ status: 200, json: [primary] });
+      return;
+    }
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, json: [] });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto('/work-orders');
+  await expect(page.getByText('Summer Gala')).toBeVisible();
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: /download packing list|تحميل قائمة التعبئة/i }).click(),
+  ]);
+
+  expect(download.suggestedFilename()).toBe('packing-list-WO-1.pdf');
+});
