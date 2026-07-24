@@ -277,6 +277,8 @@
       "productTypeSummary": "{{productType}}: {{returned}} تم إرجاعه / {{damaged}} تالف / {{stillOut}} لا يزال خارجًا",
       "viewDetailsButton": "عرض التفاصيل",
       "addSupplementaryButton": "إضافة أمر تكميلي",
+      "downloadPackingListButton": "تحميل قائمة التعبئة",
+      "downloadPackingListError": "فشل تحميل قائمة التعبئة. حاول مرة أخرى.",
       "emptyState": "لا توجد أوامر عمل نشطة",
       "loadError": "فشل تحميل أوامر العمل النشطة. حاول مرة أخرى."
     },

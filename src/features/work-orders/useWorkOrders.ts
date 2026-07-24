@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   completeWorkOrder,
   createWorkOrder,
+  downloadWorkOrderPackingList,
   getWorkOrder,
   listActiveWorkOrders,
   listWorkOrders,
@@ -136,6 +137,12 @@ export function useReturnWorkOrderItem(workOrderId: number) {
   // identical end-of-session invalidation.
   return useMutation({
     mutationFn: (input: ReturnItemFormValues) => returnWorkOrderItem(workOrderId, input),
+  });
+}
+
+export function useDownloadWorkOrderPackingList() {
+  return useMutation({
+    mutationFn: (workOrderId: number) => downloadWorkOrderPackingList(workOrderId),
   });
 }
 

@@ -273,6 +273,8 @@
       "productTypeSummary": "{{productType}}: {{returned}} returned / {{damaged}} damaged / {{stillOut}} still out",
       "viewDetailsButton": "View Details",
       "addSupplementaryButton": "Add Supplementary",
+      "downloadPackingListButton": "Download Packing List",
+      "downloadPackingListError": "Failed to download the packing list. Please try again.",
       "emptyState": "No active work orders found",
       "loadError": "Failed to load active work orders. Please try again."
     },
