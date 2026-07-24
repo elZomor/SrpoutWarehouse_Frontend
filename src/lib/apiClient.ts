@@ -6,12 +6,29 @@ import { env } from '../config/env';
 export const apiClient = axios.create({
   baseURL: env.VITE_API_BASE_URL,
   withCredentials: true,
-  // Reads the `csrftoken` cookie Django sets after login and attaches it as
-  // X-CSRFToken on subsequent unsafe requests (e.g. logout) automatically.
-  // withXSRFToken must be explicit: axios only auto-sends the XSRF header
-  // for same-origin requests otherwise, and the API is on a different
-  // origin/port than the SPA in every environment this app runs in.
-  xsrfCookieName: 'csrftoken',
-  xsrfHeaderName: 'X-CSRFToken',
-  withXSRFToken: true,
+});
+
+// The frontend and backend are on different registrable domains, so the SPA's JS
+// can never read Django's csrftoken cookie (cross-domain cookies aren't visible
+// to document.cookie, no matter SameSite/Secure) — axios's built-in xsrfCookieName
+// support can't work here. The backend hands the token back as a plain
+// X-CSRFToken response header on login/me instead; cache it here and echo it on
+// every unsafe request.
+let csrfToken: string | null = null;
+
+const UNSAFE_METHODS = new Set(['post', 'put', 'patch', 'delete']);
+
+apiClient.interceptors.request.use((config) => {
+  if (csrfToken && config.method && UNSAFE_METHODS.has(config.method)) {
+    config.headers.set('X-CSRFToken', csrfToken);
+  }
+  return config;
+});
+
+apiClient.interceptors.response.use((response) => {
+  const token = response.headers['x-csrftoken'];
+  if (typeof token === 'string') {
+    csrfToken = token;
+  }
+  return response;
 });
