@@ -289,6 +289,65 @@ describe('BoxesPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows a translated, interpolated message when an item is already in another box', async () => {
+    // WRH-27/AC-2: item_ids rejections name a specific item and the
+    // specific other box it's already in - classified and interpolated
+    // into a translated template, not shown as the raw server string.
+    mockListEndpoints({ serializedItems: [makeSerializedItem()] });
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: { item_ids: ['SN-042 is already in box BX-001'] },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderBoxesPage();
+
+    await user.click(await screen.findByRole('button', { name: /register box|تسجيل صندوق/i }));
+    await user.type(screen.getByLabelText(/box code|رمز الصندوق/i), 'BX-002');
+    await selectInForm(user, 'Bar LED Model A');
+    await selectItemInForm(user, 'SN-042');
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+
+    expect(
+      await screen.findByText(
+        /SN-042 is already in box BX-001|SN-042 موجود بالفعل في الصندوق BX-001/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/failed to register box|فشل تسجيل الصندوق/i)).not.toBeInTheDocument();
+  });
+
+  it('shows the generic error banner for an unclassified item_ids error', async () => {
+    // A plain DRF field error (e.g. "Select an item that exists." from a
+    // does_not_exist rejection) has no free-text identifier to interpolate
+    // and isn't one of the three classified shapes - falls through to the
+    // existing translated banner rather than showing raw English.
+    mockListEndpoints({ serializedItems: [makeSerializedItem()] });
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: { item_ids: ['Select an item that exists.'] },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderBoxesPage();
+
+    await user.click(await screen.findByRole('button', { name: /register box|تسجيل صندوق/i }));
+    await user.type(screen.getByLabelText(/box code|رمز الصندوق/i), 'BX-003');
+    await selectInForm(user, 'Bar LED Model A');
+    await selectItemInForm(user, 'SN-042');
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+
+    expect(
+      await screen.findByText(/failed to register box|فشل تسجيل الصندوق/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Select an item that exists.')).not.toBeInTheDocument();
+  });
+
   it('shows an error banner when the list fails to load', async () => {
     mockListEndpoints({ boxesError: true });
 

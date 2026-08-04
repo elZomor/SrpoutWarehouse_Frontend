@@ -150,3 +150,62 @@ test('registers a box with available items and prints its QR', async ({ page }) 
   await expect(popup.getByText('BX-001')).toBeVisible();
   await popup.close();
 });
+
+test('shows a translated, interpolated message when an item is rejected', async ({ page }) => {
+  // WRH-27/AC-2: item_ids rejections name a specific item and the
+  // specific other box it's already in - classified and interpolated into
+  // a translated template, not shown as the raw server string.
+  const serializedItems: SerializedItem[] = [
+    { id: 1, serial_number: 'SN-042', product_type: 1, status: 'available' },
+  ];
+
+  await page.route('**/api/auth/**', stubAuth);
+  await registerProductTypesRoute(page);
+  await page.route('**/api/serialized-items/**', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        json: serializedItems.map((item) => ({
+          ...item,
+          serial: `00000000-0000-0000-0000-00000000000${item.id}`,
+          product_type_name: 'Bar LED Model A',
+          last_work_order_reference: '',
+          notes: '',
+        })),
+      });
+      return;
+    }
+    await route.continue();
+  });
+  await page.route('**/api/boxes/**', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, json: [] });
+      return;
+    }
+    if (route.request().method() === 'POST') {
+      await route.fulfill({
+        status: 400,
+        json: { item_ids: ['SN-042 is already in box BX-001'] },
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto('/boxes');
+
+  await page.getByRole('button', { name: /register box|تسجيل صندوق/i }).click();
+  await page.getByLabel(/box code|رمز الصندوق/i).fill('BX-002');
+  const dialog = page.getByRole('dialog');
+  const comboboxes = dialog.getByRole('combobox');
+  await comboboxes.nth(0).click();
+  await page.getByTitle('Bar LED Model A').click();
+  await comboboxes.nth(1).click();
+  await page.getByTitle('SN-042').click();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'OK' }).click();
+
+  await expect(
+    page.getByText(/SN-042 is already in box BX-001|SN-042 موجود بالفعل في الصندوق BX-001/i),
+  ).toBeVisible();
+});

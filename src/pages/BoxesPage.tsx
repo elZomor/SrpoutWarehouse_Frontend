@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Form, Input, Modal, Select, Table, Typography } from 'antd';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { classifyItemRejection, type ItemRejection } from '../features/boxes/logic';
 import { boxSchema, type BoxFormValues } from '../features/boxes/schema';
 import { printBoxLabel } from '../features/boxes/printLabel';
 import type { Box } from '../features/boxes/types';
@@ -16,6 +17,13 @@ export function BoxesPage() {
   const { data: boxes, isLoading, isError: isListError } = useBoxes();
   const createMutation = useCreateBox();
   const { data: productTypes, isError: isProductTypesError } = useProductTypes('');
+  // WRH-27/AC-1/AC-2/AC-5: item_ids rejections name a specific item (and,
+  // for AC-2, the specific other box) - classifyItemRejection anchors on
+  // each rejection's fixed wrapping phrase and interpolates the free-text
+  // identifiers into a translated template, the same way WorkOrdersPage
+  // interpolates a WO id into classifyScanRejection's messages - never
+  // shown as a raw, untranslated server string.
+  const [itemRejection, setItemRejection] = useState<ItemRejection | null>(null);
 
   const {
     control,
@@ -45,11 +53,18 @@ export function BoxesPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     reset();
+    setItemRejection(null);
     createMutation.reset();
   };
 
   const onSubmit = (values: BoxFormValues) => {
-    createMutation.mutate(values, { onSuccess: closeModal });
+    setItemRejection(null);
+    createMutation.mutate(values, {
+      onSuccess: closeModal,
+      onError: (error) => {
+        setItemRejection(classifyItemRejection(error));
+      },
+    });
   };
 
   const productTypeOptions = (productTypes ?? []).map((productType) => ({
@@ -192,7 +207,15 @@ export function BoxesPage() {
           )}
           {createMutation.isError && (
             <Form.Item>
-              <Alert type="error" message={t('boxes.createError')} showIcon />
+              <Alert
+                type="error"
+                message={
+                  itemRejection
+                    ? t(itemRejection.messageKey, itemRejection.params)
+                    : t('boxes.createError')
+                }
+                showIcon
+              />
             </Form.Item>
           )}
         </Form>

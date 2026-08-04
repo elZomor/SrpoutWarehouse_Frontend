@@ -176,7 +176,10 @@
     "form": {
       "codeRequired": "رمز الصندوق مطلوب",
       "productTypeRequired": "نوع المنتج مطلوب",
-      "itemsRequired": "اختر عنصرًا واحدًا على الأقل"
+      "itemsRequired": "اختر عنصرًا واحدًا على الأقل",
+      "itemAlreadyInBoxError": "{{serial}} موجود بالفعل في الصندوق {{boxCode}}",
+      "itemNotAvailableError": "{{serial}} غير متاح لوضعه في صندوق",
+      "itemProductTypeMismatchError": "{{serial}} لا يطابق نوع منتج هذا الصندوق"
     }
   },
   "purchaseOrders": {

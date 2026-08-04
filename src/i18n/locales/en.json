@@ -172,7 +172,10 @@
     "form": {
       "codeRequired": "Box code is required",
       "productTypeRequired": "Product type is required",
-      "itemsRequired": "Select at least one item"
+      "itemsRequired": "Select at least one item",
+      "itemAlreadyInBoxError": "{{serial}} is already in box {{boxCode}}",
+      "itemNotAvailableError": "{{serial}} is not available to box",
+      "itemProductTypeMismatchError": "{{serial}} does not match this box's product type"
     }
   },
   "purchaseOrders": {
