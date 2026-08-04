@@ -9,6 +9,7 @@ import type { Box } from '../features/boxes/types';
 import { useBoxes, useCreateBox } from '../features/boxes/useBoxes';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import { useSerializedItems } from '../features/serialized-items/useSerializedItems';
+import { getFieldErrorMessages } from '../lib/apiErrors';
 
 export function BoxesPage() {
   const { t } = useTranslation();
@@ -16,6 +17,13 @@ export function BoxesPage() {
   const { data: boxes, isLoading, isError: isListError } = useBoxes();
   const createMutation = useCreateBox();
   const { data: productTypes, isError: isProductTypesError } = useProductTypes('');
+  // WRH-27/AC-1/AC-2/AC-5: item_ids rejections name a specific item (and,
+  // for AC-2, the specific other box) - the message is built server-side
+  // from free-text serial_number/code values with no fixed shape, so
+  // unlike the WorkOrders scan/return flows' classified, i18n-mapped
+  // rejections, this one is shown verbatim rather than reconstructed into
+  // a translated template.
+  const [itemError, setItemError] = useState<string | null>(null);
 
   const {
     control,
@@ -45,11 +53,21 @@ export function BoxesPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     reset();
+    setItemError(null);
     createMutation.reset();
   };
 
   const onSubmit = (values: BoxFormValues) => {
-    createMutation.mutate(values, { onSuccess: closeModal });
+    setItemError(null);
+    createMutation.mutate(values, {
+      onSuccess: closeModal,
+      onError: (error) => {
+        const itemErrors = getFieldErrorMessages(error, 'item_ids');
+        if (itemErrors.length > 0) {
+          setItemError(itemErrors[0] ?? null);
+        }
+      },
+    });
   };
 
   const productTypeOptions = (productTypes ?? []).map((productType) => ({
@@ -192,7 +210,7 @@ export function BoxesPage() {
           )}
           {createMutation.isError && (
             <Form.Item>
-              <Alert type="error" message={t('boxes.createError')} showIcon />
+              <Alert type="error" message={itemError ?? t('boxes.createError')} showIcon />
             </Form.Item>
           )}
         </Form>

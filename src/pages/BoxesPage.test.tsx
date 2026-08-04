@@ -289,6 +289,31 @@ describe('BoxesPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the specific server message when an item is rejected', async () => {
+    // WRH-27/AC-1/AC-2/AC-5: item_ids rejections name a specific item (and
+    // possibly another box) - shown verbatim rather than the generic banner.
+    mockListEndpoints({ serializedItems: [makeSerializedItem()] });
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: { item_ids: ['SN-042 is already in box BX-001'] },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderBoxesPage();
+
+    await user.click(await screen.findByRole('button', { name: /register box|تسجيل صندوق/i }));
+    await user.type(screen.getByLabelText(/box code|رمز الصندوق/i), 'BX-002');
+    await selectInForm(user, 'Bar LED Model A');
+    await selectItemInForm(user, 'SN-042');
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+
+    expect(await screen.findByText('SN-042 is already in box BX-001')).toBeInTheDocument();
+    expect(screen.queryByText(/failed to register box|فشل تسجيل الصندوق/i)).not.toBeInTheDocument();
+  });
+
   it('shows an error banner when the list fails to load', async () => {
     mockListEndpoints({ boxesError: true });
 
