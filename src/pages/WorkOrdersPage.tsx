@@ -239,8 +239,16 @@ export function WorkOrdersPage() {
   // Mirrors pendingReturnSubmission's identical stale-response-guarding
   // reasoning (returnSession is local state, not derived from a query
   // cache) - a box-return response can land after the session's moved on
-  // just as easily as a single-item return's can.
-  const [pendingReturnBoxSubmission, setPendingReturnBoxSubmission] = useState<string | null>(null);
+  // just as easily as a single-item return's can. Wrapped in an object
+  // (not a bare string) for the same reason pendingReturnSubmission is a
+  // form-values object rather than just a serial number: a retry with the
+  // *same* box code (a barcode scanner re-feeding it, or a user retrying
+  // after a transient error without changing the input) must still get a
+  // fresh reference, or React bails out of the state update as a no-op and
+  // the effect below never re-runs.
+  const [pendingReturnBoxSubmission, setPendingReturnBoxSubmission] = useState<{
+    box_code: string;
+  } | null>(null);
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -515,7 +523,7 @@ export function WorkOrdersPage() {
   }, [pendingReturnSubmission]);
 
   const onReturnBoxSubmit = (values: ReturnBoxFormValues) => {
-    setPendingReturnBoxSubmission(values.box_code);
+    setPendingReturnBoxSubmission({ box_code: values.box_code });
   };
 
   // Box-return counterpart to the pendingReturnSubmission effect above -
@@ -527,7 +535,7 @@ export function WorkOrdersPage() {
     if (pendingReturnBoxSubmission === null) {
       return;
     }
-    const boxCode = pendingReturnBoxSubmission;
+    const boxCode = pendingReturnBoxSubmission.box_code;
     const generation = returnSessionGenerationRef.current;
     let ignore = false;
 

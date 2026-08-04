@@ -391,4 +391,45 @@ describe('WorkOrdersPage - return', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/^returned$|^تم الإرجاع$/i)).toBeInTheDocument();
   }, 40000);
+
+  it('retries a box return with the same code after a transient error', async () => {
+    // Regression: pendingReturnBoxSubmission used to be a bare string, so
+    // resubmitting the identical box code after an error was an
+    // Object.is-equal no-op state update - React skipped the re-render and
+    // the retry's mutation never fired. A barcode scanner re-feeding the
+    // same code after a transient rejection is the realistic trigger.
+    const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
+    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockedApiClient.post
+      .mockRejectedValueOnce({
+        isAxiosError: true,
+        response: { status: 400, data: { box_code: ['Box not found'] } },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          work_order: { ...workOrder, status: 'returned' },
+          box_summary: {
+            code: 'BX-004',
+            added: 1,
+            results: [{ serial_number: 'SN-4001', added: true, reason: '' }],
+          },
+        },
+      });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openReturnModal(user);
+    await returnBox(user, 'BX-004');
+
+    expect(
+      await screen.findByText(/no box found with this code|لم يتم العثور على صندوق بهذا الرمز/i),
+    ).toBeInTheDocument();
+
+    await returnBox(user, 'BX-004');
+
+    expect(mockedApiClient.post).toHaveBeenCalledTimes(2);
+    expect(
+      await screen.findByText(/box bx-004 expanded: 1 items added|تم توسيع الصندوق bx-004/i),
+    ).toBeInTheDocument();
+  });
 });
