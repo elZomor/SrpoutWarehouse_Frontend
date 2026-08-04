@@ -151,10 +151,10 @@ test('registers a box with available items and prints its QR', async ({ page }) 
   await popup.close();
 });
 
-test('shows the server-provided message when an item is rejected', async ({ page }) => {
+test('shows a translated, interpolated message when an item is rejected', async ({ page }) => {
   // WRH-27/AC-2: item_ids rejections name a specific item and the
-  // specific other box it's already in - shown verbatim, not a generic
-  // banner.
+  // specific other box it's already in - classified and interpolated into
+  // a translated template, not shown as the raw server string.
   const serializedItems: SerializedItem[] = [
     { id: 1, serial_number: 'SN-042', product_type: 1, status: 'available' },
   ];
@@ -205,5 +205,7 @@ test('shows the server-provided message when an item is rejected', async ({ page
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'OK' }).click();
 
-  await expect(page.getByText('SN-042 is already in box BX-001')).toBeVisible();
+  await expect(
+    page.getByText(/SN-042 is already in box BX-001|SN-042 موجود بالفعل في الصندوق BX-001/i),
+  ).toBeVisible();
 });
