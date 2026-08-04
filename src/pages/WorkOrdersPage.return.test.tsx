@@ -82,6 +82,25 @@ async function markSerialDamaged(user: ReturnType<typeof userEvent.setup>, seria
   );
 }
 
+// WRH-26/AC-2/AC-3: return-box() only - matches mockReturnItem's identical
+// POST-only-mock precedent.
+function mockReturnBox(workOrder: ActiveWorkOrder, response: unknown) {
+  mockedApiClient.post.mockImplementation((url: string) => {
+    if (url === `/api/work-orders/${workOrder.id}/return-box/`) {
+      return Promise.resolve({ data: response });
+    }
+    return Promise.reject(new Error(`Unexpected POST ${url}`));
+  });
+}
+
+async function returnBox(user: ReturnType<typeof userEvent.setup>, boxCode: string) {
+  const dialog = screen.getByRole('dialog');
+  const input = within(dialog).getByLabelText(/box code|رمز الصندوق/i);
+  await user.clear(input);
+  await user.type(input, boxCode);
+  await user.click(within(dialog).getByRole('button', { name: /^return box$|^إرجاع صندوق$/i }));
+}
+
 describe('WorkOrdersPage - return', () => {
   afterEach(() => {
     vi.resetAllMocks();
@@ -330,4 +349,87 @@ describe('WorkOrdersPage - return', () => {
     expect(screen.queryByText(/^partially returned$|^إرجاع جزئي$/i)).not.toBeInTheDocument();
     expect(screen.getByRole('dialog').textContent).toMatch(/fulfilled|تم التنفيذ/i);
   }, 90000);
+
+  it('returns a box and marks the WO returned once every item is back', async () => {
+    // WRH-26/AC-2/AC-3
+    const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
+    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockReturnBox(workOrder, {
+      work_order: {
+        id: workOrder.id,
+        job_name: workOrder.job_name,
+        status: 'returned',
+        line_items: [
+          {
+            ...workOrder.line_items[0],
+            returned_quantity: 5,
+            damaged_quantity: 0,
+            still_out_quantity: 0,
+          },
+        ],
+      },
+      box_summary: {
+        code: 'BX-003',
+        added: 5,
+        results: [
+          { serial_number: 'SN-3001', added: true, reason: '' },
+          { serial_number: 'SN-3002', added: true, reason: '' },
+        ],
+      },
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openReturnModal(user);
+    await returnBox(user, 'BX-003');
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/1/return-box/', {
+      box_code: 'BX-003',
+    });
+    expect(
+      await screen.findByText(/box bx-003 expanded: 5 items added|تم توسيع الصندوق bx-003/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^returned$|^تم الإرجاع$/i)).toBeInTheDocument();
+  }, 40000);
+
+  it('retries a box return with the same code after a transient error', async () => {
+    // Regression: pendingReturnBoxSubmission used to be a bare string, so
+    // resubmitting the identical box code after an error was an
+    // Object.is-equal no-op state update - React skipped the re-render and
+    // the retry's mutation never fired. A barcode scanner re-feeding the
+    // same code after a transient rejection is the realistic trigger.
+    const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
+    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockedApiClient.post
+      .mockRejectedValueOnce({
+        isAxiosError: true,
+        response: { status: 400, data: { box_code: ['Box not found'] } },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          work_order: { ...workOrder, status: 'returned' },
+          box_summary: {
+            code: 'BX-004',
+            added: 1,
+            results: [{ serial_number: 'SN-4001', added: true, reason: '' }],
+          },
+        },
+      });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openReturnModal(user);
+    await returnBox(user, 'BX-004');
+
+    expect(
+      await screen.findByText(/no box found with this code|لم يتم العثور على صندوق بهذا الرمز/i),
+    ).toBeInTheDocument();
+
+    await returnBox(user, 'BX-004');
+
+    expect(mockedApiClient.post).toHaveBeenCalledTimes(2);
+    expect(
+      await screen.findByText(/box bx-004 expanded: 1 items added|تم توسيع الصندوق bx-004/i),
+    ).toBeInTheDocument();
+  });
 });

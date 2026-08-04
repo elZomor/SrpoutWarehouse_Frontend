@@ -68,6 +68,31 @@ export interface WorkOrderReturnResult {
   line_items: ActiveWorkOrderLineItem[];
 }
 
+// WRH-26/AC-2/AC-3: one entry per item inside a scanned box, each validated
+// individually - "added" mirrors whether that specific item was claimed/
+// returned, "reason" is a human-readable rejection message when it wasn't.
+export interface BoxScanResultItem {
+  serial_number: string;
+  added: boolean;
+  reason: string;
+}
+
+export interface BoxScanSummary {
+  code: string;
+  added: number;
+  results: BoxScanResultItem[];
+}
+
+export interface ScanWorkOrderBoxResponse {
+  work_order: WorkOrder;
+  box_summary: BoxScanSummary;
+}
+
+export interface ReturnWorkOrderBoxResponse {
+  work_order: WorkOrderReturnResult;
+  box_summary: BoxScanSummary;
+}
+
 export type SerializedItemStatus = 'available' | 'reserved' | 'out';
 
 export interface WorkOrderDetailSerializedItem {

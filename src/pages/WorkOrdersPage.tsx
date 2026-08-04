@@ -5,6 +5,7 @@ import {
   App,
   Button,
   DatePicker,
+  Divider,
   Form,
   Input,
   InputNumber,
@@ -33,10 +34,14 @@ import {
   scannableLineItemOptions as computeScannableLineItemOptions,
 } from '../features/work-orders/logic';
 import {
+  returnBoxSchema,
   returnItemSchema,
+  scanBoxSchema,
   scanItemSchema,
   workOrderSchema,
+  type ReturnBoxFormValues,
   type ReturnItemFormValues,
+  type ScanBoxFormValues,
   type ScanItemFormValues,
   type WorkOrderFormValues,
 } from '../features/work-orders/schema';
@@ -44,6 +49,7 @@ import type {
   ActiveWorkOrder,
   ActiveWorkOrderLineItem,
   ActiveWorkOrderSupplementary,
+  BoxScanSummary,
   WorkOrder,
   WorkOrderReturnResult,
 } from '../features/work-orders/types';
@@ -53,7 +59,9 @@ import {
   useCreateWorkOrder,
   useDownloadWorkOrderPackingList,
   useInvalidateActiveWorkOrders,
+  useReturnWorkOrderBox,
   useReturnWorkOrderItem,
+  useScanWorkOrderBox,
   useScanWorkOrderItem,
   useStartWorkOrder,
   useWorkOrderDetail,
@@ -72,6 +80,14 @@ const SERIALIZED_ITEM_STATUS_COLORS = new Map<string, string>([
   ['out', 'red'],
 ]);
 const DEFAULT_STATUS_COLOR = 'default';
+// WRH-26/AC-2: scan-box/return-box's box_code rejections are fixed
+// constants (no interpolated free text like the per-serial patterns
+// classifyScanRejection/classifyReturnRejection handle), so exact equality
+// is enough - no anchoring needed.
+const BOX_NOT_FOUND_MESSAGE = 'Box not found';
+const BOX_NO_LINE_ITEM_MESSAGE = "This work order has no line item for the box's product type.";
+const BOX_AMBIGUOUS_LINE_ITEM_MESSAGE =
+  "This work order has more than one line item for the box's product type - scan its items individually instead.";
 
 export function WorkOrdersPage() {
   const { t } = useTranslation();
@@ -92,6 +108,7 @@ export function WorkOrdersPage() {
   const createMutation = useCreateWorkOrder();
   const startMutation = useStartWorkOrder();
   const scanMutation = useScanWorkOrderItem(fulfillingWorkOrderId ?? 0);
+  const scanBoxMutation = useScanWorkOrderBox(fulfillingWorkOrderId ?? 0);
   const completeMutation = useCompleteWorkOrder();
   const downloadPackingListMutation = useDownloadWorkOrderPackingList();
   const invalidateActiveWorkOrders = useInvalidateActiveWorkOrders();
@@ -149,6 +166,25 @@ export function WorkOrdersPage() {
   // baked into the key itself.
   const [scanErrorParams, setScanErrorParams] = useState<{ workOrderId?: string }>({});
 
+  // WRH-26/AC-2/AC-3: scanning a Box's code expands to every item inside in
+  // one call - boxScanSummary holds the last call's per-item results so the
+  // "Box BX-001 expanded: N items added" summary (and any rejected items)
+  // stays visible until the next box scan or the modal closes, mirroring
+  // fulfillingWorkOrder's "derived from the latest response" approach
+  // rather than a one-off toast.
+  const [boxScanSummary, setBoxScanSummary] = useState<BoxScanSummary | null>(null);
+  const {
+    control: scanBoxControl,
+    handleSubmit: handleScanBoxSubmit,
+    reset: resetScanBoxForm,
+    setError: setScanBoxError,
+    setFocus: setScanBoxFocus,
+    formState: { errors: scanBoxErrors },
+  } = useForm<ScanBoxFormValues>({
+    resolver: zodResolver(scanBoxSchema),
+    defaultValues: { box_code: '' },
+  });
+
   // AC-1/AC-2/AC-4: returnSession holds the running return summary (status
   // + per-line-item returned/still-out counts) - seeded from the clicked
   // Active-tab row on open, then replaced by each return_item response.
@@ -171,6 +207,7 @@ export function WorkOrdersPage() {
   // objects to per useRef's own docs).
   const returnSessionGenerationRef = useRef(0);
   const returnMutation = useReturnWorkOrderItem(returnSession?.id ?? 0);
+  const returnBoxMutation = useReturnWorkOrderBox(returnSession?.id ?? 0);
   const {
     control: returnControl,
     handleSubmit: handleReturnSubmit,
@@ -185,6 +222,33 @@ export function WorkOrdersPage() {
   const [returnErrorParams, setReturnErrorParams] = useState<{ workOrderId?: string }>({});
   const [pendingReturnSubmission, setPendingReturnSubmission] =
     useState<ReturnItemFormValues | null>(null);
+
+  // WRH-26/AC-2/AC-3: return-context counterpart to boxScanSummary above.
+  const [boxReturnSummary, setBoxReturnSummary] = useState<BoxScanSummary | null>(null);
+  const {
+    control: returnBoxControl,
+    handleSubmit: handleReturnBoxSubmit,
+    reset: resetReturnBoxForm,
+    setError: setReturnBoxError,
+    setFocus: setReturnBoxFocus,
+    formState: { errors: returnBoxErrors },
+  } = useForm<ReturnBoxFormValues>({
+    resolver: zodResolver(returnBoxSchema),
+    defaultValues: { box_code: '' },
+  });
+  // Mirrors pendingReturnSubmission's identical stale-response-guarding
+  // reasoning (returnSession is local state, not derived from a query
+  // cache) - a box-return response can land after the session's moved on
+  // just as easily as a single-item return's can. Wrapped in an object
+  // (not a bare string) for the same reason pendingReturnSubmission is a
+  // form-values object rather than just a serial number: a retry with the
+  // *same* box code (a barcode scanner re-feeding it, or a user retrying
+  // after a transient error without changing the input) must still get a
+  // fresh reference, or React bails out of the state update as a no-op and
+  // the effect below never re-runs.
+  const [pendingReturnBoxSubmission, setPendingReturnBoxSubmission] = useState<{
+    box_code: string;
+  } | null>(null);
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -238,6 +302,9 @@ export function WorkOrdersPage() {
     setScanErrorParams({});
     scanMutation.reset();
     completeMutation.reset();
+    resetScanBoxForm({ box_code: '' });
+    setBoxScanSummary(null);
+    scanBoxMutation.reset();
   };
 
   const closeFulfillmentModal = () => {
@@ -252,6 +319,50 @@ export function WorkOrdersPage() {
     setScanErrorParams({});
     scanMutation.reset();
     completeMutation.reset();
+    resetScanBoxForm();
+    setBoxScanSummary(null);
+    scanBoxMutation.reset();
+  };
+
+  const onScanBoxSubmit = (values: ScanBoxFormValues) => {
+    scanBoxMutation.mutate(values.box_code, {
+      onSuccess: (response) => {
+        setBoxScanSummary(response.box_summary);
+        resetScanBoxForm({ box_code: '' });
+        setScanBoxFocus('box_code');
+      },
+      onError: (error) => {
+        setBoxScanSummary(null);
+        const boxCodeErrors = getFieldErrorMessages(error, 'box_code');
+        if (boxCodeErrors.some((message) => message === BOX_NOT_FOUND_MESSAGE)) {
+          setScanBoxError('box_code', {
+            type: 'server',
+            message: 'workOrders.scan.boxCodeNotFoundError',
+          });
+          return;
+        }
+        if (boxCodeErrors.some((message) => message === BOX_NO_LINE_ITEM_MESSAGE)) {
+          setScanBoxError('box_code', {
+            type: 'server',
+            message: 'workOrders.scan.boxCodeNoLineItemError',
+          });
+          return;
+        }
+        if (boxCodeErrors.some((message) => message === BOX_AMBIGUOUS_LINE_ITEM_MESSAGE)) {
+          setScanBoxError('box_code', {
+            type: 'server',
+            message: 'workOrders.scan.boxCodeAmbiguousError',
+          });
+          return;
+        }
+        if (boxCodeErrors.length > 0) {
+          setScanBoxError('box_code', {
+            type: 'server',
+            message: 'workOrders.scan.boxScanGenericError',
+          });
+        }
+      },
+    });
   };
 
   const onScanSubmit = (values: ScanItemFormValues) => {
@@ -318,6 +429,9 @@ export function WorkOrdersPage() {
     resetReturnForm({ serial_number: '' });
     setReturnErrorParams({});
     returnMutation.reset();
+    resetReturnBoxForm({ box_code: '' });
+    setBoxReturnSummary(null);
+    returnBoxMutation.reset();
   };
 
   const closeReturnModal = () => {
@@ -333,6 +447,9 @@ export function WorkOrdersPage() {
     resetReturnForm();
     setReturnErrorParams({});
     returnMutation.reset();
+    resetReturnBoxForm();
+    setBoxReturnSummary(null);
+    returnBoxMutation.reset();
   };
 
   const onReturnSubmit = (values: ReturnItemFormValues) => {
@@ -404,6 +521,60 @@ export function WorkOrdersPage() {
       ignore = true;
     };
   }, [pendingReturnSubmission]);
+
+  const onReturnBoxSubmit = (values: ReturnBoxFormValues) => {
+    setPendingReturnBoxSubmission({ box_code: values.box_code });
+  };
+
+  // Box-return counterpart to the pendingReturnSubmission effect above -
+  // same stale-response guarding (returnSession is local state a late
+  // response could otherwise overwrite or reopen), same reason
+  // returnMutation/resetReturnBoxForm/setReturnBoxError/setReturnBoxFocus
+  // are excluded from the dependency array.
+  useEffect(() => {
+    if (pendingReturnBoxSubmission === null) {
+      return;
+    }
+    const boxCode = pendingReturnBoxSubmission.box_code;
+    const generation = returnSessionGenerationRef.current;
+    let ignore = false;
+
+    returnBoxMutation.mutateAsync(boxCode).then(
+      (response) => {
+        if (ignore || returnSessionGenerationRef.current !== generation) {
+          return;
+        }
+        setReturnSession(response.work_order);
+        setBoxReturnSummary(response.box_summary);
+        resetReturnBoxForm({ box_code: '' });
+        setReturnBoxFocus('box_code');
+      },
+      (error) => {
+        if (ignore || returnSessionGenerationRef.current !== generation) {
+          return;
+        }
+        setBoxReturnSummary(null);
+        const boxCodeErrors = getFieldErrorMessages(error, 'box_code');
+        if (boxCodeErrors.some((message) => message === BOX_NOT_FOUND_MESSAGE)) {
+          setReturnBoxError('box_code', {
+            type: 'server',
+            message: 'workOrders.return.boxCodeNotFoundError',
+          });
+          return;
+        }
+        if (boxCodeErrors.length > 0) {
+          setReturnBoxError('box_code', {
+            type: 'server',
+            message: 'workOrders.return.boxReturnGenericError',
+          });
+        }
+      },
+    );
+
+    return () => {
+      ignore = true;
+    };
+  }, [pendingReturnBoxSubmission]);
 
   const productTypeOptions = (productTypes ?? []).map((productType) => ({
     value: productType.id,
@@ -973,6 +1144,64 @@ export function WorkOrdersPage() {
                 {t('workOrders.scan.scanButton')}
               </Button>
             </Form>
+            <Divider />
+            <Form layout="vertical" noValidate onFinish={handleScanBoxSubmit(onScanBoxSubmit)}>
+              <Form.Item
+                label={t('workOrders.scan.boxCodeLabel')}
+                htmlFor="scan-box_code"
+                validateStatus={scanBoxErrors.box_code ? 'error' : ''}
+                help={scanBoxErrors.box_code ? t(scanBoxErrors.box_code.message ?? '') : undefined}
+              >
+                <Controller
+                  name="box_code"
+                  control={scanBoxControl}
+                  render={({ field }) => (
+                    <Input
+                      {...field}
+                      id="scan-box_code"
+                      placeholder={t('workOrders.scan.boxCodePlaceholder')}
+                    />
+                  )}
+                />
+              </Form.Item>
+              {scanBoxMutation.isError && !scanBoxErrors.box_code && (
+                <Alert
+                  type="error"
+                  message={t('workOrders.scan.boxScanGenericError')}
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                />
+              )}
+              <Button htmlType="submit" loading={scanBoxMutation.isPending}>
+                {t('workOrders.scan.scanBoxButton')}
+              </Button>
+              {boxScanSummary && (
+                <Alert
+                  style={{ marginTop: 16 }}
+                  type={
+                    boxScanSummary.added === boxScanSummary.results.length ? 'success' : 'warning'
+                  }
+                  showIcon
+                  message={t('workOrders.scan.boxSummaryMessage', {
+                    code: boxScanSummary.code,
+                    count: boxScanSummary.added,
+                  })}
+                  description={
+                    boxScanSummary.results.some((result) => !result.added) ? (
+                      <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+                        {boxScanSummary.results
+                          .filter((result) => !result.added)
+                          .map((result) => (
+                            <li key={result.serial_number}>
+                              {result.serial_number}: {result.reason}
+                            </li>
+                          ))}
+                      </ul>
+                    ) : undefined
+                  }
+                />
+              )}
+            </Form>
           </>
         )}
       </Modal>
@@ -1045,6 +1274,68 @@ export function WorkOrdersPage() {
                   {t('workOrders.return.markDamagedButton')}
                 </Button>
               </Space>
+            </Form>
+            <Divider />
+            <Form layout="vertical" noValidate onFinish={handleReturnBoxSubmit(onReturnBoxSubmit)}>
+              <Form.Item
+                label={t('workOrders.return.boxCodeLabel')}
+                htmlFor="return-box_code"
+                validateStatus={returnBoxErrors.box_code ? 'error' : ''}
+                help={
+                  returnBoxErrors.box_code ? t(returnBoxErrors.box_code.message ?? '') : undefined
+                }
+              >
+                <Controller
+                  name="box_code"
+                  control={returnBoxControl}
+                  render={({ field }) => (
+                    <Input
+                      {...field}
+                      id="return-box_code"
+                      placeholder={t('workOrders.return.boxCodePlaceholder')}
+                    />
+                  )}
+                />
+              </Form.Item>
+              {returnBoxMutation.isError && !returnBoxErrors.box_code && (
+                <Alert
+                  type="error"
+                  message={t('workOrders.return.boxReturnGenericError')}
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                />
+              )}
+              <Button htmlType="submit" loading={returnBoxMutation.isPending}>
+                {t('workOrders.return.returnBoxButton')}
+              </Button>
+              {boxReturnSummary && (
+                <Alert
+                  style={{ marginTop: 16 }}
+                  type={
+                    boxReturnSummary.added === boxReturnSummary.results.length
+                      ? 'success'
+                      : 'warning'
+                  }
+                  showIcon
+                  message={t('workOrders.return.boxSummaryMessage', {
+                    code: boxReturnSummary.code,
+                    count: boxReturnSummary.added,
+                  })}
+                  description={
+                    boxReturnSummary.results.some((result) => !result.added) ? (
+                      <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+                        {boxReturnSummary.results
+                          .filter((result) => !result.added)
+                          .map((result) => (
+                            <li key={result.serial_number}>
+                              {result.serial_number}: {result.reason}
+                            </li>
+                          ))}
+                      </ul>
+                    ) : undefined
+                  }
+                />
+              )}
             </Form>
           </>
         )}
