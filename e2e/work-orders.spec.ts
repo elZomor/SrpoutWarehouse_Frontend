@@ -280,7 +280,9 @@ test('fulfills a WO end-to-end: start, scan to completion, complete', async ({ p
   await page.getByRole('dialog').getByRole('combobox').click();
   await page.getByTitle('Bar LED Model A').click();
   const dialog = page.getByRole('dialog');
-  const scanButton = dialog.locator('button[type="submit"]');
+  // Scoped by exact name, not `button[type="submit"]` - WRH-26 added a
+  // second submit button (box scan) to this same dialog.
+  const scanButton = dialog.getByRole('button', { name: /^scan$|^مسح$/i });
   await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-1001');
   await scanButton.click();
   await expect(dialog.getByRole('row', { name: /bar led model a/i })).toContainText('1');
@@ -445,7 +447,9 @@ test('returns items against a fulfilled WO: partial then full return', async ({ 
     .getByRole('button', { name: /^return$|^إرجاع$/i })
     .click();
   const dialog = page.getByRole('dialog');
-  const returnButton = dialog.locator('button[type="submit"]');
+  // Scoped by exact name, not `button[type="submit"]` - WRH-26 added a
+  // second submit button (box return) to this same dialog.
+  const returnButton = dialog.getByRole('button', { name: /^return$|^إرجاع$/i });
 
   await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-2001');
   await returnButton.click();
@@ -638,7 +642,9 @@ test('marks a returning unit as damaged: excluded from stock and its own summary
   await expect(row.locator('td')).toHaveText(['Bar LED Model A', '2', '0', '1', '1']);
 
   await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-9002');
-  await dialog.locator('button[type="submit"]').click();
+  // Scoped by exact name, not `button[type="submit"]` - WRH-26 added a
+  // second submit button (box return) to this same dialog.
+  await dialog.getByRole('button', { name: /^return$|^إرجاع$/i }).click();
   // AC-3: the damaged unit doesn't block the WO from reaching "returned"
   // once the remaining unit is also accounted for.
   await expect(dialog.getByText(/^returned$|^تم الإرجاع$/i)).toBeVisible();
