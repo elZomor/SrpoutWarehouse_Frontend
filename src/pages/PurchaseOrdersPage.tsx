@@ -20,6 +20,10 @@ import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
+  classifyReceiveRejection,
+  resolveReceiveFormReset,
+} from '../features/purchase-orders/logic';
+import {
   purchaseOrderSchema,
   receiveItemSchema,
   type PurchaseOrderFormValues,
@@ -104,24 +108,11 @@ export function PurchaseOrdersPage() {
   const onReceiveSubmit = (values: ReceiveItemFormValues) => {
     receiveMutation.mutate(values, {
       onSuccess: (updatedPurchaseOrder) => {
-        // Keep the same line item selected - a scan gun typically fires many
-        // scans against the same line item in a row - and clear+refocus the
-        // serial number field for the next one (AC-1/AC-3/AC-4). But if that
-        // scan just completed the line item, it's no longer a valid option
-        // in receivableLineItemOptions - keeping it selected would leave the
-        // Select showing no matching option while still silently submitting
-        // against the now-exhausted line item on the next scan. Read the
-        // freshly returned PurchaseOrder (not the component's own
-        // receivingPurchaseOrder, which hasn't re-rendered with this
-        // response yet) to decide.
-        const scannedLineItem = updatedPurchaseOrder.line_items.find(
-          (item) => item.id === values.line_item,
-        );
+        // AC-1/AC-3/AC-4: clear+refocus the serial number field for the next
+        // scan - see resolveReceiveFormReset's comment for why the line
+        // item selection itself needs the freshly returned PurchaseOrder.
         resetReceiveForm({
-          line_item:
-            scannedLineItem && scannedLineItem.remaining_quantity > 0
-              ? values.line_item
-              : undefined,
+          ...resolveReceiveFormReset(updatedPurchaseOrder, values.line_item),
           serial_number: '',
         });
         setReceiveFocus('serial_number');
@@ -130,29 +121,9 @@ export function PurchaseOrdersPage() {
         const serialErrors = getFieldErrorMessages(error, 'serial_number');
         const lineItemErrors = getFieldErrorMessages(error, 'line_item');
 
-        if (serialErrors.some((message) => message.includes('already registered'))) {
-          setReceiveError('serial_number', {
-            type: 'server',
-            message: 'purchaseOrders.receive.duplicateSerialError',
-          });
-          return;
-        }
-        if (
-          lineItemErrors.some((message) =>
-            message.includes('already received its expected quantity'),
-          )
-        ) {
-          setReceiveError('line_item', {
-            type: 'server',
-            message: 'purchaseOrders.receive.overCapError',
-          });
-          return;
-        }
-        if (lineItemErrors.some((message) => message.includes('archived'))) {
-          setReceiveError('line_item', {
-            type: 'server',
-            message: 'purchaseOrders.receive.archivedError',
-          });
+        const rejection = classifyReceiveRejection(serialErrors, lineItemErrors);
+        if (rejection) {
+          setReceiveError(rejection.field, { type: 'server', message: rejection.messageKey });
         }
       },
     });

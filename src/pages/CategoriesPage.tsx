@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, App, Button, Form, Input, Modal, Popconfirm, Space, Table, Typography } from 'antd';
-import axios from 'axios';
 import { Controller, type Control, type FieldError, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { getAssignedProductTypeCount, isDuplicateNameError } from '../features/categories/logic';
 import { categorySchema, type CategoryFormValues } from '../features/categories/schema';
 import type { Category } from '../features/categories/types';
 import {
@@ -60,8 +60,6 @@ function CategoryField({
   );
 }
 
-const DUPLICATE_NAME_MESSAGE = 'A category with this name already exists.';
-
 export function CategoriesPage() {
   const { t } = useTranslation();
   const { message } = App.useApp();
@@ -99,15 +97,7 @@ export function CategoriesPage() {
     createMutation.mutate(values, {
       onSuccess: closeModal,
       onError: (error) => {
-        // AC-2: duplicate name gets its own inline message, not the
-        // generic create-failed banner. Match on the backend's specific
-        // duplicate-name text so other `name` validation failures (e.g. a
-        // blank/whitespace-only name) fall through to the generic banner
-        // instead of being mislabeled as a duplicate.
-        const nameErrors = axios.isAxiosError<{ name?: string[] }>(error)
-          ? error.response?.data?.name
-          : undefined;
-        if (nameErrors?.includes(DUPLICATE_NAME_MESSAGE)) {
+        if (isDuplicateNameError(error)) {
           setError('name', { type: 'server', message: 'categories.form.nameDuplicate' });
         }
       },
@@ -121,9 +111,7 @@ export function CategoriesPage() {
         // AC-3: build the blocked-delete message from the backend's count
         // rather than showing its (English-only) `detail` text as-is, so
         // it's properly translated/pluralized in both AR and EN.
-        const assignedCount = axios.isAxiosError<{ assigned_product_type_count?: number }>(error)
-          ? error.response?.data?.assigned_product_type_count
-          : undefined;
+        const assignedCount = getAssignedProductTypeCount(error);
         message.error(
           assignedCount != null
             ? t('categories.deleteBlockedError', { count: assignedCount })

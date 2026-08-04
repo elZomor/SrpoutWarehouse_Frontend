@@ -203,37 +203,9 @@ describe('ProductTypesPage', () => {
     expect(await screen.findByText('Bar LED Model A')).toBeInTheDocument();
   });
 
-  it('requires a name before submitting', async () => {
-    mockListEndpoints({});
-
-    const user = userEvent.setup();
-    renderProductTypesPage();
-
-    await user.click(
-      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i }),
-    );
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-
-    expect(await screen.findByText(/name is required|الاسم مطلوب/i)).toBeInTheDocument();
-    expect(mockedApiClient.post).not.toHaveBeenCalled();
-  });
-
-  it('requires a category before submitting', async () => {
-    // AC-4
-    mockListEndpoints({});
-
-    const user = userEvent.setup();
-    renderProductTypesPage();
-
-    await user.click(
-      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i }),
-    );
-    await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Bar LED Model A');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-
-    expect(await screen.findByText(/category is required|الفئة مطلوبة/i)).toBeInTheDocument();
-    expect(mockedApiClient.post).not.toHaveBeenCalled();
-  });
+  // "requires a name before submitting" / "requires a category before
+  // submitting" moved to src/features/product-types/schema.test.ts - pure
+  // zod validation.
 
   it('offers an existing category as a selectable option', async () => {
     // AC-4 / TC-05

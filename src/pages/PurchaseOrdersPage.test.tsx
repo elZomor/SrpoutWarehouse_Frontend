@@ -292,56 +292,10 @@ describe('PurchaseOrdersPage', () => {
     });
   });
 
-  it('requires a supplier name before submitting', async () => {
-    mockListEndpoints({});
-
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderPurchaseOrdersPage();
-
-    await user.click(await screen.findByRole('button', { name: /new po|أمر شراء جديد/i }));
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-
-    expect(await screen.findByText(/supplier is required|المورد مطلوب/i)).toBeInTheDocument();
-    expect(mockedApiClient.post).not.toHaveBeenCalled();
-  });
-
-  it('requires an order date before submitting', async () => {
-    mockListEndpoints({});
-
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderPurchaseOrdersPage();
-
-    await user.click(await screen.findByRole('button', { name: /new po|أمر شراء جديد/i }));
-    await user.type(screen.getByLabelText(/^supplier$|^المورد$/i), 'Acme Lighting Co');
-    await selectProductTypeForLineItem(user, 0, 'Bar LED Model A');
-    await user.type(screen.getByPlaceholderText(/qty|الكمية/i), '5');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-
-    expect(
-      await screen.findByText(/order date is required|تاريخ الطلب مطلوب/i),
-    ).toBeInTheDocument();
-    expect(mockedApiClient.post).not.toHaveBeenCalled();
-  });
-
-  it('requires a product type and quantity on the line item before submitting', async () => {
-    mockListEndpoints({});
-
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderPurchaseOrdersPage();
-
-    await user.click(await screen.findByRole('button', { name: /new po|أمر شراء جديد/i }));
-    await user.type(screen.getByLabelText(/^supplier$|^المورد$/i), 'Acme Lighting Co');
-    await fillOrderDate(user, '2026-07-01');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-
-    expect(
-      await screen.findByText(/product type is required|نوع المنتج مطلوب/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/quantity must be at least 1|يجب أن تكون الكمية 1 على الأقل/i),
-    ).toBeInTheDocument();
-    expect(mockedApiClient.post).not.toHaveBeenCalled();
-  });
+  // "requires a supplier name before submitting" / "requires an order date
+  // before submitting" / "requires a product type and quantity on the line
+  // item before submitting" moved to
+  // src/features/purchase-orders/schema.test.ts - pure zod validation.
 
   it('removes an added line item', async () => {
     mockListEndpoints({});
@@ -431,33 +385,10 @@ describe('PurchaseOrdersPage', () => {
     expect(cells).toEqual(['Bar LED Model A', '2', '2', '0']); // expected, received, remaining
   });
 
-  it('deselects a line item once it is fully received, instead of leaving it silently selected', async () => {
-    const purchaseOrder = makePurchaseOrder({
-      line_items: [
-        {
-          id: 1,
-          product_type: 1,
-          product_type_name: 'Bar LED Model A',
-          expected_quantity: 1,
-          received_quantity: 0,
-          remaining_quantity: 1,
-        },
-      ],
-    });
-    mockListEndpoints({ purchaseOrders: [purchaseOrder] });
-    mockReceiveEndpoint(purchaseOrder);
-
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderPurchaseOrdersPage();
-
-    await user.click(await screen.findByRole('button', { name: /receive|استلام/i }));
-    await selectReceiveLineItem(user, 'Bar LED Model A');
-    await scanSerial(user, 'SN-LAST-001');
-    await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
-
-    const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText(/select a line item|اختر بند الطلب/i)).toBeInTheDocument();
-  });
+  // "deselects a line item once it is fully received, instead of leaving
+  // it silently selected" moved to src/features/purchase-orders/logic.test.ts
+  // (resolveReceiveFormReset) - pure decision logic, no scan simulation
+  // needed.
 
   it('shows partially_received status and remaining quantity after a partial scan', async () => {
     // TC-03/AC-3

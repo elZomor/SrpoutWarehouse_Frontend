@@ -23,6 +23,16 @@ import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
+  classifyReturnRejection,
+  classifyScanRejection,
+  flattenWorkOrderDetailRows,
+  isFullyScanned as computeIsFullyScanned,
+  isPackingListEligible,
+  isPrimaryWorkOrder,
+  isReturnEligible,
+  scannableLineItemOptions as computeScannableLineItemOptions,
+} from '../features/work-orders/logic';
+import {
   returnItemSchema,
   scanItemSchema,
   workOrderSchema,
@@ -62,27 +72,6 @@ const SERIALIZED_ITEM_STATUS_COLORS = new Map<string, string>([
   ['out', 'red'],
 ]);
 const DEFAULT_STATUS_COLOR = 'default';
-// WRH-33: scan()'s serial_number rejection messages are always
-// `${serial_number} ${reason}` - and serial_number is unconstrained free
-// text (backend SerializedItem.serial_number has no format restriction),
-// so every one of these has to be matched against the message's actual
-// *end*, not just checked with .includes() anywhere in the string. A serial
-// number that happens to contain another reason's phrase (e.g.
-// "SN is currently out on WO-5" scanned while genuinely damaged) would
-// otherwise misclassify: the backend always appends its real reason last,
-// so anchoring to $ is what makes the true reason unambiguous regardless of
-// what's in the serial itself.
-const OUT_PATTERN = /is currently out on WO-(\d+)$/;
-const RESERVED_PATTERN = /is already reserved on WO-(\d+)$/;
-const DAMAGED_PATTERN = /is damaged and cannot be issued$/;
-const MISSING_PATTERN = /is missing and cannot be issued$/;
-// WRH-38: return_item()'s serial_number rejections follow the same
-// `${serial_number} ${reason}` shape as scan()'s - anchored to the
-// message's end for the same reason as the OUT/RESERVED/DAMAGED/MISSING
-// patterns above.
-const NOT_ISSUED_PATTERN = /was not issued on WO-(\d+)$/;
-const NOT_OUT_PATTERN = /is not currently out on this work order$/;
-const RETURN_ELIGIBLE_STATUSES = new Set(['fulfilled', 'partially_returned']);
 
 export function WorkOrdersPage() {
   const { t } = useTranslation();
@@ -296,77 +285,10 @@ export function WorkOrdersPage() {
         const lineItemErrors = getFieldErrorMessages(error, 'line_item');
         setScanErrorParams({});
 
-        // AC-4/AC-2: both are fixed constants with no serial_number in
-        // them, unlike the four dynamic messages below - checked by exact
-        // equality (not .includes()) so a *different* rejection whose
-        // free-text serial_number happens to contain one of these phrases
-        // can't be swallowed by an earlier, looser check.
-        if (serialErrors.some((message) => message === 'Serial not found')) {
-          setScanError('serial_number', {
-            type: 'server',
-            message: 'workOrders.scan.notFoundError',
-          });
-          return;
-        }
-        if (
-          serialErrors.some(
-            (message) => message === "Item does not match this line item's product type.",
-          )
-        ) {
-          setScanError('serial_number', {
-            type: 'server',
-            message: 'workOrders.scan.productTypeMismatchError',
-          });
-          return;
-        }
-        // AC-1: item already out on another WO - name that WO.
-        const outMatch = serialErrors.map((message) => message.match(OUT_PATTERN)).find(Boolean);
-        if (outMatch) {
-          setScanErrorParams({ workOrderId: outMatch[1] });
-          setScanError('serial_number', { type: 'server', message: 'workOrders.scan.outError' });
-          return;
-        }
-        // Same WO reference as above, but for a scan-in-progress double-tap
-        // (item already claimed, not yet confirmed out) rather than a fully
-        // fulfilled WO.
-        const reservedMatch = serialErrors
-          .map((message) => message.match(RESERVED_PATTERN))
-          .find(Boolean);
-        if (reservedMatch) {
-          setScanErrorParams({ workOrderId: reservedMatch[1] });
-          setScanError('serial_number', {
-            type: 'server',
-            message: 'workOrders.scan.reservedError',
-          });
-          return;
-        }
-        // AC-3: damaged/missing items.
-        if (serialErrors.some((message) => DAMAGED_PATTERN.test(message))) {
-          setScanError('serial_number', {
-            type: 'server',
-            message: 'workOrders.scan.damagedError',
-          });
-          return;
-        }
-        if (serialErrors.some((message) => MISSING_PATTERN.test(message))) {
-          setScanError('serial_number', {
-            type: 'server',
-            message: 'workOrders.scan.missingError',
-          });
-          return;
-        }
-        if (serialErrors.length > 0) {
-          setScanError('serial_number', {
-            type: 'server',
-            message: 'workOrders.scan.notAvailableError',
-          });
-          return;
-        }
-        if (lineItemErrors.some((message) => message.includes('already reached'))) {
-          setScanError('line_item', {
-            type: 'server',
-            message: 'workOrders.scan.overCapError',
-          });
+        const rejection = classifyScanRejection(serialErrors, lineItemErrors);
+        if (rejection) {
+          setScanErrorParams(rejection.params ?? {});
+          setScanError(rejection.field, { type: 'server', message: rejection.messageKey });
         }
       },
     });
@@ -470,36 +392,10 @@ export function WorkOrdersPage() {
         const statusErrors = getFieldErrorMessages(error, 'status');
         setReturnErrorParams({});
 
-        if (serialErrors.some((message) => message === 'Serial not found')) {
-          setReturnError('serial_number', {
-            type: 'server',
-            message: 'workOrders.return.notFoundError',
-          });
-          return;
-        }
-        const notIssuedMatch = serialErrors
-          .map((message) => message.match(NOT_ISSUED_PATTERN))
-          .find(Boolean);
-        if (notIssuedMatch) {
-          setReturnErrorParams({ workOrderId: notIssuedMatch[1] });
-          setReturnError('serial_number', {
-            type: 'server',
-            message: 'workOrders.return.notIssuedError',
-          });
-          return;
-        }
-        if (serialErrors.some((message) => NOT_OUT_PATTERN.test(message))) {
-          setReturnError('serial_number', {
-            type: 'server',
-            message: 'workOrders.return.notOutError',
-          });
-          return;
-        }
-        if (statusErrors.length > 0) {
-          setReturnError('serial_number', {
-            type: 'server',
-            message: 'workOrders.return.statusError',
-          });
+        const rejection = classifyReturnRejection(serialErrors, statusErrors);
+        if (rejection) {
+          setReturnErrorParams(rejection.params ?? {});
+          setReturnError('serial_number', { type: 'server', message: rejection.messageKey });
         }
       },
     );
@@ -520,12 +416,10 @@ export function WorkOrdersPage() {
   // populates. See https://react-hook-form.com/docs/useform/formstate.
   const lineItemsError = errors.line_items?.root?.message ?? errors.line_items?.message;
 
-  const scannableLineItemOptions = (fulfillingWorkOrder?.line_items ?? [])
-    .filter((item) => item.remaining_quantity > 0)
-    .map((item) => ({ value: item.id, label: item.product_type_name }));
-  const isFullyScanned = (fulfillingWorkOrder?.line_items ?? []).every(
-    (item) => item.remaining_quantity <= 0,
+  const scannableLineItemOptions = computeScannableLineItemOptions(
+    fulfillingWorkOrder?.line_items ?? [],
   );
+  const isFullyScanned = computeIsFullyScanned(fulfillingWorkOrder?.line_items ?? []);
 
   // Shared by the Manage tab's table and the Active tab's (both primary and
   // nested supplementary) tables - every WorkOrder/ActiveWorkOrder shape
@@ -707,7 +601,7 @@ export function WorkOrdersPage() {
               ActiveWorkOrder, never on ActiveWorkOrderSupplementary, so
               this also narrows `record` for openSupplementaryModal's
               ActiveWorkOrder-only parameter. */}
-          {'supplementaries' in record && (
+          {isPrimaryWorkOrder(record) && (
             <Button size="small" onClick={() => openSupplementaryModal(record)}>
               {t('workOrders.active.addSupplementaryButton')}
             </Button>
@@ -718,7 +612,7 @@ export function WorkOrdersPage() {
               matching the backend's "in_progress or later" availability
               gate (see WorkOrderViewSet.packing_list's own comment: there
               is no STATUS_CLOSED yet, so "not draft" is the real rule). */}
-          {'supplementaries' in record && record.status !== 'draft' && (
+          {isPackingListEligible(record) && (
             <Button
               size="small"
               loading={
@@ -730,7 +624,7 @@ export function WorkOrdersPage() {
               {t('workOrders.active.downloadPackingListButton')}
             </Button>
           )}
-          {RETURN_ELIGIBLE_STATUSES.has(record.status) && (
+          {isReturnEligible(record.status) && (
             <Button size="small" onClick={() => openReturnModal(record)}>
               {t('workOrders.return.button')}
             </Button>
@@ -740,14 +634,7 @@ export function WorkOrdersPage() {
     },
   ];
 
-  const detailRows = (workOrderDetail?.line_items ?? []).flatMap((lineItem) =>
-    lineItem.serialized_items.map((item) => ({
-      key: item.id,
-      product_type_name: lineItem.product_type_name,
-      serial_number: item.serial_number,
-      status: item.status,
-    })),
-  );
+  const detailRows = flattenWorkOrderDetailRows(workOrderDetail?.line_items ?? []);
 
   const detailColumns = [
     {

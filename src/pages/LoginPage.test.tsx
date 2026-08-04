@@ -67,60 +67,10 @@ describe('LoginPage', () => {
     expect(await screen.findByText('Dashboard Page')).toBeInTheDocument();
   });
 
-  it('shows a required-field error and does not submit when email is empty', async () => {
-    // WRH-19 TC-01
-    const user = userEvent.setup();
-    renderLoginPage();
-
-    await user.type(await screen.findByLabelText(/password|كلمة المرور/i), 'some-password');
-    await user.click(screen.getByRole('button', { name: /login|تسجيل الدخول/i }));
-
-    expect(
-      await screen.findByText(/email is required|البريد الإلكتروني مطلوب/i),
-    ).toBeInTheDocument();
-    expect(mockedApiClient.post).not.toHaveBeenCalled();
-  });
-
-  it('shows a required-field error and does not submit when password is empty', async () => {
-    // WRH-19 TC-02
-    const user = userEvent.setup();
-    renderLoginPage();
-
-    await user.type(await screen.findByLabelText(/email|البريد الإلكتروني/i), 'jane@example.com');
-    await user.click(screen.getByRole('button', { name: /login|تسجيل الدخول/i }));
-
-    expect(await screen.findByText(/password is required|كلمة المرور مطلوبة/i)).toBeInTheDocument();
-    expect(mockedApiClient.post).not.toHaveBeenCalled();
-  });
-
-  it('shows both required-field errors and does not submit when both fields are empty', async () => {
-    // WRH-19 TC-03
-    const user = userEvent.setup();
-    renderLoginPage();
-
-    await user.click(await screen.findByRole('button', { name: /login|تسجيل الدخول/i }));
-
-    expect(
-      await screen.findByText(/email is required|البريد الإلكتروني مطلوب/i),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/password is required|كلمة المرور مطلوبة/i)).toBeInTheDocument();
-    expect(mockedApiClient.post).not.toHaveBeenCalled();
-  });
-
-  it('shows a format error and does not submit for a malformed email', async () => {
-    // WRH-19 TC-04
-    const user = userEvent.setup();
-    renderLoginPage();
-
-    await user.type(await screen.findByLabelText(/email|البريد الإلكتروني/i), 'not-an-email');
-    await user.type(screen.getByLabelText(/password|كلمة المرور/i), 'some-password');
-    await user.click(screen.getByRole('button', { name: /login|تسجيل الدخول/i }));
-
-    expect(
-      await screen.findByText(/enter a valid email address|أدخل بريدًا إلكترونيًا صالحًا/i),
-    ).toBeInTheDocument();
-    expect(mockedApiClient.post).not.toHaveBeenCalled();
-  });
+  // WRH-19 TC-01/TC-02/TC-03/TC-04 (required-field/malformed-email
+  // validation) moved to src/features/auth/schema.test.ts - pure
+  // loginSchema.safeParse() cases, no DOM needed. This file keeps the
+  // happy path and the one representative error-path (401 below).
 
   it('shows a generic invalid-credentials error and stays on the login page on a 401', async () => {
     // WRH-19 TC-05/TC-06: unregistered email and wrong password are

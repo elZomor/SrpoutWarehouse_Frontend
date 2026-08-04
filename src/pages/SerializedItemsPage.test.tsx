@@ -177,36 +177,11 @@ describe('SerializedItemsPage', () => {
     expect(screen.getByText(/available|متاح/i)).toBeInTheDocument();
   });
 
-  it('opens a print window with the QR image, serial number and product type when Print QR is clicked', async () => {
-    // TC-02/AC-1: the label is built via DOM APIs in a new window (not a
-    // raw QR-PNG link) so it carries serial number + product type name
-    // alongside the QR code, per AC-1's label content requirement.
-    mockListEndpoints({ serializedItems: [makeSerializedItem()] });
-    const printSpy = vi.fn();
-    const fakePrintWindow = {
-      document: window.document.implementation.createHTMLDocument(),
-      focus: vi.fn(),
-      print: printSpy,
-    };
-    const openSpy = vi.spyOn(window, 'open').mockReturnValue(fakePrintWindow as never);
-
-    const user = userEvent.setup();
-    renderSerializedItemsPage();
-
-    await user.click(await screen.findByRole('button', { name: /print qr|طباعة رمز qr/i }));
-
-    expect(openSpy).toHaveBeenCalled();
-    const img = fakePrintWindow.document.querySelector('img');
-    expect(img?.getAttribute('src')).toBe('http://localhost:8000/api/serialized-items/1/qr-code/');
-    expect(img?.getAttribute('alt')).toBeTruthy();
-    expect(fakePrintWindow.document.body.textContent).toContain('SN-042');
-    expect(fakePrintWindow.document.body.textContent).toContain('Bar LED Model A');
-
-    img?.dispatchEvent(new Event('load'));
-    expect(printSpy).toHaveBeenCalled();
-
-    openSpy.mockRestore();
-  });
+  // "opens a print window with the QR image, serial number and product
+  // type..." moved to src/features/serialized-items/printLabel.test.ts -
+  // direct test of printSerializedItemLabel, no page mount needed. Kept
+  // below: the one case that proves the *page* wires a freshly-created
+  // item's id into the print call, not printLabel's own internals.
 
   it('prints the QR label immediately after registering a new item (AC-4)', async () => {
     // AC-4: the QR is generated on demand (see printLabel.ts / api.ts) rather
@@ -244,30 +219,8 @@ describe('SerializedItemsPage', () => {
     openSpy.mockRestore();
   });
 
-  it('shows a fallback message in the print window when the QR image fails to load', async () => {
-    mockListEndpoints({ serializedItems: [makeSerializedItem()] });
-    const fakePrintWindow = {
-      document: window.document.implementation.createHTMLDocument(),
-      focus: vi.fn(),
-      print: vi.fn(),
-    };
-    const openSpy = vi.spyOn(window, 'open').mockReturnValue(fakePrintWindow as never);
-
-    const user = userEvent.setup();
-    renderSerializedItemsPage();
-
-    await user.click(await screen.findByRole('button', { name: /print qr|طباعة رمز qr/i }));
-
-    const img = fakePrintWindow.document.querySelector('img');
-    img?.dispatchEvent(new Event('error'));
-
-    expect(fakePrintWindow.document.querySelector('img')).toBeNull();
-    expect(fakePrintWindow.document.body.textContent).toMatch(
-      /failed to load qr code|فشل تحميل رمز qr/i,
-    );
-
-    openSpy.mockRestore();
-  });
+  // "shows a fallback message in the print window when the QR image fails
+  // to load" moved to src/features/serialized-items/printLabel.test.ts.
 
   it('downloads a QR labels PDF scoped to the selected product type filter', async () => {
     // AC-4: "Download QR PDF" while a product type filter is selected only
@@ -314,31 +267,10 @@ describe('SerializedItemsPage', () => {
     clickSpy.mockRestore();
   });
 
-  it('shows a generic error message when the QR labels PDF download fails for a real error', async () => {
-    mockListEndpoints({ serializedItems: [makeSerializedItem()] });
-    mockedApiClient.get.mockImplementation((url: string) => {
-      if (url === '/api/serialized-items/qr-pdf/') {
-        return Promise.reject({ isAxiosError: true, response: { status: 500, data: {} } });
-      }
-      if (url === '/api/product-types/') {
-        return Promise.resolve({ data: [makeProductType()] });
-      }
-      if (url === '/api/serialized-items/') {
-        return Promise.resolve({ data: [makeSerializedItem()] });
-      }
-      return Promise.reject(new Error(`Unexpected GET ${url}`));
-    });
-
-    const user = userEvent.setup();
-    renderSerializedItemsPage();
-    await screen.findByText('SN-042');
-
-    await user.click(screen.getByRole('button', { name: /download qr pdf|تنزيل ملصقات qr/i }));
-
-    expect(
-      await screen.findByText(/failed to download qr labels|فشل تنزيل ملصقات qr/i),
-    ).toBeInTheDocument();
-  });
+  // "shows a generic error message when the QR labels PDF download fails
+  // for a real error" moved to src/features/serialized-items/logic.test.ts
+  // (resolveQrDownloadErrorMessageKey) - the AC-1 case below already
+  // proves the classifier's wiring end-to-end.
 
   it('shows a "no items to export" message for a product type with zero items (AC-1)', async () => {
     mockedApiClient.get.mockImplementation((url: string) => {
@@ -373,62 +305,12 @@ describe('SerializedItemsPage', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows a "no items to export" message for "All" when no items exist anywhere (AC-2)', async () => {
-    mockedApiClient.get.mockImplementation((url: string) => {
-      if (url === '/api/serialized-items/qr-pdf/') {
-        return Promise.reject({ isAxiosError: true, response: { status: 400, data: {} } });
-      }
-      if (url === '/api/product-types/') {
-        return Promise.resolve({ data: [makeProductType()] });
-      }
-      if (url === '/api/serialized-items/') {
-        return Promise.resolve({ data: [] });
-      }
-      return Promise.reject(new Error(`Unexpected GET ${url}`));
-    });
+  // "shows a 'no items to export' message for 'All' when no items exist
+  // anywhere (AC-2)" moved to logic.test.ts.
 
-    const user = userEvent.setup();
-    renderSerializedItemsPage();
-
-    await user.click(
-      await screen.findByRole('button', { name: /download qr pdf|تنزيل ملصقات qr/i }),
-    );
-
-    expect(
-      await screen.findByText(/^no items to export\.?$|^لا توجد عناصر لتصديرها\.?$/i),
-    ).toBeInTheDocument();
-  });
-
-  it('requires a serial number before submitting', async () => {
-    mockListEndpoints({});
-
-    const user = userEvent.setup();
-    renderSerializedItemsPage();
-
-    await user.click(await screen.findByRole('button', { name: /register item|تسجيل وحدة/i }));
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-
-    expect(
-      await screen.findByText(/serial number is required|الرقم التسلسلي مطلوب/i),
-    ).toBeInTheDocument();
-    expect(mockedApiClient.post).not.toHaveBeenCalled();
-  });
-
-  it('requires a product type before submitting', async () => {
-    mockListEndpoints({});
-
-    const user = userEvent.setup();
-    renderSerializedItemsPage();
-
-    await user.click(await screen.findByRole('button', { name: /register item|تسجيل وحدة/i }));
-    await user.type(screen.getByLabelText(/serial number|الرقم التسلسلي/i), 'SN-042');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-
-    expect(
-      await screen.findByText(/product type is required|نوع المنتج مطلوب/i),
-    ).toBeInTheDocument();
-    expect(mockedApiClient.post).not.toHaveBeenCalled();
-  });
+  // "requires a serial number before submitting" / "requires a product
+  // type before submitting" moved to
+  // src/features/serialized-items/schema.test.ts - pure zod validation.
 
   it('shows a duplicate-serial-number error inline when registration fails on a duplicate', async () => {
     // AC-1/AC-2: matches on the serial_number field being present in the
@@ -458,114 +340,14 @@ describe('SerializedItemsPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows a duplicate-serial-number error inline for the DB-constraint race fallback shape', async () => {
-    // AC-5: the race-condition fallback returns serial_number as a bare
-    // string rather than a list - must still be treated as a duplicate,
-    // not fall through to the generic banner.
-    mockListEndpoints({ serializedItems: [makeSerializedItem()] });
-    mockedApiClient.post.mockRejectedValueOnce({
-      isAxiosError: true,
-      response: {
-        status: 400,
-        data: { serial_number: 'Serial number SN-042 is already registered.' },
-      },
-    });
-
-    const user = userEvent.setup();
-    renderSerializedItemsPage();
-
-    await user.click(await screen.findByRole('button', { name: /register item|تسجيل وحدة/i }));
-    await user.type(screen.getByLabelText(/serial number|الرقم التسلسلي/i), 'SN-042');
-    await selectProductTypeInForm(user, 'Bar LED Model A');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-
-    expect(
-      await screen.findByText(
-        /an item with this serial number is already registered|توجد وحدة مسجلة بهذا الرقم التسلسلي بالفعل/i,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it('shows the generic banner (not the duplicate message) for a whitespace-only serial number', async () => {
-    // A single space passes the client-side zod schema (min length 1, no
-    // trim), but the backend trims and rejects it as blank - that must not
-    // be mislabeled as a duplicate.
-    mockListEndpoints({});
-    mockedApiClient.post.mockRejectedValueOnce({
-      isAxiosError: true,
-      response: {
-        status: 400,
-        data: { serial_number: ['Serial number is required.'] },
-      },
-    });
-
-    const user = userEvent.setup();
-    renderSerializedItemsPage();
-
-    await user.click(await screen.findByRole('button', { name: /register item|تسجيل وحدة/i }));
-    await user.type(screen.getByLabelText(/serial number|الرقم التسلسلي/i), ' ');
-    await selectProductTypeInForm(user, 'Bar LED Model A');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-
-    expect(
-      await screen.findByText(/failed to register item|فشل تسجيل الوحدة/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText(
-        /an item with this serial number is already registered|توجد وحدة مسجلة بهذا الرقم التسلسلي بالفعل/i,
-      ),
-    ).not.toBeInTheDocument();
-  });
-
-  it('shows the generic banner (not the duplicate message) for a too-long serial number', async () => {
-    // The backend's 255-char max isn't mirrored client-side; a max-length
-    // rejection must not be mislabeled as a duplicate either.
-    mockListEndpoints({});
-    mockedApiClient.post.mockRejectedValueOnce({
-      isAxiosError: true,
-      response: {
-        status: 400,
-        data: { serial_number: ['Ensure this field has no more than 255 characters.'] },
-      },
-    });
-
-    const user = userEvent.setup();
-    renderSerializedItemsPage();
-
-    await user.click(await screen.findByRole('button', { name: /register item|تسجيل وحدة/i }));
-    await user.type(screen.getByLabelText(/serial number|الرقم التسلسلي/i), 'SN-042'.repeat(50));
-    await selectProductTypeInForm(user, 'Bar LED Model A');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-
-    expect(
-      await screen.findByText(/failed to register item|فشل تسجيل الوحدة/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText(
-        /an item with this serial number is already registered|توجد وحدة مسجلة بهذا الرقم التسلسلي بالفعل/i,
-      ),
-    ).not.toBeInTheDocument();
-  });
-
-  it('shows a generic error banner when registration fails for another reason', async () => {
-    mockListEndpoints({});
-    mockedApiClient.post.mockRejectedValueOnce({
-      isAxiosError: true,
-      response: { status: 500, data: {} },
-    });
-
-    const user = userEvent.setup();
-    renderSerializedItemsPage();
-
-    await user.click(await screen.findByRole('button', { name: /register item|تسجيل وحدة/i }));
-    await user.type(screen.getByLabelText(/serial number|الرقم التسلسلي/i), 'SN-042');
-    await selectProductTypeInForm(user, 'Bar LED Model A');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-
-    expect(
-      await screen.findByText(/failed to register item|فشل تسجيل الوحدة/i),
-    ).toBeInTheDocument();
-  });
+  // "shows a duplicate-serial-number error inline for the DB-constraint
+  // race fallback shape" / "shows the generic banner (not the duplicate
+  // message) for a whitespace-only serial number" / "...for a too-long
+  // serial number" / "shows a generic error banner when registration
+  // fails for another reason" all moved to
+  // src/features/serialized-items/logic.test.ts (isDuplicateSerialError) -
+  // the positive case above already proves the classifier's wiring
+  // end-to-end.
 
   it('shows an error banner when the list fails to load', async () => {
     mockListEndpoints({ serializedItemsError: true });
