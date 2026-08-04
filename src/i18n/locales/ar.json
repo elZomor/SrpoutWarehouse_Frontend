@@ -156,6 +156,29 @@
       "productTypeRequired": "نوع المنتج مطلوب"
     }
   },
+  "boxes": {
+    "title": "الصناديق",
+    "newButton": "تسجيل صندوق",
+    "codeLabel": "رمز الصندوق",
+    "productTypeLabel": "نوع المنتج",
+    "productTypePlaceholder": "اختر نوع المنتج",
+    "itemsLabel": "العناصر",
+    "itemsPlaceholder": "اختر العناصر المتاحة",
+    "itemCountLabel": "العناصر",
+    "qrCodeLabel": "رمز QR",
+    "printQrButton": "طباعة رمز QR",
+    "printQrLoadError": "فشل تحميل رمز QR.",
+    "emptyState": "لا توجد صناديق",
+    "loadError": "فشل تحميل الصناديق. حاول مرة أخرى.",
+    "loadProductTypesError": "فشل تحميل أنواع المنتجات. حاول مرة أخرى.",
+    "loadItemsError": "فشل تحميل عناصر هذا النوع من المنتجات. حاول مرة أخرى.",
+    "createError": "فشل تسجيل الصندوق. حاول مرة أخرى.",
+    "form": {
+      "codeRequired": "رمز الصندوق مطلوب",
+      "productTypeRequired": "نوع المنتج مطلوب",
+      "itemsRequired": "اختر عنصرًا واحدًا على الأقل"
+    }
+  },
   "purchaseOrders": {
     "title": "أوامر الشراء",
     "newButton": "أمر شراء جديد",
@@ -266,7 +289,16 @@
       "notAvailableError": "هذا العنصر غير متاح للمسح.",
       "overCapError": "استلم هذا البند بالفعل الكمية المطلوبة.",
       "genericError": "فشل تسجيل هذا المسح. حاول مرة أخرى.",
-      "completeError": "فشل إتمام التنفيذ. حاول مرة أخرى."
+      "completeError": "فشل إتمام التنفيذ. حاول مرة أخرى.",
+      "boxCodeLabel": "رمز الصندوق",
+      "boxCodePlaceholder": "امسح أو اكتب رمز الصندوق",
+      "boxCodeRequired": "رمز الصندوق مطلوب",
+      "scanBoxButton": "مسح صندوق",
+      "boxCodeNotFoundError": "لم يتم العثور على صندوق بهذا الرمز.",
+      "boxCodeNoLineItemError": "لا يوجد بند في أمر العمل هذا يطابق نوع منتج هذا الصندوق.",
+      "boxCodeAmbiguousError": "يحتوي أمر العمل هذا على أكثر من بند لنوع منتج هذا الصندوق - امسح عناصره بشكل فردي بدلاً من ذلك.",
+      "boxScanGenericError": "فشل مسح هذا الصندوق. حاول مرة أخرى.",
+      "boxSummaryMessage": "تم توسيع الصندوق {{code}}: تمت إضافة {{count}} عنصر"
     },
     "tabs": {
       "active": "النشطة",
@@ -309,7 +341,14 @@
       "notIssuedError": "هذا العنصر لم يُصرف على أمر العمل WO-{{workOrderId}}.",
       "notOutError": "هذا العنصر ليس مصروفًا حاليًا على أمر العمل هذا.",
       "statusError": "أمر العمل هذا غير مؤهل للإرجاع.",
-      "genericError": "فشل تسجيل هذا الإرجاع. حاول مرة أخرى."
+      "genericError": "فشل تسجيل هذا الإرجاع. حاول مرة أخرى.",
+      "boxCodeLabel": "رمز الصندوق",
+      "boxCodePlaceholder": "امسح أو اكتب رمز الصندوق",
+      "boxCodeRequired": "رمز الصندوق مطلوب",
+      "returnBoxButton": "إرجاع صندوق",
+      "boxCodeNotFoundError": "لم يتم العثور على صندوق بهذا الرمز.",
+      "boxReturnGenericError": "فشل إرجاع هذا الصندوق. حاول مرة أخرى.",
+      "boxSummaryMessage": "تم توسيع الصندوق {{code}}: تمت إضافة {{count}} عنصر"
     }
   },
   "transactionLog": {

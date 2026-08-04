@@ -137,6 +137,38 @@ function mockScanRejection(workOrder: WorkOrder, message: string) {
   });
 }
 
+// WRH-26/AC-2/AC-3: scan-box() only - mockFulfillmentEndpoints' generic
+// scan/complete mocks aren't needed for these, matching mockScanRejection's
+// identical POST-only-mock precedent.
+function mockScanBox(workOrder: WorkOrder, response: unknown) {
+  mockedApiClient.post.mockImplementation((url: string) => {
+    if (url === `/api/work-orders/${workOrder.id}/scan-box/`) {
+      return Promise.resolve({ data: response });
+    }
+    return Promise.reject(new Error(`Unexpected POST ${url}`));
+  });
+}
+
+function mockScanBoxRejection(workOrder: WorkOrder, field: string, message: string) {
+  mockedApiClient.post.mockImplementation((url: string) => {
+    if (url === `/api/work-orders/${workOrder.id}/scan-box/`) {
+      return Promise.reject({
+        isAxiosError: true,
+        response: { status: 400, data: { [field]: [message] } },
+      });
+    }
+    return Promise.reject(new Error(`Unexpected POST ${url}`));
+  });
+}
+
+async function scanBox(user: ReturnType<typeof userEvent.setup>, boxCode: string) {
+  const dialog = screen.getByRole('dialog');
+  const input = within(dialog).getByLabelText(/box code|رمز الصندوق/i);
+  await user.clear(input);
+  await user.type(input, boxCode);
+  await user.click(within(dialog).getByRole('button', { name: /^scan box$|^مسح صندوق$/i }));
+}
+
 describe('WorkOrdersPage - fulfillment', () => {
   afterEach(() => {
     vi.resetAllMocks();
@@ -384,5 +416,104 @@ describe('WorkOrdersPage - fulfillment', () => {
     await scanSerial(user, 'SN-042');
 
     expect(await screen.findByText(/WO-17/)).toBeInTheDocument();
+  });
+
+  it('scans a box and reserves every item inside, showing the expansion summary', async () => {
+    // WRH-26/AC-2/AC-3
+    const workOrder = makeWorkOrder({
+      status: 'in_progress',
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          quantity: 3,
+          scanned_quantity: 0,
+          remaining_quantity: 3,
+        },
+      ],
+    });
+    mockListEndpoints(mockedApiClient.get, { workOrders: [workOrder] });
+    mockScanBox(workOrder, {
+      work_order: {
+        ...workOrder,
+        line_items: [{ ...workOrder.line_items[0], scanned_quantity: 3, remaining_quantity: 0 }],
+      },
+      box_summary: {
+        code: 'BX-001',
+        added: 3,
+        results: [
+          { serial_number: 'SN-1001', added: true, reason: '' },
+          { serial_number: 'SN-1002', added: true, reason: '' },
+          { serial_number: 'SN-1003', added: true, reason: '' },
+        ],
+      },
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await scanBox(user, 'BX-001');
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/1/scan-box/', {
+      box_code: 'BX-001',
+    });
+    expect(
+      await screen.findByText(/box bx-001 expanded: 3 items added|تم توسيع الصندوق bx-001/i),
+    ).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog');
+    const row = await within(dialog).findByRole('row', { name: /bar led model a/i });
+    const cells = within(row)
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent);
+    expect(cells).toEqual(['Bar LED Model A', '3', '3', '0']);
+  });
+
+  it('reports a rejected item in the box scan summary without blocking the rest', async () => {
+    // WRH-26/AC-2: "each validated individually"
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints(mockedApiClient.get, { workOrders: [workOrder] });
+    mockScanBox(workOrder, {
+      work_order: {
+        ...workOrder,
+        line_items: [{ ...workOrder.line_items[0], scanned_quantity: 1, remaining_quantity: 4 }],
+      },
+      box_summary: {
+        code: 'BX-002',
+        added: 1,
+        results: [
+          { serial_number: 'SN-2001', added: true, reason: '' },
+          { serial_number: 'SN-2002', added: false, reason: 'SN-2002 is not available to scan' },
+        ],
+      },
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await scanBox(user, 'BX-002');
+
+    expect(
+      await screen.findByText(/box bx-002 expanded: 1 items added|تم توسيع الصندوق bx-002/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/SN-2002 is not available to scan/i)).toBeInTheDocument();
+  });
+
+  it('shows an inline error when scanning an unknown box code', async () => {
+    const workOrder = makeWorkOrder({ status: 'in_progress' });
+    mockListEndpoints(mockedApiClient.get, { workOrders: [workOrder] });
+    mockScanBoxRejection(workOrder, 'box_code', 'Box not found');
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await scanBox(user, 'BX-DOES-NOT-EXIST');
+
+    expect(
+      await screen.findByText(/no box found with this code|لم يتم العثور على صندوق بهذا الرمز/i),
+    ).toBeInTheDocument();
   });
 });

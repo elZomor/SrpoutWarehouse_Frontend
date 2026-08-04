@@ -1,6 +1,13 @@
 import { apiClient } from '../../lib/apiClient';
 import type { ReturnItemFormValues, ScanItemFormValues, WorkOrderFormValues } from './schema';
-import type { ActiveWorkOrder, WorkOrder, WorkOrderDetail, WorkOrderReturnResult } from './types';
+import type {
+  ActiveWorkOrder,
+  ReturnWorkOrderBoxResponse,
+  ScanWorkOrderBoxResponse,
+  WorkOrder,
+  WorkOrderDetail,
+  WorkOrderReturnResult,
+} from './types';
 
 export async function listWorkOrders(): Promise<WorkOrder[]> {
   const { data } = await apiClient.get<WorkOrder[]>('/api/work-orders/');
@@ -35,6 +42,17 @@ export async function scanWorkOrderItem(
   return data;
 }
 
+export async function scanWorkOrderBox(
+  workOrderId: number,
+  boxCode: string,
+): Promise<ScanWorkOrderBoxResponse> {
+  const { data } = await apiClient.post<ScanWorkOrderBoxResponse>(
+    `/api/work-orders/${workOrderId}/scan-box/`,
+    { box_code: boxCode },
+  );
+  return data;
+}
+
 export async function completeWorkOrder(workOrderId: number): Promise<WorkOrder> {
   const { data } = await apiClient.post<WorkOrder>(`/api/work-orders/${workOrderId}/complete/`);
   return data;
@@ -47,6 +65,17 @@ export async function returnWorkOrderItem(
   const { data } = await apiClient.post<WorkOrderReturnResult>(
     `/api/work-orders/${workOrderId}/return-item/`,
     input,
+  );
+  return data;
+}
+
+export async function returnWorkOrderBox(
+  workOrderId: number,
+  boxCode: string,
+): Promise<ReturnWorkOrderBoxResponse> {
+  const { data } = await apiClient.post<ReturnWorkOrderBoxResponse>(
+    `/api/work-orders/${workOrderId}/return-box/`,
+    { box_code: boxCode },
   );
   return data;
 }

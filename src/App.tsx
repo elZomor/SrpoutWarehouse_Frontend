@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from './components/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { BoxesPage } from './pages/BoxesPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -22,7 +23,7 @@ function App() {
           <Route path={ROUTES.productTypes} element={<ProductTypesPage />} />
           <Route path={ROUTES.categories} element={<CategoriesPage />} />
           <Route path={ROUTES.serializedItems} element={<SerializedItemsPage />} />
-          <Route path={ROUTES.boxes} element={<ComingSoonPage titleKey="nav.boxes" />} />
+          <Route path={ROUTES.boxes} element={<BoxesPage />} />
           <Route path={ROUTES.purchaseOrders} element={<PurchaseOrdersPage />} />
           <Route path={ROUTES.workOrders} element={<WorkOrdersPage />} />
           <Route

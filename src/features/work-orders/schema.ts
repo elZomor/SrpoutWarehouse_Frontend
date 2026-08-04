@@ -52,3 +52,15 @@ export const returnItemSchema = z.object({
 });
 
 export type ReturnItemFormValues = z.infer<typeof returnItemSchema>;
+
+export const scanBoxSchema = z.object({
+  box_code: z.string().min(1, 'workOrders.scan.boxCodeRequired'),
+});
+
+export type ScanBoxFormValues = z.infer<typeof scanBoxSchema>;
+
+export const returnBoxSchema = z.object({
+  box_code: z.string().min(1, 'workOrders.return.boxCodeRequired'),
+});
+
+export type ReturnBoxFormValues = z.infer<typeof returnBoxSchema>;

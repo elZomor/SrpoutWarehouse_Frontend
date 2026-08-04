@@ -152,6 +152,29 @@
       "productTypeRequired": "Product type is required"
     }
   },
+  "boxes": {
+    "title": "Boxes",
+    "newButton": "Register Box",
+    "codeLabel": "Box Code",
+    "productTypeLabel": "Product Type",
+    "productTypePlaceholder": "Select a product type",
+    "itemsLabel": "Items",
+    "itemsPlaceholder": "Select available items",
+    "itemCountLabel": "Items",
+    "qrCodeLabel": "QR Code",
+    "printQrButton": "Print QR",
+    "printQrLoadError": "Failed to load QR code.",
+    "emptyState": "No boxes found",
+    "loadError": "Failed to load boxes. Please try again.",
+    "loadProductTypesError": "Failed to load product types. Please try again.",
+    "loadItemsError": "Failed to load items for this product type. Please try again.",
+    "createError": "Failed to register box. Please try again.",
+    "form": {
+      "codeRequired": "Box code is required",
+      "productTypeRequired": "Product type is required",
+      "itemsRequired": "Select at least one item"
+    }
+  },
   "purchaseOrders": {
     "title": "Purchase Orders",
     "newButton": "New PO",
@@ -262,7 +285,16 @@
       "notAvailableError": "This item is not available to scan.",
       "overCapError": "This line item has already reached its requested quantity.",
       "genericError": "Failed to record this scan. Please try again.",
-      "completeError": "Failed to complete fulfillment. Please try again."
+      "completeError": "Failed to complete fulfillment. Please try again.",
+      "boxCodeLabel": "Box Code",
+      "boxCodePlaceholder": "Scan or type a box code",
+      "boxCodeRequired": "Box code is required",
+      "scanBoxButton": "Scan Box",
+      "boxCodeNotFoundError": "No box found with this code.",
+      "boxCodeNoLineItemError": "This work order has no line item for the box's product type.",
+      "boxCodeAmbiguousError": "This work order has more than one line item for the box's product type - scan its items individually instead.",
+      "boxScanGenericError": "Failed to scan this box. Please try again.",
+      "boxSummaryMessage": "Box {{code}} expanded: {{count}} items added"
     },
     "tabs": {
       "active": "Active",
@@ -305,7 +337,14 @@
       "notIssuedError": "This item was not issued on WO-{{workOrderId}}.",
       "notOutError": "This item is not currently out on this work order.",
       "statusError": "This work order is not eligible for return.",
-      "genericError": "Failed to record this return. Please try again."
+      "genericError": "Failed to record this return. Please try again.",
+      "boxCodeLabel": "Box Code",
+      "boxCodePlaceholder": "Scan or type a box code",
+      "boxCodeRequired": "Box code is required",
+      "returnBoxButton": "Return Box",
+      "boxCodeNotFoundError": "No box found with this code.",
+      "boxReturnGenericError": "Failed to return this box. Please try again.",
+      "boxSummaryMessage": "Box {{code}} expanded: {{count}} items added"
     }
   },
   "transactionLog": {

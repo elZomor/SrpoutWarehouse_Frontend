@@ -6,7 +6,9 @@ import {
   getWorkOrder,
   listActiveWorkOrders,
   listWorkOrders,
+  returnWorkOrderBox,
   returnWorkOrderItem,
+  scanWorkOrderBox,
   scanWorkOrderItem,
   startWorkOrder,
 } from './api';
@@ -114,6 +116,19 @@ export function useScanWorkOrderItem(workOrderId: number) {
   });
 }
 
+export function useScanWorkOrderBox(workOrderId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (boxCode: string) => scanWorkOrderBox(workOrderId, boxCode),
+    // Same reasoning as useScanWorkOrderItem: patch the freshly-recomputed
+    // WorkOrder straight into the cached list rather than invalidating -
+    // the Active tab's cache is caught up once by closeFulfillmentModal
+    // when the session ends, not on every box scan.
+    onSuccess: (response) => patchWorkOrder(queryClient)(response.work_order),
+  });
+}
+
 export function useCompleteWorkOrder() {
   const queryClient = useQueryClient();
 
@@ -137,6 +152,15 @@ export function useReturnWorkOrderItem(workOrderId: number) {
   // identical end-of-session invalidation.
   return useMutation({
     mutationFn: (input: ReturnItemFormValues) => returnWorkOrderItem(workOrderId, input),
+  });
+}
+
+export function useReturnWorkOrderBox(workOrderId: number) {
+  // Same reasoning as useReturnWorkOrderItem: its response doesn't match
+  // either cached shape, so the page keeps the running return session as
+  // local state instead of patching a query cache here.
+  return useMutation({
+    mutationFn: (boxCode: string) => returnWorkOrderBox(workOrderId, boxCode),
   });
 }
 
