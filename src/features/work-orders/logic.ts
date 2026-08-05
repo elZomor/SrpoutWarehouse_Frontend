@@ -146,13 +146,16 @@ export function isPrimaryWorkOrder(
   return 'supplementaries' in record;
 }
 
-// WRH-34/AC-1/AC-2: same Primary-only rule as isPrimaryWorkOrder, plus "not
-// draft" - matching the backend's "in_progress or later" availability gate
-// (there is no STATUS_CLOSED yet, so "not draft" is the real rule).
+// WRH-34/AC-1: "not draft" gate, matching the backend's "in_progress or
+// later" availability rule (there is no STATUS_CLOSED yet, so "not draft" is
+// the real rule). WRH-35/AC-2: no longer Primary-only - the backend now
+// resolves a supplementary's own request to its Primary's consolidated
+// document instead of rejecting it, so the button is offered on
+// supplementary rows too.
 export function isPackingListEligible(
   record: ActiveWorkOrder | ActiveWorkOrderSupplementary,
-): record is ActiveWorkOrder {
-  return isPrimaryWorkOrder(record) && record.status !== 'draft';
+): boolean {
+  return record.status !== 'draft';
 }
 
 export function isFullyScanned(lineItems: WorkOrderLineItem[]): boolean {

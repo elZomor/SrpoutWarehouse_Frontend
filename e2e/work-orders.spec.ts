@@ -726,3 +726,82 @@ test('downloads a packing list PDF from a Primary WO on the Active tab', async (
 
   expect(download.suggestedFilename()).toBe('packing-list-WO-1.pdf');
 });
+
+test('downloads the consolidated packing list PDF from a supplementary row directly', async ({
+  page,
+}) => {
+  // WRH-35/AC-2: requesting the packing list from a supplementary's own row
+  // (not its Primary) returns the same consolidated document - the button
+  // is now offered on supplementary rows too (see isPackingListEligible),
+  // and the backend resolves the request id (2, the supplementary) to its
+  // Primary's (1) consolidated PDF. The download filename is still composed
+  // client-side from the row's own reference (handleDownloadPackingList),
+  // not the server's Content-Disposition, so it reads "WO-1-S1" even though
+  // the PDF content served is the Primary's consolidated document.
+  const primary = {
+    id: 1,
+    reference: 'WO-1',
+    job_name: 'Summer Gala',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-01',
+    status: 'fulfilled',
+    line_items: [] as unknown[],
+    supplementaries: [
+      {
+        id: 2,
+        reference: 'WO-1-S1',
+        job_name: 'Summer Gala (Supplementary)',
+        client_name: 'Acme Events',
+        expected_date_out: '2026-08-02',
+        status: 'fulfilled',
+        line_items: [] as unknown[],
+      },
+    ],
+  };
+
+  await page.route('**/api/auth/**', stubAuth);
+  await registerProductTypesRoute(page);
+  await page.route('**/api/work-orders/2/packing-list/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/pdf',
+      headers: { 'Content-Disposition': 'attachment; filename="packing-list-WO-1.pdf"' },
+      body: Buffer.from('%PDF-fake-content'),
+    });
+  });
+  await page.route('**/api/work-orders/**', async (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+
+    if (url.includes('packing-list')) {
+      await route.continue();
+      return;
+    }
+    if (method === 'GET' && url.endsWith('/active/')) {
+      await route.fulfill({ status: 200, json: [primary] });
+      return;
+    }
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, json: [] });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto('/work-orders');
+  await expect(page.getByText('Summer Gala').first()).toBeVisible();
+
+  await page.getByRole('button', { name: /expand row/i }).click();
+  await expect(page.getByText('Summer Gala (Supplementary)')).toBeVisible();
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page
+      .getByRole('button', { name: /download packing list|تحميل قائمة التعبئة/i })
+      .last()
+      .click(),
+  ]);
+
+  expect(download.suggestedFilename()).toBe('packing-list-WO-1-S1.pdf');
+});

@@ -209,8 +209,12 @@ describe('isPackingListEligible', () => {
     expect(isPackingListEligible(makePrimary({ status: 'draft' }))).toBe(false);
   });
 
-  it('is not eligible for a nested supplementary, even if not draft', () => {
-    expect(isPackingListEligible(makeSupplementary({ status: 'fulfilled' }))).toBe(false);
+  it('is eligible for a nested supplementary once fulfillment has started', () => {
+    expect(isPackingListEligible(makeSupplementary({ status: 'fulfilled' }))).toBe(true);
+  });
+
+  it('is not eligible for a draft nested supplementary', () => {
+    expect(isPackingListEligible(makeSupplementary({ status: 'draft' }))).toBe(false);
   });
 });
 

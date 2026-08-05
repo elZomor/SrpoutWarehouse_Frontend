@@ -270,12 +270,11 @@ export function WorkOrdersPage() {
     setIsModalOpen(true);
   };
 
-  // WRH-34/AC-1/AC-2: only ever called from a Primary row (the button
-  // itself only renders for Primary rows - see activeColumns below), so
-  // the backend's consolidated-PDF-from-Primary rule is already satisfied
-  // by the time this fires. Mirrors SerializedItemsPage's
-  // handleDownloadQrPdf blob-download pattern.
-  const handleDownloadPackingList = (record: ActiveWorkOrder) => {
+  // WRH-35/AC-2: called from either a Primary or a supplementary row - the
+  // backend resolves a supplementary's request to its Primary's
+  // consolidated document, so this fires the same mutation either way.
+  // Mirrors SerializedItemsPage's handleDownloadQrPdf blob-download pattern.
+  const handleDownloadPackingList = (record: ActiveWorkOrder | ActiveWorkOrderSupplementary) => {
     downloadPackingListMutation.mutate(record.id, {
       onSuccess: (blob) => {
         const url = URL.createObjectURL(blob);
@@ -777,12 +776,13 @@ export function WorkOrdersPage() {
               {t('workOrders.active.addSupplementaryButton')}
             </Button>
           )}
-          {/* WRH-34/AC-1/AC-2: same Primary-only narrowing as Add
-              Supplementary above (the backend only accepts this request
-              from a Primary WO, never a supplementary), plus "not draft" -
-              matching the backend's "in_progress or later" availability
-              gate (see WorkOrderViewSet.packing_list's own comment: there
-              is no STATUS_CLOSED yet, so "not draft" is the real rule). */}
+          {/* WRH-34/AC-1: "not draft" gate, matching the backend's
+              "in_progress or later" availability rule (there is no
+              STATUS_CLOSED yet, so "not draft" is the real rule). WRH-35/
+              AC-2: offered on supplementary rows too - the backend resolves
+              a supplementary's own request to its Primary's consolidated
+              document instead of rejecting it (see
+              WorkOrderViewSet.packing_list's own comment). */}
           {isPackingListEligible(record) && (
             <Button
               size="small"
