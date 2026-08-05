@@ -64,3 +64,19 @@ export const returnBoxSchema = z.object({
 });
 
 export type ReturnBoxFormValues = z.infer<typeof returnBoxSchema>;
+
+// WRH-36/AC-1/AC-2: one scanned serial (currently out on the source WO)
+// plus its destination WO - mirrors scanItemSchema's line_item
+// required-via-refine pattern for the same reason (a Select's "nothing
+// chosen yet" state is `undefined`, not an empty string).
+export const transferItemSchema = z.object({
+  serial_number: z.string().min(1, 'workOrders.transfer.serialNumberRequired'),
+  destination_work_order: z
+    .number()
+    .optional()
+    .refine((value): value is number => value !== undefined, {
+      message: 'workOrders.transfer.destinationRequired',
+    }),
+});
+
+export type TransferItemFormValues = z.infer<typeof transferItemSchema>;

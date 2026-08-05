@@ -26,6 +26,7 @@ import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
   classifyReturnRejection,
   classifyScanRejection,
+  classifyTransferRejection,
   flattenWorkOrderDetailRows,
   isFullyScanned as computeIsFullyScanned,
   isPackingListEligible,
@@ -38,11 +39,13 @@ import {
   returnItemSchema,
   scanBoxSchema,
   scanItemSchema,
+  transferItemSchema,
   workOrderSchema,
   type ReturnBoxFormValues,
   type ReturnItemFormValues,
   type ScanBoxFormValues,
   type ScanItemFormValues,
+  type TransferItemFormValues,
   type WorkOrderFormValues,
 } from '../features/work-orders/schema';
 import type {
@@ -52,6 +55,7 @@ import type {
   BoxScanSummary,
   WorkOrder,
   WorkOrderReturnResult,
+  WorkOrderTransferResult,
 } from '../features/work-orders/types';
 import {
   useActiveWorkOrders,
@@ -64,6 +68,7 @@ import {
   useScanWorkOrderBox,
   useScanWorkOrderItem,
   useStartWorkOrder,
+  useTransferWorkOrderItem,
   useWorkOrderDetail,
   useWorkOrders,
 } from '../features/work-orders/useWorkOrders';
@@ -249,6 +254,39 @@ export function WorkOrdersPage() {
   const [pendingReturnBoxSubmission, setPendingReturnBoxSubmission] = useState<{
     box_code: string;
   } | null>(null);
+
+  // WRH-36/AC-1: transferSourceWorkOrder just needs enough of the clicked
+  // row to drive the modal's title/destination-exclusion - unlike
+  // returnSession, nothing about the source WO ever changes as a result of
+  // a transfer (see the backend's transfer() comment), so this is set once
+  // on open and never overwritten by a response.
+  const [transferSourceWorkOrder, setTransferSourceWorkOrder] = useState<{
+    id: number;
+    reference: string;
+  } | null>(null);
+  // Same "ignore a response that no longer belongs to the open session"
+  // hazard class as returnSessionGenerationRef - a transfer response can
+  // still land after the modal's been closed or reopened against a
+  // different source WO.
+  const transferSessionGenerationRef = useRef(0);
+  const transferMutation = useTransferWorkOrderItem(transferSourceWorkOrder?.id ?? 0);
+  const {
+    control: transferControl,
+    handleSubmit: handleTransferSubmit,
+    reset: resetTransferForm,
+    setError: setTransferError,
+    setFocus: setTransferFocus,
+    formState: { errors: transferErrors },
+  } = useForm<TransferItemFormValues>({
+    resolver: zodResolver(transferItemSchema),
+    defaultValues: { serial_number: '', destination_work_order: undefined },
+  });
+  const [transferErrorParams, setTransferErrorParams] = useState<{ workOrderId?: string }>({});
+  const [pendingTransferSubmission, setPendingTransferSubmission] =
+    useState<TransferItemFormValues | null>(null);
+  const [lastTransferResult, setLastTransferResult] = useState<WorkOrderTransferResult | null>(
+    null,
+  );
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -575,6 +613,73 @@ export function WorkOrdersPage() {
     };
   }, [pendingReturnBoxSubmission]);
 
+  // WRH-36/AC-1/AC-2: entry point for transferring an item off this
+  // (source) WO - mirrors openReturnModal's session-start bookkeeping.
+  const openTransferModal = (workOrder: ActiveWorkOrder | ActiveWorkOrderSupplementary) => {
+    transferSessionGenerationRef.current += 1;
+    setTransferSourceWorkOrder({ id: workOrder.id, reference: workOrder.reference });
+    resetTransferForm({ serial_number: '', destination_work_order: undefined });
+    setTransferErrorParams({});
+    setLastTransferResult(null);
+    transferMutation.reset();
+  };
+
+  const closeTransferModal = () => {
+    transferSessionGenerationRef.current += 1;
+    setTransferSourceWorkOrder(null);
+    resetTransferForm();
+    setTransferErrorParams({});
+    setLastTransferResult(null);
+    transferMutation.reset();
+  };
+
+  const onTransferSubmit = (values: TransferItemFormValues) => {
+    setPendingTransferSubmission(values);
+  };
+
+  // Mirrors the pendingReturnSubmission effect's stale-response guarding -
+  // see transferSourceWorkOrder's comment for why a plain mutate() call
+  // inside onTransferSubmit isn't enough on its own.
+  useEffect(() => {
+    if (!pendingTransferSubmission) {
+      return;
+    }
+    const values = pendingTransferSubmission;
+    const generation = transferSessionGenerationRef.current;
+    let ignore = false;
+
+    transferMutation.mutateAsync(values).then(
+      (result) => {
+        if (ignore || transferSessionGenerationRef.current !== generation) {
+          return;
+        }
+        setLastTransferResult(result);
+        resetTransferForm({ serial_number: '', destination_work_order: undefined });
+        setTransferErrorParams({});
+        setTransferFocus('serial_number');
+      },
+      (error) => {
+        if (ignore || transferSessionGenerationRef.current !== generation) {
+          return;
+        }
+        const serialErrors = getFieldErrorMessages(error, 'serial_number');
+        const statusErrors = getFieldErrorMessages(error, 'status');
+        const destinationErrors = getFieldErrorMessages(error, 'destination_work_order');
+        setTransferErrorParams({});
+
+        const rejection = classifyTransferRejection(serialErrors, statusErrors, destinationErrors);
+        if (rejection) {
+          setTransferErrorParams(rejection.params ?? {});
+          setTransferError(rejection.field, { type: 'server', message: rejection.messageKey });
+        }
+      },
+    );
+
+    return () => {
+      ignore = true;
+    };
+  }, [pendingTransferSubmission]);
+
   const productTypeOptions = (productTypes ?? []).map((productType) => ({
     value: productType.id,
     label: productType.name,
@@ -590,6 +695,17 @@ export function WorkOrdersPage() {
     fulfillingWorkOrder?.line_items ?? [],
   );
   const isFullyScanned = computeIsFullyScanned(fulfillingWorkOrder?.line_items ?? []);
+
+  // WRH-36/AC-2: any WO (Primary or Supplementary) is a valid destination
+  // except the source itself - `workOrders` (the Manage tab's flat list,
+  // already fetched regardless of which tab is active) is the only query
+  // that returns every WO by id/reference in one flat shape.
+  const transferDestinationOptions = (workOrders ?? [])
+    .filter((workOrder) => workOrder.id !== transferSourceWorkOrder?.id)
+    .map((workOrder) => ({
+      value: workOrder.id,
+      label: `${workOrder.reference} — ${workOrder.job_name}`,
+    }));
 
   // Shared by the Manage tab's table and the Active tab's (both primary and
   // nested supplementary) tables - every WorkOrder/ActiveWorkOrder shape
@@ -798,6 +914,15 @@ export function WorkOrdersPage() {
           {isReturnEligible(record.status) && (
             <Button size="small" onClick={() => openReturnModal(record)}>
               {t('workOrders.return.button')}
+            </Button>
+          )}
+          {/* WRH-36/AC-1: same "fulfilled or partially_returned" gate as
+              Return - reuses isReturnEligible rather than a parallel
+              constant, matching the backend's own RETURN_ELIGIBLE_STATUSES
+              reuse in transfer(). */}
+          {isReturnEligible(record.status) && (
+            <Button size="small" onClick={() => openTransferModal(record)}>
+              {t('workOrders.transfer.button')}
             </Button>
           )}
         </Space>
@@ -1350,6 +1475,92 @@ export function WorkOrdersPage() {
               )}
             </Form>
           </>
+        )}
+      </Modal>
+      <Modal
+        title={t('workOrders.transfer.title', {
+          reference: transferSourceWorkOrder?.reference ?? '',
+        })}
+        open={transferSourceWorkOrder !== null}
+        onCancel={closeTransferModal}
+        footer={[
+          <Button key="done" onClick={closeTransferModal}>
+            {t('workOrders.transfer.doneButton')}
+          </Button>,
+        ]}
+      >
+        {transferSourceWorkOrder && (
+          <Form layout="vertical" noValidate onFinish={handleTransferSubmit(onTransferSubmit)}>
+            <Form.Item
+              label={t('workOrders.transfer.serialNumberLabel')}
+              htmlFor="transfer-serial_number"
+              validateStatus={transferErrors.serial_number ? 'error' : ''}
+              help={
+                transferErrors.serial_number
+                  ? t(transferErrors.serial_number.message ?? '', transferErrorParams)
+                  : undefined
+              }
+            >
+              <Controller
+                name="serial_number"
+                control={transferControl}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    id="transfer-serial_number"
+                    placeholder={t('workOrders.transfer.serialNumberPlaceholder')}
+                  />
+                )}
+              />
+            </Form.Item>
+            <Form.Item
+              label={t('workOrders.transfer.destinationLabel')}
+              htmlFor="transfer-destination_work_order"
+              validateStatus={transferErrors.destination_work_order ? 'error' : ''}
+              help={
+                transferErrors.destination_work_order
+                  ? t(transferErrors.destination_work_order.message ?? '')
+                  : undefined
+              }
+            >
+              <Controller
+                name="destination_work_order"
+                control={transferControl}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    id="transfer-destination_work_order"
+                    placeholder={t('workOrders.transfer.destinationPlaceholder')}
+                    options={transferDestinationOptions}
+                  />
+                )}
+              />
+            </Form.Item>
+            {transferMutation.isError &&
+              !transferErrors.serial_number &&
+              !transferErrors.destination_work_order && (
+                <Alert
+                  type="error"
+                  message={t('workOrders.transfer.genericError')}
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                />
+              )}
+            {lastTransferResult && (
+              <Alert
+                type="success"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message={t('workOrders.transfer.successMessage', {
+                  serialNumber: lastTransferResult.serial_number,
+                  destination: lastTransferResult.destination_work_order,
+                })}
+              />
+            )}
+            <Button type="primary" htmlType="submit" loading={transferMutation.isPending}>
+              {t('workOrders.transfer.submitButton')}
+            </Button>
+          </Form>
         )}
       </Modal>
     </>

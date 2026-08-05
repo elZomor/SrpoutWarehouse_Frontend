@@ -121,3 +121,14 @@ export interface WorkOrderDetail {
   parent_work_order: number | null;
   line_items: WorkOrderDetailLineItem[];
 }
+
+// WRH-36/AC-1: transfer()'s response - a flat confirmation, not a WorkOrder/
+// ActiveWorkOrder shape, since neither WO's own status/line items change
+// (see the backend's transfer() comment on why work_order_line_item is left
+// untouched).
+export interface WorkOrderTransferResult {
+  serial_number: string;
+  status: SerializedItemStatus;
+  source_work_order: string;
+  destination_work_order: string;
+}

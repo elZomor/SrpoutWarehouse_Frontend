@@ -11,8 +11,14 @@ import {
   scanWorkOrderBox,
   scanWorkOrderItem,
   startWorkOrder,
+  transferWorkOrderItem,
 } from './api';
-import type { ReturnItemFormValues, ScanItemFormValues, WorkOrderFormValues } from './schema';
+import type {
+  ReturnItemFormValues,
+  ScanItemFormValues,
+  TransferItemFormValues,
+  WorkOrderFormValues,
+} from './schema';
 import type { WorkOrder } from './types';
 
 const workOrdersBaseKey = ['work-orders'] as const;
@@ -161,6 +167,16 @@ export function useReturnWorkOrderBox(workOrderId: number) {
   // local state instead of patching a query cache here.
   return useMutation({
     mutationFn: (boxCode: string) => returnWorkOrderBox(workOrderId, boxCode),
+  });
+}
+
+export function useTransferWorkOrderItem(workOrderId: number) {
+  // Its response (WorkOrderTransferResult) doesn't match either cached
+  // shape either, and neither WO's status/line items actually change (see
+  // the backend's transfer() comment) - so, same reasoning as
+  // useReturnWorkOrderItem, no query cache is patched or invalidated here.
+  return useMutation({
+    mutationFn: (input: TransferItemFormValues) => transferWorkOrderItem(workOrderId, input),
   });
 }
 

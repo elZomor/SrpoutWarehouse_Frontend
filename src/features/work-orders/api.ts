@@ -1,5 +1,10 @@
 import { apiClient } from '../../lib/apiClient';
-import type { ReturnItemFormValues, ScanItemFormValues, WorkOrderFormValues } from './schema';
+import type {
+  ReturnItemFormValues,
+  ScanItemFormValues,
+  TransferItemFormValues,
+  WorkOrderFormValues,
+} from './schema';
 import type {
   ActiveWorkOrder,
   ReturnWorkOrderBoxResponse,
@@ -7,6 +12,7 @@ import type {
   WorkOrder,
   WorkOrderDetail,
   WorkOrderReturnResult,
+  WorkOrderTransferResult,
 } from './types';
 
 export async function listWorkOrders(): Promise<WorkOrder[]> {
@@ -76,6 +82,17 @@ export async function returnWorkOrderBox(
   const { data } = await apiClient.post<ReturnWorkOrderBoxResponse>(
     `/api/work-orders/${workOrderId}/return-box/`,
     { box_code: boxCode },
+  );
+  return data;
+}
+
+export async function transferWorkOrderItem(
+  workOrderId: number,
+  input: TransferItemFormValues,
+): Promise<WorkOrderTransferResult> {
+  const { data } = await apiClient.post<WorkOrderTransferResult>(
+    `/api/work-orders/${workOrderId}/transfer/`,
+    input,
   );
   return data;
 }

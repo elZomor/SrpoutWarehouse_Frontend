@@ -350,6 +350,25 @@
       "boxReturnGenericError": "Failed to return this box. Please try again.",
       "boxSummaryMessage": "Box {{code}} expanded: {{count}} items added",
       "boxSummaryMessageFlagged": "Box {{code}} expanded: {{count}} items added ({{flaggedCount}} flagged)"
+    },
+    "transfer": {
+      "button": "Transfer",
+      "title": "Transfer: {{reference}}",
+      "serialNumberLabel": "Serial Number",
+      "serialNumberPlaceholder": "Scan or type a serial number",
+      "serialNumberRequired": "Serial number is required",
+      "destinationLabel": "Destination Work Order",
+      "destinationPlaceholder": "Select a destination work order",
+      "destinationRequired": "Destination work order is required",
+      "submitButton": "Transfer",
+      "doneButton": "Done",
+      "notFoundError": "No item found with this serial number.",
+      "notOnSourceError": "This item is not currently out on WO-{{workOrderId}}.",
+      "notOutError": "This item is not currently out and cannot be transferred.",
+      "sameWorkOrderError": "This item is already on that work order.",
+      "statusError": "This work order is not eligible for transfer.",
+      "genericError": "Failed to record this transfer. Please try again.",
+      "successMessage": "{{serialNumber}} transferred to {{destination}}."
     }
   },
   "transactionLog": {

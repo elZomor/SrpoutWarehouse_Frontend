@@ -467,6 +467,112 @@ test('returns items against a fulfilled WO: partial then full return', async ({ 
   await expect(dialog.getByText(/^returned$|^تم الإرجاع$/i)).toBeVisible();
 });
 
+test('transfers an item from one work order to another', async ({ page }) => {
+  // WRH-36/AC-1/AC-2/TC-01
+  // Active-tab shape (returned/damaged/still_out counts), not the flat
+  // WorkOrder shape - matches the "views the Active tab" test's precedent
+  // of an untyped literal rather than this file's narrower local WorkOrder
+  // interface, which lacks `reference`/`supplementaries`.
+  const activeSourceWorkOrder = {
+    id: 1,
+    reference: 'WO-1',
+    job_name: 'Summer Gala',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-01',
+    status: 'fulfilled',
+    line_items: [
+      {
+        id: 1,
+        product_type: 1,
+        product_type_name: 'Bar LED Model A',
+        quantity: 1,
+        returned_quantity: 0,
+        damaged_quantity: 0,
+        still_out_quantity: 1,
+      },
+    ],
+    supplementaries: [],
+  };
+  // Flat WorkOrder shape - what the Manage tab's list (and the transfer
+  // modal's destination picker) actually consumes.
+  const flatSourceWorkOrder = {
+    id: 1,
+    reference: 'WO-1',
+    job_name: 'Summer Gala',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-01',
+    status: 'fulfilled',
+    created_by: 1,
+    created_by_username: 'jane',
+    line_items: [],
+  };
+  const destinationWorkOrder = {
+    id: 2,
+    reference: 'WO-2',
+    job_name: 'Winter Expo',
+    client_name: 'Contoso',
+    expected_date_out: '2026-12-01',
+    status: 'in_progress',
+    created_by: 1,
+    created_by_username: 'jane',
+    line_items: [],
+  };
+
+  await page.route('**/api/auth/**', stubAuth);
+  await registerProductTypesRoute(page);
+  await page.route('**/api/work-orders/**', async (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+
+    if (method === 'POST' && url.endsWith('/transfer/')) {
+      const body = route.request().postDataJSON() as {
+        serial_number: string;
+        destination_work_order: number;
+      };
+      await route.fulfill({
+        status: 201,
+        json: {
+          serial_number: body.serial_number,
+          status: 'out',
+          source_work_order: 'WO-1',
+          destination_work_order: 'WO-2',
+        },
+      });
+      return;
+    }
+    if (method === 'GET' && url.endsWith('/active/')) {
+      await route.fulfill({ status: 200, json: [activeSourceWorkOrder] });
+      return;
+    }
+    if (method === 'GET' && url.endsWith('/work-orders/')) {
+      await route.fulfill({ status: 200, json: [flatSourceWorkOrder, destinationWorkOrder] });
+      return;
+    }
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, json: [] });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto('/work-orders');
+
+  await page
+    .getByRole('row', { name: /summer gala/i })
+    .getByRole('button', { name: /^transfer$|^نقل$/i })
+    .click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-042');
+  await dialog.getByRole('combobox').click();
+  await page.getByTitle(/WO-2 — Winter Expo/).click();
+  await dialog.getByRole('button', { name: /^transfer$|^نقل$/i }).click();
+
+  await expect(
+    dialog.getByText(/SN-042 transferred to WO-2|تم نقل SN-042 إلى WO-2/i),
+  ).toBeVisible();
+});
+
 test('creates a supplementary work order linked to a Primary and it appears nested with its own reference', async ({
   page,
 }) => {
