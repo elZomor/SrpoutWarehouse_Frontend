@@ -297,7 +297,8 @@
       "boxCodeNoLineItemError": "This work order has no line item for the box's product type.",
       "boxCodeAmbiguousError": "This work order has more than one line item for the box's product type - scan its items individually instead.",
       "boxScanGenericError": "Failed to scan this box. Please try again.",
-      "boxSummaryMessage": "Box {{code}} expanded: {{count}} items added"
+      "boxSummaryMessage": "Box {{code}} expanded: {{count}} items added",
+      "boxSummaryMessageFlagged": "Box {{code}} expanded: {{count}} items added ({{flaggedCount}} flagged)"
     },
     "tabs": {
       "active": "Active",
@@ -347,7 +348,8 @@
       "returnBoxButton": "Return Box",
       "boxCodeNotFoundError": "No box found with this code.",
       "boxReturnGenericError": "Failed to return this box. Please try again.",
-      "boxSummaryMessage": "Box {{code}} expanded: {{count}} items added"
+      "boxSummaryMessage": "Box {{code}} expanded: {{count}} items added",
+      "boxSummaryMessageFlagged": "Box {{code}} expanded: {{count}} items added ({{flaggedCount}} flagged)"
     }
   },
   "transactionLog": {

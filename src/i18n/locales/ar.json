@@ -301,7 +301,8 @@
       "boxCodeNoLineItemError": "لا يوجد بند في أمر العمل هذا يطابق نوع منتج هذا الصندوق.",
       "boxCodeAmbiguousError": "يحتوي أمر العمل هذا على أكثر من بند لنوع منتج هذا الصندوق - امسح عناصره بشكل فردي بدلاً من ذلك.",
       "boxScanGenericError": "فشل مسح هذا الصندوق. حاول مرة أخرى.",
-      "boxSummaryMessage": "تم توسيع الصندوق {{code}}: تمت إضافة {{count}} عنصر"
+      "boxSummaryMessage": "تم توسيع الصندوق {{code}}: تمت إضافة {{count}} عنصر",
+      "boxSummaryMessageFlagged": "تم توسيع الصندوق {{code}}: تمت إضافة {{count}} عنصر (تم تمييز {{flaggedCount}})"
     },
     "tabs": {
       "active": "النشطة",
@@ -351,7 +352,8 @@
       "returnBoxButton": "إرجاع صندوق",
       "boxCodeNotFoundError": "لم يتم العثور على صندوق بهذا الرمز.",
       "boxReturnGenericError": "فشل إرجاع هذا الصندوق. حاول مرة أخرى.",
-      "boxSummaryMessage": "تم توسيع الصندوق {{code}}: تمت إضافة {{count}} عنصر"
+      "boxSummaryMessage": "تم توسيع الصندوق {{code}}: تمت إضافة {{count}} عنصر",
+      "boxSummaryMessageFlagged": "تم توسيع الصندوق {{code}}: تمت إضافة {{count}} عنصر (تم تمييز {{flaggedCount}})"
     }
   },
   "transactionLog": {
