@@ -496,7 +496,9 @@ describe('WorkOrdersPage - fulfillment', () => {
     await scanBox(user, 'BX-002');
 
     expect(
-      await screen.findByText(/box bx-002 expanded: 1 items added|تم توسيع الصندوق bx-002/i),
+      await screen.findByText(
+        /box bx-002 expanded: 1 items added \(1 flagged\)|تم توسيع الصندوق bx-002/i,
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText(/SN-2002 is not available to scan/i)).toBeInTheDocument();
   });

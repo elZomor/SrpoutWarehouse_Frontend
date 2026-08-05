@@ -392,6 +392,49 @@ describe('WorkOrdersPage - return', () => {
     expect(screen.getByText(/^returned$|^تم الإرجاع$/i)).toBeInTheDocument();
   }, 40000);
 
+  it('flags an already-damaged item in the box return summary without counting it as returned', async () => {
+    // WRH-28/AC-3/TC-05: a box-mate flagged damaged by the backend must show
+    // up in the flagged-reason list and be excluded from the "items added"
+    // count, not folded into a plain success message.
+    const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
+    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockReturnBox(workOrder, {
+      work_order: {
+        id: workOrder.id,
+        job_name: workOrder.job_name,
+        status: 'partially_returned',
+        line_items: [
+          {
+            ...workOrder.line_items[0],
+            returned_quantity: 1,
+            damaged_quantity: 1,
+            still_out_quantity: 0,
+          },
+        ],
+      },
+      box_summary: {
+        code: 'BX-005',
+        added: 1,
+        results: [
+          { serial_number: 'SN-5001', added: true, reason: '' },
+          { serial_number: 'SN-5002', added: false, reason: 'SN-5002 is already marked damaged' },
+        ],
+      },
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openReturnModal(user);
+    await returnBox(user, 'BX-005');
+
+    expect(
+      await screen.findByText(
+        /box bx-005 expanded: 1 items added \(1 flagged\)|تم توسيع الصندوق bx-005/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/SN-5002 is already marked damaged/i)).toBeInTheDocument();
+  }, 40000);
+
   it('retries a box return with the same code after a transient error', async () => {
     // Regression: pendingReturnBoxSubmission used to be a bare string, so
     // resubmitting the identical box code after an error was an

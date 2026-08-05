@@ -1182,10 +1182,16 @@ export function WorkOrdersPage() {
                     boxScanSummary.added === boxScanSummary.results.length ? 'success' : 'warning'
                   }
                   showIcon
-                  message={t('workOrders.scan.boxSummaryMessage', {
-                    code: boxScanSummary.code,
-                    count: boxScanSummary.added,
-                  })}
+                  message={t(
+                    boxScanSummary.added < boxScanSummary.results.length
+                      ? 'workOrders.scan.boxSummaryMessageFlagged'
+                      : 'workOrders.scan.boxSummaryMessage',
+                    {
+                      code: boxScanSummary.code,
+                      count: boxScanSummary.added,
+                      flaggedCount: boxScanSummary.results.length - boxScanSummary.added,
+                    },
+                  )}
                   description={
                     boxScanSummary.results.some((result) => !result.added) ? (
                       <ul style={{ margin: 0, paddingInlineStart: 20 }}>
@@ -1317,10 +1323,16 @@ export function WorkOrdersPage() {
                       : 'warning'
                   }
                   showIcon
-                  message={t('workOrders.return.boxSummaryMessage', {
-                    code: boxReturnSummary.code,
-                    count: boxReturnSummary.added,
-                  })}
+                  message={t(
+                    boxReturnSummary.added < boxReturnSummary.results.length
+                      ? 'workOrders.return.boxSummaryMessageFlagged'
+                      : 'workOrders.return.boxSummaryMessage',
+                    {
+                      code: boxReturnSummary.code,
+                      count: boxReturnSummary.added,
+                      flaggedCount: boxReturnSummary.results.length - boxReturnSummary.added,
+                    },
+                  )}
                   description={
                     boxReturnSummary.results.some((result) => !result.added) ? (
                       <ul style={{ margin: 0, paddingInlineStart: 20 }}>
