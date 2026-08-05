@@ -35,6 +35,14 @@ export const RETURN_ELIGIBLE_STATUSES = new Set<WorkOrderStatus>([
   'fulfilled',
   'partially_returned',
 ]);
+// WRH-36: transfer()'s serial_number rejections follow the same
+// `${serial_number} ${reason}` shape as scan()'s/return_item()'s - same
+// end-anchoring reasoning as OUT_PATTERN/NOT_ISSUED_PATTERN above. Distinct
+// wording from NOT_ISSUED_PATTERN ("is not currently out on WO-<id>" vs.
+// "was not issued on WO-<id>") since it's a different backend action/
+// message, not reusable as-is.
+export const NOT_ON_SOURCE_WORK_ORDER_PATTERN = /is not currently out on WO-(\d+)$/;
+export const NOT_OUT_FOR_TRANSFER_PATTERN = /is not currently out and cannot be transferred$/;
 
 export interface ScanRejection {
   field: 'serial_number' | 'line_item';
@@ -135,6 +143,49 @@ export function classifyReturnRejection(
 
 export function isReturnEligible(status: WorkOrderStatus): boolean {
   return RETURN_ELIGIBLE_STATUSES.has(status);
+}
+
+export interface TransferRejection {
+  field: 'serial_number' | 'destination_work_order';
+  messageKey: string;
+  params?: { workOrderId?: string };
+}
+
+// WRH-36: mirrors classifyReturnRejection's first-match-wins shape.
+// statusErrors (the source WO's own eligibility, {"status": [...]}) has no
+// dedicated form field in the transfer modal, same as classifyReturnRejection
+// - it's surfaced on serial_number too.
+export function classifyTransferRejection(
+  serialErrors: string[],
+  statusErrors: string[],
+  destinationErrors: string[],
+): TransferRejection | null {
+  if (serialErrors.some((message) => message === 'Serial not found')) {
+    return { field: 'serial_number', messageKey: 'workOrders.transfer.notFoundError' };
+  }
+  const notOnSourceMatch = serialErrors
+    .map((message) => message.match(NOT_ON_SOURCE_WORK_ORDER_PATTERN))
+    .find(Boolean);
+  if (notOnSourceMatch) {
+    return {
+      field: 'serial_number',
+      messageKey: 'workOrders.transfer.notOnSourceError',
+      params: { workOrderId: notOnSourceMatch[1] },
+    };
+  }
+  if (serialErrors.some((message) => NOT_OUT_FOR_TRANSFER_PATTERN.test(message))) {
+    return { field: 'serial_number', messageKey: 'workOrders.transfer.notOutError' };
+  }
+  if (destinationErrors.length > 0) {
+    return {
+      field: 'destination_work_order',
+      messageKey: 'workOrders.transfer.sameWorkOrderError',
+    };
+  }
+  if (statusErrors.length > 0) {
+    return { field: 'serial_number', messageKey: 'workOrders.transfer.statusError' };
+  }
+  return null;
 }
 
 // WRH-53/AC-1/AC-2: only a Primary can be a supplementary's parent (see the

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyReturnRejection,
   classifyScanRejection,
+  classifyTransferRejection,
   flattenWorkOrderDetailRows,
   isFullyScanned,
   isPackingListEligible,
@@ -140,6 +141,46 @@ describe('classifyReturnRejection', () => {
 
   it('returns null when nothing matches', () => {
     expect(classifyReturnRejection([], [])).toBeNull();
+  });
+});
+
+describe('classifyTransferRejection', () => {
+  it('classifies "Serial not found"', () => {
+    expect(classifyTransferRejection(['Serial not found'], [], [])).toEqual({
+      field: 'serial_number',
+      messageKey: 'workOrders.transfer.notFoundError',
+    });
+  });
+
+  it('classifies an item not currently out on the source WO and extracts the WO id', () => {
+    expect(classifyTransferRejection(['SN-042 is not currently out on WO-17'], [], [])).toEqual({
+      field: 'serial_number',
+      messageKey: 'workOrders.transfer.notOnSourceError',
+      params: { workOrderId: '17' },
+    });
+  });
+
+  it('classifies an item that is not currently out at all', () => {
+    expect(
+      classifyTransferRejection(['SN-055 is not currently out and cannot be transferred'], [], []),
+    ).toEqual({ field: 'serial_number', messageKey: 'workOrders.transfer.notOutError' });
+  });
+
+  it('classifies a same-work-order destination error', () => {
+    expect(classifyTransferRejection([], [], ['Item is already on this work order.'])).toEqual({
+      field: 'destination_work_order',
+      messageKey: 'workOrders.transfer.sameWorkOrderError',
+    });
+  });
+
+  it('classifies a status error', () => {
+    expect(classifyTransferRejection([], ['Work order is not eligible for transfer.'], [])).toEqual(
+      { field: 'serial_number', messageKey: 'workOrders.transfer.statusError' },
+    );
+  });
+
+  it('returns null when nothing matches', () => {
+    expect(classifyTransferRejection([], [], [])).toBeNull();
   });
 });
 

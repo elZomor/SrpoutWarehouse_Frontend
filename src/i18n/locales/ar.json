@@ -354,6 +354,25 @@
       "boxReturnGenericError": "فشل إرجاع هذا الصندوق. حاول مرة أخرى.",
       "boxSummaryMessage": "تم توسيع الصندوق {{code}}: تمت إضافة {{count}} عنصر",
       "boxSummaryMessageFlagged": "تم توسيع الصندوق {{code}}: تمت إضافة {{count}} عنصر (تم تمييز {{flaggedCount}})"
+    },
+    "transfer": {
+      "button": "نقل",
+      "title": "نقل: {{reference}}",
+      "serialNumberLabel": "الرقم التسلسلي",
+      "serialNumberPlaceholder": "امسح أو أدخل الرقم التسلسلي",
+      "serialNumberRequired": "الرقم التسلسلي مطلوب",
+      "destinationLabel": "أمر العمل الوجهة",
+      "destinationPlaceholder": "اختر أمر عمل الوجهة",
+      "destinationRequired": "أمر عمل الوجهة مطلوب",
+      "submitButton": "نقل",
+      "doneButton": "تم",
+      "notFoundError": "لا يوجد عنصر بهذا الرقم التسلسلي.",
+      "notOnSourceError": "هذا العنصر ليس مصروفًا حاليًا على أمر العمل WO-{{workOrderId}}.",
+      "notOutError": "هذا العنصر ليس مصروفًا حاليًا ولا يمكن نقله.",
+      "sameWorkOrderError": "هذا العنصر موجود بالفعل على أمر العمل هذا.",
+      "statusError": "أمر العمل هذا غير مؤهل للنقل.",
+      "genericError": "فشل تسجيل هذا النقل. حاول مرة أخرى.",
+      "successMessage": "تم نقل {{serialNumber}} إلى {{destination}}."
     }
   },
   "transactionLog": {
