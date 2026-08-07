@@ -370,6 +370,7 @@
       "notOnSourceError": "هذا العنصر ليس مصروفًا حاليًا على أمر العمل WO-{{workOrderId}}.",
       "notOutError": "هذا العنصر ليس مصروفًا حاليًا ولا يمكن نقله.",
       "sameWorkOrderError": "هذا العنصر موجود بالفعل على أمر العمل هذا.",
+      "closedDestinationError": "أمر العمل هذا مغلق ولا يمكنه استقبال عمليات النقل.",
       "statusError": "أمر العمل هذا غير مؤهل للنقل.",
       "genericError": "فشل تسجيل هذا النقل. حاول مرة أخرى.",
       "successMessage": "تم نقل {{serialNumber}} إلى {{destination}}."
