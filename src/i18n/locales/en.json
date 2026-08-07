@@ -366,6 +366,7 @@
       "notOnSourceError": "This item is not currently out on WO-{{workOrderId}}.",
       "notOutError": "This item is not currently out and cannot be transferred.",
       "sameWorkOrderError": "This item is already on that work order.",
+      "closedDestinationError": "This destination work order is closed and cannot receive transfers.",
       "statusError": "This work order is not eligible for transfer.",
       "genericError": "Failed to record this transfer. Please try again.",
       "successMessage": "{{serialNumber}} transferred to {{destination}}."

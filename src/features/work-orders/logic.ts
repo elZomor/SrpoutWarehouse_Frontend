@@ -43,6 +43,10 @@ export const RETURN_ELIGIBLE_STATUSES = new Set<WorkOrderStatus>([
 // message, not reusable as-is.
 export const NOT_ON_SOURCE_WORK_ORDER_PATTERN = /is not currently out on WO-(\d+)$/;
 export const NOT_OUT_FOR_TRANSFER_PATTERN = /is not currently out and cannot be transferred$/;
+// WRH-37/AC-4: a fixed constant with no free text in it (destination_work_order
+// is an id, not user-entered text), so exact equality is enough - same
+// reasoning as the fixed-constant checks in classifyScanRejection.
+const CLOSED_DESTINATION_MESSAGE = 'Destination work order is closed and cannot receive transfers.';
 
 export interface ScanRejection {
   field: 'serial_number' | 'line_item';
@@ -175,6 +179,12 @@ export function classifyTransferRejection(
   }
   if (serialErrors.some((message) => NOT_OUT_FOR_TRANSFER_PATTERN.test(message))) {
     return { field: 'serial_number', messageKey: 'workOrders.transfer.notOutError' };
+  }
+  if (destinationErrors.some((message) => message === CLOSED_DESTINATION_MESSAGE)) {
+    return {
+      field: 'destination_work_order',
+      messageKey: 'workOrders.transfer.closedDestinationError',
+    };
   }
   if (destinationErrors.length > 0) {
     return {

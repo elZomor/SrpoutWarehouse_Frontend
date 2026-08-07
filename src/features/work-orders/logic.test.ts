@@ -173,6 +173,19 @@ describe('classifyTransferRejection', () => {
     });
   });
 
+  it('classifies a closed-destination error', () => {
+    expect(
+      classifyTransferRejection(
+        [],
+        [],
+        ['Destination work order is closed and cannot receive transfers.'],
+      ),
+    ).toEqual({
+      field: 'destination_work_order',
+      messageKey: 'workOrders.transfer.closedDestinationError',
+    });
+  });
+
   it('classifies a status error', () => {
     expect(classifyTransferRejection([], ['Work order is not eligible for transfer.'], [])).toEqual(
       { field: 'serial_number', messageKey: 'workOrders.transfer.statusError' },
