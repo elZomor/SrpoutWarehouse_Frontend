@@ -164,6 +164,62 @@ describe('WorkOrdersPage - close', () => {
     await waitFor(() => expect(getCallCount).toBeGreaterThan(countBeforeClose));
   });
 
+  it('does not show a close action for a draft work order', async () => {
+    // WRH-41/AC-1/TC-01
+    const workOrder = makeActiveWorkOrder({ status: 'draft' });
+    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+
+    await renderWorkOrdersPage({ tab: 'active' });
+
+    await screen.findByText(workOrder.job_name);
+    expect(
+      screen.queryByRole('button', { name: /close work order|إغلاق أمر العمل/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not show a close action for an in_progress work order', async () => {
+    // WRH-41/AC-2/TC-02
+    const workOrder = makeActiveWorkOrder({ status: 'in_progress' });
+    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+
+    await renderWorkOrdersPage({ tab: 'active' });
+
+    await screen.findByText(workOrder.job_name);
+    expect(
+      screen.queryByRole('button', { name: /close work order|إغلاق أمر العمل/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('leaves the work order open when the close confirmation is dismissed', async () => {
+    // WRH-41/AC-5/TC-05
+    const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
+    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockCloseWorkOrder(workOrder, {
+      work_order: {
+        id: workOrder.id,
+        job_name: workOrder.job_name,
+        status: 'closed',
+        line_items: [],
+      },
+      missing_count: 0,
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    const button = await screen.findByRole('button', {
+      name: /close work order|إغلاق أمر العمل/i,
+    });
+    await user.click(button);
+    await screen.findByRole('button', { name: /^ok$|^موافق$/i });
+
+    await user.click(screen.getByRole('button', { name: /^cancel$|^إلغاء$/i }));
+
+    expect(mockedApiClient.post).not.toHaveBeenCalled();
+    expect(
+      await screen.findByRole('button', { name: /close work order|إغلاق أمر العمل/i }),
+    ).toBeInTheDocument();
+  });
+
   it('shows a generic error when closing fails', async () => {
     const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
     mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
