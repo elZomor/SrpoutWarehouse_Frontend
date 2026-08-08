@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  closeWorkOrder,
   completeWorkOrder,
   createWorkOrder,
   downloadWorkOrderPackingList,
@@ -177,6 +178,22 @@ export function useTransferWorkOrderItem(workOrderId: number) {
   // useReturnWorkOrderItem, no query cache is patched or invalidated here.
   return useMutation({
     mutationFn: (input: TransferItemFormValues) => transferWorkOrderItem(workOrderId, input),
+  });
+}
+
+export function useCloseWorkOrder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (workOrderId: number) => closeWorkOrder(workOrderId),
+    onSuccess: (_result, workOrderId) => {
+      // Its response (work_order: WorkOrderReturnResult) doesn't match
+      // workOrdersBaseKey's flat WorkOrder shape (missing reference,
+      // client_name, expected_date_out, etc.) unlike useStartWorkOrder/
+      // useCompleteWorkOrder, so invalidate both caches instead of patching.
+      queryClient.invalidateQueries({ queryKey: workOrdersBaseKey });
+      invalidateActiveWorkOrders(queryClient, workOrderId);
+    },
   });
 }
 

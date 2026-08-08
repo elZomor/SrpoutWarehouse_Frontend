@@ -10,6 +10,7 @@ import type {
   ReturnWorkOrderBoxResponse,
   ScanWorkOrderBoxResponse,
   WorkOrder,
+  WorkOrderCloseResponse,
   WorkOrderDetail,
   WorkOrderReturnResult,
   WorkOrderTransferResult,
@@ -93,6 +94,13 @@ export async function transferWorkOrderItem(
   const { data } = await apiClient.post<WorkOrderTransferResult>(
     `/api/work-orders/${workOrderId}/transfer/`,
     input,
+  );
+  return data;
+}
+
+export async function closeWorkOrder(workOrderId: number): Promise<WorkOrderCloseResponse> {
+  const { data } = await apiClient.post<WorkOrderCloseResponse>(
+    `/api/work-orders/${workOrderId}/close/`,
   );
   return data;
 }

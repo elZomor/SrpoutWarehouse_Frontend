@@ -1,5 +1,6 @@
 import type {
   ActiveWorkOrder,
+  ActiveWorkOrderLineItem,
   ActiveWorkOrderSupplementary,
   WorkOrderDetailLineItem,
   WorkOrderLineItem,
@@ -149,6 +150,15 @@ export function isReturnEligible(status: WorkOrderStatus): boolean {
   return RETURN_ELIGIBLE_STATUSES.has(status);
 }
 
+// WRH-40/AC-1: the close-confirmation warning's "N items are still out"
+// count - summed client-side from data the Active tab already has
+// (ActiveWorkOrderLineItem.still_out_quantity), no separate preview
+// endpoint needed since close() itself is a single one-shot POST, not a
+// two-step API flow.
+export function stillOutCount(lineItems: ActiveWorkOrderLineItem[]): number {
+  return lineItems.reduce((total, lineItem) => total + lineItem.still_out_quantity, 0);
+}
+
 export interface TransferRejection {
   field: 'serial_number' | 'destination_work_order';
   messageKey: string;
@@ -208,8 +218,9 @@ export function isPrimaryWorkOrder(
 }
 
 // WRH-34/AC-1: "not draft" gate, matching the backend's "in_progress or
-// later" availability rule (there is no STATUS_CLOSED yet, so "not draft" is
-// the real rule). WRH-35/AC-2: no longer Primary-only - the backend now
+// later" availability rule - every non-draft status (including WRH-40's
+// "closed") satisfies this already, no change needed here for it. WRH-35/
+// AC-2: no longer Primary-only - the backend now
 // resolves a supplementary's own request to its Primary's consolidated
 // document instead of rejecting it, so the button is offered on
 // supplementary rows too.

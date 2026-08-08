@@ -240,7 +240,8 @@
       "in_progress": "In Progress",
       "fulfilled": "Fulfilled",
       "returned": "Returned",
-      "partially_returned": "Partially Returned"
+      "partially_returned": "Partially Returned",
+      "closed": "Closed"
     },
     "createdByLabel": "Created By",
     "lineItemsLabel": "Line Items",
@@ -370,6 +371,13 @@
       "statusError": "This work order is not eligible for transfer.",
       "genericError": "Failed to record this transfer. Please try again.",
       "successMessage": "{{serialNumber}} transferred to {{destination}}."
+    },
+    "close": {
+      "button": "Close Work Order",
+      "confirmTitle": "Close this work order?",
+      "warning_one": "{{count}} item is still out. It will be marked as missing.",
+      "warning_other": "{{count}} items are still out. They will be marked as missing.",
+      "error": "Failed to close this work order. Please try again."
     }
   },
   "transactionLog": {
