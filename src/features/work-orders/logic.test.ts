@@ -9,9 +9,11 @@ import {
   isPrimaryWorkOrder,
   isReturnEligible,
   scannableLineItemOptions,
+  stillOutCount,
 } from './logic';
 import type {
   ActiveWorkOrder,
+  ActiveWorkOrderLineItem,
   ActiveWorkOrderSupplementary,
   WorkOrderDetailLineItem,
   WorkOrderLineItem,
@@ -212,6 +214,49 @@ describe('isReturnEligible', () => {
 
   it('is not eligible for an in_progress WO', () => {
     expect(isReturnEligible('in_progress')).toBe(false);
+  });
+
+  it('is not eligible for a closed WO (WRH-40)', () => {
+    expect(isReturnEligible('closed')).toBe(false);
+  });
+});
+
+function makeActiveLineItem(
+  overrides: Partial<ActiveWorkOrderLineItem> = {},
+): ActiveWorkOrderLineItem {
+  return {
+    id: 1,
+    product_type: 1,
+    product_type_name: 'Bar LED Model A',
+    quantity: 2,
+    returned_quantity: 0,
+    damaged_quantity: 0,
+    still_out_quantity: 2,
+    ...overrides,
+  };
+}
+
+describe('stillOutCount', () => {
+  it('sums still_out_quantity across every line item', () => {
+    const lineItems = [
+      makeActiveLineItem({ id: 1, still_out_quantity: 3 }),
+      makeActiveLineItem({ id: 2, still_out_quantity: 1 }),
+    ];
+
+    expect(stillOutCount(lineItems)).toBe(4);
+  });
+
+  it('is zero when every line item has nothing still out (AC-4)', () => {
+    const lineItems = [
+      makeActiveLineItem({ still_out_quantity: 0 }),
+      makeActiveLineItem({ still_out_quantity: 0 }),
+    ];
+
+    expect(stillOutCount(lineItems)).toBe(0);
+  });
+
+  it('is zero for an empty line-item list', () => {
+    expect(stillOutCount([])).toBe(0);
   });
 });
 

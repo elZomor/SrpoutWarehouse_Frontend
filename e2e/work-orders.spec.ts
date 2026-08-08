@@ -467,6 +467,72 @@ test('returns items against a fulfilled WO: partial then full return', async ({ 
   await expect(dialog.getByText(/^returned$|^تم الإرجاع$/i)).toBeVisible();
 });
 
+test('manually closes a fulfilled WO, sweeping remaining items to Missing', async ({ page }) => {
+  // WRH-40 (US-019a) AC-1/AC-2/TC-01/TC-02
+  const workOrder = {
+    id: 1,
+    job_name: 'Summer Gala',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-01',
+    status: 'fulfilled',
+    line_items: [
+      {
+        id: 1,
+        product_type: 1,
+        product_type_name: 'Bar LED Model A',
+        quantity: 3,
+        returned_quantity: 0,
+        still_out_quantity: 3,
+      },
+    ],
+    supplementaries: [] as unknown[],
+  };
+
+  await page.route('**/api/auth/**', stubAuth);
+  await registerProductTypesRoute(page);
+  await page.route('**/api/work-orders/**', async (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+
+    if (method === 'POST' && url.endsWith('/close/')) {
+      workOrder.status = 'closed';
+      await route.fulfill({
+        status: 200,
+        json: {
+          work_order: { id: workOrder.id, job_name: workOrder.job_name, status: 'closed' },
+          missing_count: 3,
+        },
+      });
+      return;
+    }
+    if (method === 'GET' && url.endsWith('/active/')) {
+      await route.fulfill({ status: 200, json: workOrder.status === 'closed' ? [] : [workOrder] });
+      return;
+    }
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, json: [] });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto('/work-orders');
+
+  const row = page.getByRole('row', { name: /summer gala/i });
+  await row.getByRole('button', { name: /^close work order$|^إغلاق أمر العمل$/i }).click();
+  // Arabic count=3 selects the CLDR "few" plural form (different noun
+  // agreement than "other"), so this matches loosely rather than one exact
+  // full sentence - see WorkOrdersPage.close.test.tsx's identical note.
+  await expect(page.getByText(/3.*(still out|بالخارج)/i)).toBeVisible();
+
+  await page.getByRole('button', { name: /^ok$|^موافق$/i }).click();
+
+  // The active list excludes a closed WO (WRH-40), so the row disappears
+  // once the invalidated query refetches.
+  await expect(page.getByRole('row', { name: /summer gala/i })).toHaveCount(0);
+});
+
 test('transfers an item from one work order to another', async ({ page }) => {
   // WRH-36/AC-1/AC-2/TC-01
   // Active-tab shape (returned/damaged/still_out counts), not the flat

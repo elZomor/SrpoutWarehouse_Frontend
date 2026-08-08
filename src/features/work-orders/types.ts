@@ -1,5 +1,5 @@
 export type WorkOrderStatus =
-  'draft' | 'in_progress' | 'fulfilled' | 'returned' | 'partially_returned';
+  'draft' | 'in_progress' | 'fulfilled' | 'returned' | 'partially_returned' | 'closed';
 
 export interface WorkOrderLineItem {
   id: number;
@@ -120,6 +120,18 @@ export interface WorkOrderDetail {
   created_by_username: string;
   parent_work_order: number | null;
   line_items: WorkOrderDetailLineItem[];
+}
+
+// WRH-40/AC-1/AC-2: close()'s response - same WorkOrderReturnResult shape as
+// return_item()/return_box() for the WO/line-item side, plus missing_count
+// (how many remaining out items this call swept to Missing) since that
+// number isn't otherwise derivable from the still_out_quantity breakdown
+// alone (still_out_quantity deliberately keeps counting a missing item as
+// "still out", matching the Active list's existing intent that an
+// unaccounted-for item shouldn't vanish from the summary).
+export interface WorkOrderCloseResponse {
+  work_order: WorkOrderReturnResult;
+  missing_count: number;
 }
 
 // WRH-36/AC-1: transfer()'s response - a flat confirmation, not a WorkOrder/

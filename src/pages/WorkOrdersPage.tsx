@@ -10,6 +10,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Spin,
@@ -33,6 +34,7 @@ import {
   isPrimaryWorkOrder,
   isReturnEligible,
   scannableLineItemOptions as computeScannableLineItemOptions,
+  stillOutCount,
 } from '../features/work-orders/logic';
 import {
   returnBoxSchema,
@@ -59,6 +61,7 @@ import type {
 } from '../features/work-orders/types';
 import {
   useActiveWorkOrders,
+  useCloseWorkOrder,
   useCompleteWorkOrder,
   useCreateWorkOrder,
   useDownloadWorkOrderPackingList,
@@ -115,6 +118,7 @@ export function WorkOrdersPage() {
   const scanMutation = useScanWorkOrderItem(fulfillingWorkOrderId ?? 0);
   const scanBoxMutation = useScanWorkOrderBox(fulfillingWorkOrderId ?? 0);
   const completeMutation = useCompleteWorkOrder();
+  const closeMutation = useCloseWorkOrder();
   const downloadPackingListMutation = useDownloadWorkOrderPackingList();
   const invalidateActiveWorkOrders = useInvalidateActiveWorkOrders();
   const { data: productTypes, isError: isProductTypesError } = useProductTypes('');
@@ -924,6 +928,35 @@ export function WorkOrdersPage() {
             <Button size="small" onClick={() => openTransferModal(record)}>
               {t('workOrders.transfer.button')}
             </Button>
+          )}
+          {/* WRH-40/AC-1/AC-4: same "fulfilled or partially_returned" gate
+              as Return/Transfer - reuses isReturnEligible, matching the
+              backend's own CLOSE_ELIGIBLE_STATUSES = RETURN_ELIGIBLE_STATUSES
+              alias. AC-1: a Popconfirm titled with the still-out count when
+              there is one; AC-4: a plain confirm with no count/warning line
+              when there's nothing still out. */}
+          {isReturnEligible(record.status) && (
+            <Popconfirm
+              title={
+                stillOutCount(record.line_items) > 0
+                  ? t('workOrders.close.warning', { count: stillOutCount(record.line_items) })
+                  : t('workOrders.close.confirmTitle')
+              }
+              onConfirm={() =>
+                closeMutation.mutate(record.id, {
+                  onError: () => message.error(t('workOrders.close.error')),
+                })
+              }
+              okText={t('common.ok')}
+              cancelText={t('common.cancel')}
+              okButtonProps={{
+                loading: closeMutation.isPending && closeMutation.variables === record.id,
+              }}
+            >
+              <Button size="small" danger>
+                {t('workOrders.close.button')}
+              </Button>
+            </Popconfirm>
           )}
         </Space>
       ),
