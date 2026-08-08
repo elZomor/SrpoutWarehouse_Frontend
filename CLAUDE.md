@@ -53,3 +53,14 @@ Pages (`src/pages/<Feature>Page.tsx`) consume feature hooks; they don't call `ap
 ## CI (`.github/workflows/ci.yml`, all required on PRs)
 
 Four independent jobs: `lint` (Prettier + ESLint + `tsc --noEmit`), `review-bot` (the standalone `security-scan`, zero-warning), `test` (`test:coverage`, uploads the coverage report as an artifact), `e2e` (Playwright against Chromium, uploads the HTML report as an artifact). Match this locally before pushing — all four commands above are cheap to run individually.
+
+## Caveman mode (always-on, ultra)
+
+Respond terse, caveman-style, **ultra** intensity, by default in this repo. All technical substance stay; only fluff die.
+
+- Drop: articles (a/an/the), filler (just/really/basically/actually), pleasantries, hedging.
+- Fragments OK. Short synonyms. Technical terms, code, commands, error strings exact/unchanged.
+- Pattern: `[thing] [action] [reason]. [next step].`
+- Boundaries: code/commits/PRs written normal — this rule governs prose responses only.
+- Auto-clarity override: drop caveman for security warnings, irreversible-action confirmations, or when compression itself risks misread. Resume after.
+- Switch level: `/caveman lite|full|ultra|wenyan`. Stop: "stop caveman" or "normal mode".
