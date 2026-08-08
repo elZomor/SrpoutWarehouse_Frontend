@@ -102,9 +102,14 @@ function mockFulfillmentEndpoints(initialWorkOrder: WorkOrder) {
   };
 }
 
+// hidden: true throughout this file - see hiddenTrueForRoleQueries.md /
+// WorkOrdersPage.active.test.tsx's "creates a supplementary WO..." test for
+// why: skips testing-library's default accessibility-tree visibility check,
+// which is what's actually slow (jsdom resolving antd's CSS var() chains
+// per candidate), not the click/render itself.
 async function selectScanLineItem(user: ReturnType<typeof userEvent.setup>, name: string) {
-  const dialog = screen.getByRole('dialog');
-  const combobox = within(dialog).getByRole('combobox');
+  const dialog = screen.getByRole('dialog', { hidden: true });
+  const combobox = within(dialog).getByRole('combobox', { hidden: true });
   await user.click(combobox);
   const option = screen.getAllByTitle(name).at(-1);
   if (!option) {
@@ -114,11 +119,11 @@ async function selectScanLineItem(user: ReturnType<typeof userEvent.setup>, name
 }
 
 async function scanSerial(user: ReturnType<typeof userEvent.setup>, serialNumber: string) {
-  const dialog = screen.getByRole('dialog');
+  const dialog = screen.getByRole('dialog', { hidden: true });
   const input = screen.getByLabelText(/serial number|الرقم التسلسلي/i);
   await user.clear(input);
   await user.type(input, serialNumber);
-  await user.click(within(dialog).getByRole('button', { name: /^scan$|^مسح$/i }));
+  await user.click(within(dialog).getByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
 }
 
 // AC-1/TC-01, AC-3/TC-03, AC-4/TC-04: each rejects with a distinct,
@@ -162,11 +167,13 @@ function mockScanBoxRejection(workOrder: WorkOrder, field: string, message: stri
 }
 
 async function scanBox(user: ReturnType<typeof userEvent.setup>, boxCode: string) {
-  const dialog = screen.getByRole('dialog');
+  const dialog = screen.getByRole('dialog', { hidden: true });
   const input = within(dialog).getByLabelText(/box code|رمز الصندوق/i);
   await user.clear(input);
   await user.type(input, boxCode);
-  await user.click(within(dialog).getByRole('button', { name: /^scan box$|^مسح صندوق$/i }));
+  await user.click(
+    within(dialog).getByRole('button', { name: /^scan box$|^مسح صندوق$/i, hidden: true }),
+  );
 }
 
 describe('WorkOrdersPage - fulfillment', () => {
@@ -182,19 +189,24 @@ describe('WorkOrdersPage - fulfillment', () => {
 
     await renderWorkOrdersPage();
 
-    await userEvent
-      .setup()
-      .click(await screen.findByRole('button', { name: /start fulfillment|بدء التنفيذ/i }));
+    await userEvent.setup().click(
+      await screen.findByRole('button', {
+        name: /start fulfillment|بدء التنفيذ/i,
+        hidden: true,
+      }),
+    );
 
     expect(mockedApiClient.post).toHaveBeenCalledWith(`/api/work-orders/${workOrder.id}/start/`);
     expect(await screen.findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
   });
 
-  // Timeout bumped - this test does two full render/interact cycles (start
-  // on Manage, then switch to Active), measured ~48s in isolation even
-  // after splitting this file out of the original WorkOrdersPage.test.tsx
-  // (WRH-34), with no coverage instrumentation involved. Real per-test
-  // render cost, not a file-size or coverage artifact.
+  // Timeout bump - this test does two full render/interact cycles (start on
+  // Manage, then switch to Active). It measured ~48s in isolation before the
+  // getByRole hidden:true fix (see the accessibility-visibility-check note
+  // on those queries below); after that fix it's ~16.5s plain, but
+  // `npm run test:coverage`'s v8 instrumentation (the actual CI command)
+  // measured ~35.4s for this one test - hence the bump, not the 150000ms it
+  // used to carry.
   it('refreshes the Active tab after starting a WO from the Manage tab', async () => {
     // Regression: the Active tab's query is a separate cache from the
     // flat work-orders list and doesn't remount on tab switch (AntD keeps
@@ -223,23 +235,37 @@ describe('WorkOrdersPage - fulfillment', () => {
     });
 
     await renderWorkOrdersPage();
-    await userEvent
-      .setup()
-      .click(await screen.findByRole('button', { name: /start fulfillment|بدء التنفيذ/i }));
-    // AntD keeps both tab panes mounted (not unmounted) once rendered,
-    // but marks the inactive one `aria-hidden="true"`, which
-    // findByRole/getByRole exclude by default - so scoping to a row here
-    // isn't strictly required to disambiguate, but keeps the assertion
-    // pinned to the Manage table specifically rather than "wherever a
-    // matching row happens to be found".
-    const manageRow = await screen.findByRole('row', { name: /summer gala/i });
+    await userEvent.setup().click(
+      await screen.findByRole('button', {
+        name: /start fulfillment|بدء التنفيذ/i,
+        hidden: true,
+      }),
+    );
+    // AntD keeps both tab panes mounted (not unmounted) once rendered, only
+    // marking the inactive one `aria-hidden="true"`. With `hidden: true`
+    // these row queries now traverse BOTH panes, and both the Manage and
+    // Active panes contain a "Summer Gala" row - so scoping to the
+    // tabpanel itself (by its accessible name, via AntD's
+    // aria-labelledby-to-tab-label wiring) is now required to disambiguate,
+    // not just a nice-to-have pin.
+    const managePane = screen.getByRole('tabpanel', { name: /manage|الإدارة/i, hidden: true });
+    const manageRow = await within(managePane).findByRole('row', {
+      name: /summer gala/i,
+      hidden: true,
+    });
     await within(manageRow).findByText(/^in progress$|^قيد التنفيذ$/i);
 
-    await userEvent.setup().click(screen.getByRole('tab', { name: /active|النشطة/i }));
+    await userEvent
+      .setup()
+      .click(screen.getByRole('tab', { name: /active|النشطة/i, hidden: true }));
 
-    const activeRow = await screen.findByRole('row', { name: /summer gala/i });
+    const activePane = screen.getByRole('tabpanel', { name: /active|النشطة/i, hidden: true });
+    const activeRow = await within(activePane).findByRole('row', {
+      name: /summer gala/i,
+      hidden: true,
+    });
     expect(await within(activeRow).findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
-  }, 150000);
+  }, 60000);
 
   it('shows a toast when starting fulfillment fails, leaving the WO as draft', async () => {
     const workOrder = makeWorkOrder();
@@ -254,9 +280,12 @@ describe('WorkOrdersPage - fulfillment', () => {
 
     await renderWorkOrdersPage();
 
-    await userEvent
-      .setup()
-      .click(await screen.findByRole('button', { name: /start fulfillment|بدء التنفيذ/i }));
+    await userEvent.setup().click(
+      await screen.findByRole('button', {
+        name: /start fulfillment|بدء التنفيذ/i,
+        hidden: true,
+      }),
+    );
 
     expect(
       await screen.findByText(/failed to start fulfillment|فشل بدء التنفيذ/i),
@@ -275,11 +304,13 @@ describe('WorkOrdersPage - fulfillment', () => {
 
     await renderWorkOrdersPage();
 
-    const rowA = await screen.findByRole('row', { name: /job a/i });
-    await userEvent.setup().click(within(rowA).getByRole('button'));
+    // hidden: true safe here - this test provides no activeWorkOrders, so
+    // the Active pane is empty and can't produce a "Job A"/"Job B" duplicate.
+    const rowA = await screen.findByRole('row', { name: /job a/i, hidden: true });
+    await userEvent.setup().click(within(rowA).getByRole('button', { hidden: true }));
 
-    const rowB = screen.getByRole('row', { name: /job b/i });
-    expect(within(rowB).getByRole('button')).toBeEnabled();
+    const rowB = screen.getByRole('row', { name: /job b/i, hidden: true });
+    expect(within(rowB).getByRole('button', { hidden: true })).toBeEnabled();
   });
 
   it('updates the live counter as items are scanned', async () => {
@@ -303,7 +334,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
     await selectScanLineItem(user, 'Bar LED Model A');
     await scanSerial(user, 'SN-1001');
     await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
@@ -314,10 +345,13 @@ describe('WorkOrdersPage - fulfillment', () => {
       line_item: 1,
       serial_number: 'SN-1001',
     });
-    const dialog = screen.getByRole('dialog');
-    const row = await within(dialog).findByRole('row', { name: /bar led model a/i });
+    const dialog = screen.getByRole('dialog', { hidden: true });
+    const row = await within(dialog).findByRole('row', { name: /bar led model a/i, hidden: true });
+    // getAllByRole('cell') is scoped to this single dialog row, and this
+    // test provides no activeWorkOrders - no hidden-pane duplicate can slip
+    // into this array, so the exact-order assertion below still holds.
     const cells = within(row)
-      .getAllByRole('cell')
+      .getAllByRole('cell', { hidden: true })
       .map((cell) => cell.textContent);
     expect(cells).toEqual(['Bar LED Model A', '3', '2', '1']); // requested, scanned, remaining
   });
@@ -343,9 +377,10 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
     const completeButton = screen.getByRole('button', {
       name: /complete fulfillment|إتمام التنفيذ/i,
+      hidden: true,
     });
     expect(completeButton).toBeDisabled();
 
@@ -386,13 +421,15 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
-    await user.click(screen.getByRole('button', { name: /complete fulfillment|إتمام التنفيذ/i }));
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
+    await user.click(
+      screen.getByRole('button', { name: /complete fulfillment|إتمام التنفيذ/i, hidden: true }),
+    );
 
     expect(
       await screen.findByText(/failed to complete fulfillment|فشل إتمام التنفيذ/i),
     ).toBeInTheDocument();
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument();
   });
 
   // Every scan-rejection classification case except the one below (kept as
@@ -411,7 +448,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
     await selectScanLineItem(user, 'Bar LED Model A');
     await scanSerial(user, 'SN-042');
 
@@ -453,7 +490,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
     await scanBox(user, 'BX-001');
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/1/scan-box/', {
@@ -462,10 +499,12 @@ describe('WorkOrdersPage - fulfillment', () => {
     expect(
       await screen.findByText(/box bx-001 expanded: 3 items added|تم توسيع الصندوق bx-001/i),
     ).toBeInTheDocument();
-    const dialog = screen.getByRole('dialog');
-    const row = await within(dialog).findByRole('row', { name: /bar led model a/i });
+    const dialog = screen.getByRole('dialog', { hidden: true });
+    const row = await within(dialog).findByRole('row', { name: /bar led model a/i, hidden: true });
+    // Scoped to this single dialog row; no activeWorkOrders in this test,
+    // so no hidden-pane duplicate can enter this array.
     const cells = within(row)
-      .getAllByRole('cell')
+      .getAllByRole('cell', { hidden: true })
       .map((cell) => cell.textContent);
     expect(cells).toEqual(['Bar LED Model A', '3', '3', '0']);
   });
@@ -492,7 +531,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
     await scanBox(user, 'BX-002');
 
     expect(
@@ -511,7 +550,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i }));
+    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
     await scanBox(user, 'BX-DOES-NOT-EXIST');
 
     expect(

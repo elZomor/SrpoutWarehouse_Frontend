@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { App as AntApp } from 'antd';
+import { App as AntApp, ConfigProvider } from 'antd';
 import { BoxesPage } from './BoxesPage';
 import { AppLayout } from '../components/AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
@@ -11,6 +11,7 @@ import type { Box } from '../features/boxes/types';
 import type { ProductType } from '../features/product-types/types';
 import type { SerializedItem } from '../features/serialized-items/types';
 import { apiClient } from '../lib/apiClient';
+import { motionDisabledTheme } from '../test/motionDisabledTheme';
 import '../i18n';
 
 vi.mock('../lib/apiClient', () => ({
@@ -122,30 +123,32 @@ function renderBoxesPage() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <AntApp>
-        <MemoryRouter initialEntries={['/boxes']}>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route path="/boxes" element={<BoxesPage />} />
-            </Route>
-            <Route path="/login" element={<div>Login Page</div>} />
-          </Routes>
-        </MemoryRouter>
-      </AntApp>
+      <ConfigProvider theme={motionDisabledTheme}>
+        <AntApp>
+          <MemoryRouter initialEntries={['/boxes']}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route path="/boxes" element={<BoxesPage />} />
+              </Route>
+              <Route path="/login" element={<div>Login Page</div>} />
+            </Routes>
+          </MemoryRouter>
+        </AntApp>
+      </ConfigProvider>
     </QueryClientProvider>,
   );
 }
 
 async function selectInForm(user: ReturnType<typeof userEvent.setup>, name: string) {
-  const dialog = screen.getByRole('dialog');
-  const comboboxes = within(dialog).getAllByRole('combobox');
+  const dialog = screen.getByRole('dialog', { hidden: true });
+  const comboboxes = within(dialog).getAllByRole('combobox', { hidden: true });
   await user.click(comboboxes[0]!);
   await user.click(screen.getByTitle(name));
 }
 
 async function selectItemInForm(user: ReturnType<typeof userEvent.setup>, name: string) {
-  const dialog = screen.getByRole('dialog');
-  const comboboxes = within(dialog).getAllByRole('combobox');
+  const dialog = screen.getByRole('dialog', { hidden: true });
+  const comboboxes = within(dialog).getAllByRole('combobox', { hidden: true });
   await user.click(comboboxes[1]!);
   await user.click(screen.getByTitle(name));
 }
@@ -163,7 +166,7 @@ describe('BoxesPage', () => {
 
     expect(await screen.findByText('BX-001')).toBeInTheDocument();
     expect(screen.getByText('Bar LED Model A')).toBeInTheDocument();
-    const row = screen.getByRole('row', { name: /BX-001/ });
+    const row = screen.getByRole('row', { name: /BX-001/, hidden: true });
     expect(within(row).getByText('1')).toBeInTheDocument();
   });
 
@@ -179,12 +182,14 @@ describe('BoxesPage', () => {
     const user = userEvent.setup();
     renderBoxesPage();
 
-    await user.click(await screen.findByRole('button', { name: /register box|تسجيل صندوق/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /register box|تسجيل صندوق/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/box code|رمز الصندوق/i), 'BX-001');
     await selectInForm(user, 'Bar LED Model A');
     await selectItemInForm(user, 'SN-042');
     boxes.push(makeBox());
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/boxes/', {
       code: 'BX-001',
@@ -207,7 +212,9 @@ describe('BoxesPage', () => {
     const user = userEvent.setup();
     renderBoxesPage();
 
-    await user.click(await screen.findByRole('button', { name: /print qr|طباعة رمز qr/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /print qr|طباعة رمز qr/i, hidden: true }),
+    );
 
     expect(openSpy).toHaveBeenCalled();
     const img = fakePrintWindow.document.querySelector('img');
@@ -227,9 +234,11 @@ describe('BoxesPage', () => {
     const user = userEvent.setup();
     renderBoxesPage();
 
-    await user.click(await screen.findByRole('button', { name: /register box|تسجيل صندوق/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /register box|تسجيل صندوق/i, hidden: true }),
+    );
     await selectInForm(user, 'Bar LED Model A');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(await screen.findByText(/box code is required|رمز الصندوق مطلوب/i)).toBeInTheDocument();
     expect(mockedApiClient.post).not.toHaveBeenCalled();
@@ -241,9 +250,11 @@ describe('BoxesPage', () => {
     const user = userEvent.setup();
     renderBoxesPage();
 
-    await user.click(await screen.findByRole('button', { name: /register box|تسجيل صندوق/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /register box|تسجيل صندوق/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/box code|رمز الصندوق/i), 'BX-001');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(
       await screen.findByText(/product type is required|نوع المنتج مطلوب/i),
@@ -257,10 +268,12 @@ describe('BoxesPage', () => {
     const user = userEvent.setup();
     renderBoxesPage();
 
-    await user.click(await screen.findByRole('button', { name: /register box|تسجيل صندوق/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /register box|تسجيل صندوق/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/box code|رمز الصندوق/i), 'BX-001');
     await selectInForm(user, 'Bar LED Model A');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(
       await screen.findByText(/select at least one item|اختر عنصرًا واحدًا على الأقل/i),
@@ -278,11 +291,13 @@ describe('BoxesPage', () => {
     const user = userEvent.setup();
     renderBoxesPage();
 
-    await user.click(await screen.findByRole('button', { name: /register box|تسجيل صندوق/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /register box|تسجيل صندوق/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/box code|رمز الصندوق/i), 'BX-001');
     await selectInForm(user, 'Bar LED Model A');
     await selectItemInForm(user, 'SN-042');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(
       await screen.findByText(/failed to register box|فشل تسجيل الصندوق/i),
@@ -305,11 +320,13 @@ describe('BoxesPage', () => {
     const user = userEvent.setup();
     renderBoxesPage();
 
-    await user.click(await screen.findByRole('button', { name: /register box|تسجيل صندوق/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /register box|تسجيل صندوق/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/box code|رمز الصندوق/i), 'BX-002');
     await selectInForm(user, 'Bar LED Model A');
     await selectItemInForm(user, 'SN-042');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(
       await screen.findByText(
@@ -336,11 +353,13 @@ describe('BoxesPage', () => {
     const user = userEvent.setup();
     renderBoxesPage();
 
-    await user.click(await screen.findByRole('button', { name: /register box|تسجيل صندوق/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /register box|تسجيل صندوق/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/box code|رمز الصندوق/i), 'BX-003');
     await selectInForm(user, 'Bar LED Model A');
     await selectItemInForm(user, 'SN-042');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(
       await screen.findByText(/failed to register box|فشل تسجيل الصندوق/i),

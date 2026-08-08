@@ -60,14 +60,16 @@ describe('WorkOrdersPage - create', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Summer Gala');
     await user.type(screen.getByLabelText(/^client$|^العميل$/i), 'Acme Events');
     await fillExpectedDateOut(user, '2026-08-01');
     await selectProductTypeForLineItem(user, 0, 'Bar LED Model A');
     await user.type(screen.getByPlaceholderText(/qty|الكمية/i), '5');
     workOrders.push(makeWorkOrder());
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/', {
       job_name: 'Summer Gala',
@@ -87,12 +89,14 @@ describe('WorkOrdersPage - create', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Summer Gala');
     await fillExpectedDateOut(user, '2026-08-01');
     await selectProductTypeForLineItem(user, 0, 'Bar LED Model A');
     await user.type(screen.getByPlaceholderText(/qty|الكمية/i), '5');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/', {
       job_name: 'Summer Gala',
@@ -111,18 +115,22 @@ describe('WorkOrdersPage - create', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Summer Gala');
     await fillExpectedDateOut(user, '2026-08-01');
     await selectProductTypeForLineItem(user, 0, 'Bar LED Model A');
     await user.type(screen.getAllByPlaceholderText(/qty|الكمية/i)[0]!, '5');
 
-    await user.click(screen.getByRole('button', { name: /add line item|إضافة بند/i }));
+    await user.click(
+      screen.getByRole('button', { name: /add line item|إضافة بند/i, hidden: true }),
+    );
     await selectProductTypeForLineItem(user, 1, 'Fog Machine');
     await user.type(screen.getAllByPlaceholderText(/qty|الكمية/i)[1]!, '2');
 
     workOrders.push(makeWorkOrder());
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/', {
       job_name: 'Summer Gala',
@@ -141,8 +149,10 @@ describe('WorkOrdersPage - create', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(
+      await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i, hidden: true }),
+    );
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(await screen.findByText(/job name is required|اسم المهمة مطلوب/i)).toBeInTheDocument();
     expect(mockedApiClient.post).not.toHaveBeenCalled();
@@ -154,11 +164,13 @@ describe('WorkOrdersPage - create', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Summer Gala');
     await selectProductTypeForLineItem(user, 0, 'Bar LED Model A');
     await user.type(screen.getByPlaceholderText(/qty|الكمية/i), '5');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(
       await screen.findByText(/expected date out is required|تاريخ الخروج المتوقع مطلوب/i),
@@ -172,10 +184,12 @@ describe('WorkOrdersPage - create', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Summer Gala');
     await fillExpectedDateOut(user, '2026-08-01');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(
       await screen.findByText(/product type is required|نوع المنتج مطلوب/i),
@@ -192,15 +206,21 @@ describe('WorkOrdersPage - create', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
-    await user.click(screen.getByRole('button', { name: /add line item|إضافة بند/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i, hidden: true }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: /add line item|إضافة بند/i, hidden: true }),
+    );
 
-    const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getAllByRole('combobox')).toHaveLength(2);
+    const dialog = screen.getByRole('dialog', { hidden: true });
+    expect(within(dialog).getAllByRole('combobox', { hidden: true })).toHaveLength(2);
 
-    await user.click(screen.getAllByRole('button', { name: /remove line item|إزالة البند/i })[0]!);
+    await user.click(
+      screen.getAllByRole('button', { name: /remove line item|إزالة البند/i, hidden: true })[0]!,
+    );
 
-    expect(within(dialog).getAllByRole('combobox')).toHaveLength(1);
+    expect(within(dialog).getAllByRole('combobox', { hidden: true })).toHaveLength(1);
   });
 
   it('shows a generic error banner when creation fails', async () => {
@@ -213,12 +233,14 @@ describe('WorkOrdersPage - create', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Summer Gala');
     await fillExpectedDateOut(user, '2026-08-01');
     await selectProductTypeForLineItem(user, 0, 'Bar LED Model A');
     await user.type(screen.getByPlaceholderText(/qty|الكمية/i), '5');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(
       await screen.findByText(/failed to create work order|فشل إنشاء أمر العمل/i),

@@ -3,12 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ConfigProvider } from 'antd';
 import { DashboardPage } from './DashboardPage';
 import { AppLayout } from '../components/AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
 import type { ProductTypeStockSummary } from '../features/product-types/types';
 import type { SerializedItem } from '../features/serialized-items/types';
 import { apiClient } from '../lib/apiClient';
+import { motionDisabledTheme } from '../test/motionDisabledTheme';
 import '../i18n';
 
 vi.mock('../lib/apiClient', () => ({
@@ -81,14 +83,16 @@ function renderDashboardPage() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/']}>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<DashboardPage />} />
-          </Route>
-          <Route path="/login" element={<div>Login Page</div>} />
-        </Routes>
-      </MemoryRouter>
+      <ConfigProvider theme={motionDisabledTheme}>
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route element={<AppLayout />}>
+              <Route path="/" element={<DashboardPage />} />
+            </Route>
+            <Route path="/login" element={<div>Login Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </ConfigProvider>
     </QueryClientProvider>,
   );
 }
@@ -117,7 +121,7 @@ describe('DashboardPage', () => {
     const user = userEvent.setup();
     renderDashboardPage();
 
-    await user.click(screen.getByRole('button', { name: /logout|تسجيل الخروج/i }));
+    await user.click(screen.getByRole('button', { name: /logout|تسجيل الخروج/i, hidden: true }));
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/auth/logout/');
     await waitFor(() => expect(screen.getByText('Login Page')).toBeInTheDocument());
@@ -129,9 +133,9 @@ describe('DashboardPage', () => {
 
     renderDashboardPage();
 
-    const row = await screen.findByRole('row', { name: /bar led model a/i });
+    const row = await screen.findByRole('row', { name: /bar led model a/i, hidden: true });
     const cells = within(row)
-      .getAllByRole('cell')
+      .getAllByRole('cell', { hidden: true })
       .map((cell) => cell.textContent);
     expect(cells).toEqual(['Bar LED Model A', '4', '1', '1', '1', '1']);
   });
@@ -153,7 +157,7 @@ describe('DashboardPage', () => {
 
     renderDashboardPage();
 
-    const row = await screen.findByRole('row', { name: /bar led model a/i });
+    const row = await screen.findByRole('row', { name: /bar led model a/i, hidden: true });
     expect(within(row).getByText('62')).toBeInTheDocument();
   });
 
@@ -177,9 +181,9 @@ describe('DashboardPage', () => {
     const user = userEvent.setup();
     renderDashboardPage();
 
-    await user.click(await screen.findByRole('row', { name: /bar led model a/i }));
+    await user.click(await screen.findByRole('row', { name: /bar led model a/i, hidden: true }));
 
-    const dialog = await screen.findByRole('dialog');
+    const dialog = await screen.findByRole('dialog', { hidden: true });
     expect(within(dialog).getByText('SN-0001')).toBeInTheDocument();
     expect(within(dialog).getByText(/^available$|^متاح$/i)).toBeInTheDocument();
     expect(mockedApiClient.get).toHaveBeenCalledWith('/api/serialized-items/', {
@@ -192,12 +196,12 @@ describe('DashboardPage', () => {
     mockGetEndpoints({ stockSummary: [makeStockSummaryRow()] });
     const user = userEvent.setup();
     renderDashboardPage();
-    await screen.findByRole('row', { name: /bar led model a/i });
+    await screen.findByRole('row', { name: /bar led model a/i, hidden: true });
     const callsBeforeRefresh = mockedApiClient.get.mock.calls.filter(
       ([url]) => url === '/api/product-types/stock-summary/',
     ).length;
 
-    await user.click(screen.getByRole('button', { name: /refresh|تحديث/i }));
+    await user.click(screen.getByRole('button', { name: /refresh|تحديث/i, hidden: true }));
 
     await waitFor(() => {
       const callsAfterRefresh = mockedApiClient.get.mock.calls.filter(
@@ -223,9 +227,9 @@ describe('DashboardPage', () => {
 
     renderDashboardPage();
 
-    const row = await screen.findByRole('row', { name: /bar led model a/i });
+    const row = await screen.findByRole('row', { name: /bar led model a/i, hidden: true });
     const cells = within(row)
-      .getAllByRole('cell')
+      .getAllByRole('cell', { hidden: true })
       .map((cell) => cell.textContent);
     expect(cells).toEqual(['Bar LED Model A', '0', '0', '0', '0', '0']);
   });

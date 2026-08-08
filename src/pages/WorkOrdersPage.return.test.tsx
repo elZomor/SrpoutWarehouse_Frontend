@@ -60,25 +60,28 @@ async function openReturnModal(user: ReturnType<typeof userEvent.setup>) {
   // of one - regression: this exact row+within pattern reliably pushed
   // this test past even a 60s per-test override under `--coverage`,
   // where the equivalent direct button query finishes in ~1s.
-  const button = await screen.findByRole('button', { name: /^return$|^إرجاع$/i });
+  const button = await screen.findByRole('button', { name: /^return$|^إرجاع$/i, hidden: true });
   await user.click(button);
 }
 
 async function returnSerial(user: ReturnType<typeof userEvent.setup>, serialNumber: string) {
-  const dialog = screen.getByRole('dialog');
+  const dialog = screen.getByRole('dialog', { hidden: true });
   const input = screen.getByLabelText(/serial number|الرقم التسلسلي/i);
   await user.clear(input);
   await user.type(input, serialNumber);
-  await user.click(within(dialog).getByRole('button', { name: /^return$|^إرجاع$/i }));
+  await user.click(within(dialog).getByRole('button', { name: /^return$|^إرجاع$/i, hidden: true }));
 }
 
 async function markSerialDamaged(user: ReturnType<typeof userEvent.setup>, serialNumber: string) {
-  const dialog = screen.getByRole('dialog');
+  const dialog = screen.getByRole('dialog', { hidden: true });
   const input = screen.getByLabelText(/serial number|الرقم التسلسلي/i);
   await user.clear(input);
   await user.type(input, serialNumber);
   await user.click(
-    within(dialog).getByRole('button', { name: /mark as damaged|وضع علامة كتالف/i }),
+    within(dialog).getByRole('button', {
+      name: /mark as damaged|وضع علامة كتالف/i,
+      hidden: true,
+    }),
   );
 }
 
@@ -94,11 +97,13 @@ function mockReturnBox(workOrder: ActiveWorkOrder, response: unknown) {
 }
 
 async function returnBox(user: ReturnType<typeof userEvent.setup>, boxCode: string) {
-  const dialog = screen.getByRole('dialog');
+  const dialog = screen.getByRole('dialog', { hidden: true });
   const input = within(dialog).getByLabelText(/box code|رمز الصندوق/i);
   await user.clear(input);
   await user.type(input, boxCode);
-  await user.click(within(dialog).getByRole('button', { name: /^return box$|^إرجاع صندوق$/i }));
+  await user.click(
+    within(dialog).getByRole('button', { name: /^return box$|^إرجاع صندوق$/i, hidden: true }),
+  );
 }
 
 describe('WorkOrdersPage - return', () => {
@@ -153,16 +158,19 @@ describe('WorkOrdersPage - return', () => {
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/1/return-item/', {
       serial_number: 'SN-1001',
     });
-    const dialog = await screen.findByRole('dialog');
+    const dialog = await screen.findByRole('dialog', { hidden: true });
     expect(
       await within(dialog).findByText(/^partially returned$|^إرجاع جزئي$/i),
     ).toBeInTheDocument();
-    const row = await within(dialog).findByRole('row', { name: /bar led model a/i });
+    const row = await within(dialog).findByRole('row', {
+      name: /bar led model a/i,
+      hidden: true,
+    });
     const cells = within(row)
-      .getAllByRole('cell')
+      .getAllByRole('cell', { hidden: true })
       .map((cell) => cell.textContent);
     expect(cells).toEqual(['Bar LED Model A', '2', '1', '0', '1']); // issued, returned, damaged, still out
-  }, 40000);
+  });
 
   it('marks a scanned unit as damaged instead of returning it, and reflects it as its own category', async () => {
     // WRH-57/AC-1/AC-2/AC-3/TC-01/TC-03
@@ -207,13 +215,16 @@ describe('WorkOrdersPage - return', () => {
       serial_number: 'SN-9001',
       damaged: true,
     });
-    const dialog = await screen.findByRole('dialog');
+    const dialog = await screen.findByRole('dialog', { hidden: true });
     // AC-3: a WO with a damaged item still reaches "returned" once every
     // other item is accounted for.
     expect(await within(dialog).findByText(/^returned$|^تم الإرجاع$/i)).toBeInTheDocument();
-    const row = await within(dialog).findByRole('row', { name: /bar led model a/i });
+    const row = await within(dialog).findByRole('row', {
+      name: /bar led model a/i,
+      hidden: true,
+    });
     const cells = within(row)
-      .getAllByRole('cell')
+      .getAllByRole('cell', { hidden: true })
       .map((cell) => cell.textContent);
     expect(cells).toEqual(['Bar LED Model A', '2', '1', '1', '0']); // issued, returned, damaged, still out
   });
@@ -269,7 +280,7 @@ describe('WorkOrdersPage - return', () => {
     await screen.findByText(/^partially returned$|^إرجاع جزئي$/i);
     const countBeforeClose = getCallCount;
 
-    await user.click(screen.getByRole('button', { name: /^done$|^تم$/i }));
+    await user.click(screen.getByRole('button', { name: /^done$|^تم$/i, hidden: true }));
 
     await waitFor(() => expect(getCallCount).toBeGreaterThan(countBeforeClose));
   });
@@ -293,7 +304,7 @@ describe('WorkOrdersPage - return', () => {
     await openReturnModal(user);
     await returnSerial(user, 'SN-9001');
 
-    await user.click(screen.getByRole('button', { name: /^done$|^تم$/i }));
+    await user.click(screen.getByRole('button', { name: /^done$|^تم$/i, hidden: true }));
 
     await act(async () => {
       resolvePost?.({ data: { ...workOrder, status: 'partially_returned' } });
@@ -334,7 +345,7 @@ describe('WorkOrdersPage - return', () => {
     await openReturnModal(user);
     await returnSerial(user, 'SN-8001');
 
-    await user.click(screen.getByRole('button', { name: /^done$|^تم$/i }));
+    await user.click(screen.getByRole('button', { name: /^done$|^تم$/i, hidden: true }));
     await openReturnModal(user);
 
     await act(async () => {
@@ -347,8 +358,10 @@ describe('WorkOrdersPage - return', () => {
     // not get silently overwritten by the abandoned first session's
     // stale "partially_returned" response.
     expect(screen.queryByText(/^partially returned$|^إرجاع جزئي$/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('dialog').textContent).toMatch(/fulfilled|تم التنفيذ/i);
-  }, 90000);
+    expect(screen.getByRole('dialog', { hidden: true }).textContent).toMatch(
+      /fulfilled|تم التنفيذ/i,
+    );
+  });
 
   it('returns a box and marks the WO returned once every item is back', async () => {
     // WRH-26/AC-2/AC-3
@@ -390,7 +403,7 @@ describe('WorkOrdersPage - return', () => {
       await screen.findByText(/box bx-003 expanded: 5 items added|تم توسيع الصندوق bx-003/i),
     ).toBeInTheDocument();
     expect(screen.getByText(/^returned$|^تم الإرجاع$/i)).toBeInTheDocument();
-  }, 40000);
+  });
 
   it('flags an already-damaged item in the box return summary without counting it as returned', async () => {
     // WRH-28/AC-3/TC-05: a box-mate flagged damaged by the backend must show
@@ -433,7 +446,7 @@ describe('WorkOrdersPage - return', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByText(/SN-5002 is already marked damaged/i)).toBeInTheDocument();
-  }, 40000);
+  });
 
   it('retries a box return with the same code after a transient error', async () => {
     // Regression: pendingReturnBoxSubmission used to be a bare string, so

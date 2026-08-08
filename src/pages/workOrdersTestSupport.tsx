@@ -3,12 +3,13 @@ import userEvent from '@testing-library/user-event';
 import type { Mock } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { App as AntApp } from 'antd';
+import { App as AntApp, ConfigProvider } from 'antd';
 import { WorkOrdersPage } from './WorkOrdersPage';
 import { AppLayout } from '../components/AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
 import type { ProductType } from '../features/product-types/types';
 import type { ActiveWorkOrder, WorkOrder } from '../features/work-orders/types';
+import { motionDisabledTheme } from '../test/motionDisabledTheme';
 
 // Shared across WorkOrdersPage.*.test.tsx - split out of a single 1620-line/
 // 48-test WorkOrdersPage.test.tsx (WRH-34) so each tab/feature's tests live
@@ -130,21 +131,25 @@ export async function renderWorkOrdersPage({ tab = 'manage' }: { tab?: 'active' 
 
   const result = render(
     <QueryClientProvider client={queryClient}>
-      <AntApp>
-        <MemoryRouter initialEntries={['/work-orders']}>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route path="/work-orders" element={<WorkOrdersPage />} />
-            </Route>
-            <Route path="/login" element={<div>Login Page</div>} />
-          </Routes>
-        </MemoryRouter>
-      </AntApp>
+      <ConfigProvider theme={motionDisabledTheme}>
+        <AntApp>
+          <MemoryRouter initialEntries={['/work-orders']}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route path="/work-orders" element={<WorkOrdersPage />} />
+              </Route>
+              <Route path="/login" element={<div>Login Page</div>} />
+            </Routes>
+          </MemoryRouter>
+        </AntApp>
+      </ConfigProvider>
     </QueryClientProvider>,
   );
 
   if (tab === 'manage') {
-    await userEvent.setup().click(await screen.findByRole('tab', { name: /manage|الإدارة/i }));
+    await userEvent
+      .setup()
+      .click(await screen.findByRole('tab', { name: /manage|الإدارة/i, hidden: true }));
   }
 
   return result;
@@ -163,8 +168,8 @@ export async function selectProductTypeForLineItem(
   lineItemIndex: number,
   name: string,
 ) {
-  const dialog = screen.getByRole('dialog');
-  const combobox = within(dialog).getAllByRole('combobox').at(lineItemIndex);
+  const dialog = screen.getByRole('dialog', { hidden: true });
+  const combobox = within(dialog).getAllByRole('combobox', { hidden: true }).at(lineItemIndex);
   if (!combobox) {
     throw new Error(`No combobox at index ${lineItemIndex}`);
   }

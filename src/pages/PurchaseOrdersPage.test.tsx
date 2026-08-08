@@ -3,13 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { App as AntApp } from 'antd';
+import { App as AntApp, ConfigProvider } from 'antd';
 import { PurchaseOrdersPage } from './PurchaseOrdersPage';
 import { AppLayout } from '../components/AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
 import type { ProductType } from '../features/product-types/types';
 import type { PurchaseOrder } from '../features/purchase-orders/types';
 import { apiClient } from '../lib/apiClient';
+import { motionDisabledTheme } from '../test/motionDisabledTheme';
 import '../i18n';
 
 vi.mock('../lib/apiClient', () => ({
@@ -139,8 +140,8 @@ function mockReceiveEndpoint(initialPurchaseOrder: PurchaseOrder) {
 }
 
 async function selectReceiveLineItem(user: ReturnType<typeof userEvent.setup>, name: string) {
-  const dialog = screen.getByRole('dialog');
-  const combobox = within(dialog).getByRole('combobox');
+  const dialog = screen.getByRole('dialog', { hidden: true });
+  const combobox = within(dialog).getByRole('combobox', { hidden: true });
   await user.click(combobox);
   const option = screen.getAllByTitle(name).at(-1);
   if (!option) {
@@ -153,7 +154,7 @@ async function scanSerial(user: ReturnType<typeof userEvent.setup>, serialNumber
   const input = screen.getByLabelText(/serial number|الرقم التسلسلي/i);
   await user.clear(input);
   await user.type(input, serialNumber);
-  await user.click(screen.getByRole('button', { name: /^scan$|^مسح$/i }));
+  await user.click(screen.getByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
 }
 
 function renderPurchaseOrdersPage() {
@@ -170,16 +171,18 @@ function renderPurchaseOrdersPage() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <AntApp>
-        <MemoryRouter initialEntries={['/purchase-orders']}>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
-            </Route>
-            <Route path="/login" element={<div>Login Page</div>} />
-          </Routes>
-        </MemoryRouter>
-      </AntApp>
+      <ConfigProvider theme={motionDisabledTheme}>
+        <AntApp>
+          <MemoryRouter initialEntries={['/purchase-orders']}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
+              </Route>
+              <Route path="/login" element={<div>Login Page</div>} />
+            </Routes>
+          </MemoryRouter>
+        </AntApp>
+      </ConfigProvider>
     </QueryClientProvider>,
   );
 }
@@ -197,8 +200,8 @@ async function selectProductTypeForLineItem(
   lineItemIndex: number,
   name: string,
 ) {
-  const dialog = screen.getByRole('dialog');
-  const combobox = within(dialog).getAllByRole('combobox').at(lineItemIndex);
+  const dialog = screen.getByRole('dialog', { hidden: true });
+  const combobox = within(dialog).getAllByRole('combobox', { hidden: true }).at(lineItemIndex);
   if (!combobox) {
     throw new Error(`No combobox at index ${lineItemIndex}`);
   }
@@ -241,13 +244,15 @@ describe('PurchaseOrdersPage', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderPurchaseOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /new po|أمر شراء جديد/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new po|أمر شراء جديد/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/^supplier$|^المورد$/i), 'Acme Lighting Co');
     await fillOrderDate(user, '2026-07-01');
     await selectProductTypeForLineItem(user, 0, 'Bar LED Model A');
     await user.type(screen.getByPlaceholderText(/qty|الكمية/i), '5');
     purchaseOrders.push(makePurchaseOrder());
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalled());
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/purchase-orders/', {
@@ -268,18 +273,22 @@ describe('PurchaseOrdersPage', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderPurchaseOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /new po|أمر شراء جديد/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new po|أمر شراء جديد/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/^supplier$|^المورد$/i), 'Acme Lighting Co');
     await fillOrderDate(user, '2026-07-01');
     await selectProductTypeForLineItem(user, 0, 'Bar LED Model A');
     await user.type(screen.getAllByPlaceholderText(/qty|الكمية/i)[0]!, '5');
 
-    await user.click(screen.getByRole('button', { name: /add line item|إضافة بند/i }));
+    await user.click(
+      screen.getByRole('button', { name: /add line item|إضافة بند/i, hidden: true }),
+    );
     await selectProductTypeForLineItem(user, 1, 'Fog Machine');
     await user.type(screen.getAllByPlaceholderText(/qty|الكمية/i)[1]!, '2');
 
     purchaseOrders.push(makePurchaseOrder());
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalled());
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/purchase-orders/', {
@@ -303,15 +312,21 @@ describe('PurchaseOrdersPage', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderPurchaseOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /new po|أمر شراء جديد/i }));
-    await user.click(screen.getByRole('button', { name: /add line item|إضافة بند/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new po|أمر شراء جديد/i, hidden: true }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: /add line item|إضافة بند/i, hidden: true }),
+    );
 
-    const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getAllByRole('combobox')).toHaveLength(2);
+    const dialog = screen.getByRole('dialog', { hidden: true });
+    expect(within(dialog).getAllByRole('combobox', { hidden: true })).toHaveLength(2);
 
-    await user.click(screen.getAllByRole('button', { name: /remove line item|إزالة البند/i })[0]!);
+    await user.click(
+      screen.getAllByRole('button', { name: /remove line item|إزالة البند/i, hidden: true })[0]!,
+    );
 
-    expect(within(dialog).getAllByRole('combobox')).toHaveLength(1);
+    expect(within(dialog).getAllByRole('combobox', { hidden: true })).toHaveLength(1);
   });
 
   it('shows a generic error banner when creation fails', async () => {
@@ -324,12 +339,14 @@ describe('PurchaseOrdersPage', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderPurchaseOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /new po|أمر شراء جديد/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new po|أمر شراء جديد/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/^supplier$|^المورد$/i), 'Acme Lighting Co');
     await fillOrderDate(user, '2026-07-01');
     await selectProductTypeForLineItem(user, 0, 'Bar LED Model A');
     await user.type(screen.getByPlaceholderText(/qty|الكمية/i), '5');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(
       await screen.findByText(/failed to create purchase order|فشل إنشاء أمر الشراء/i),
@@ -366,7 +383,7 @@ describe('PurchaseOrdersPage', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderPurchaseOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /receive|استلام/i }));
+    await user.click(await screen.findByRole('button', { name: /receive|استلام/i, hidden: true }));
     await selectReceiveLineItem(user, 'Bar LED Model A');
     await scanSerial(user, 'SN-1001');
     await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
@@ -377,10 +394,10 @@ describe('PurchaseOrdersPage', () => {
       line_item: 1,
       serial_number: 'SN-1001',
     });
-    const dialog = screen.getByRole('dialog');
-    const row = await within(dialog).findByRole('row', { name: /bar led model a/i });
+    const dialog = screen.getByRole('dialog', { hidden: true });
+    const row = await within(dialog).findByRole('row', { name: /bar led model a/i, hidden: true });
     const cells = within(row)
-      .getAllByRole('cell')
+      .getAllByRole('cell', { hidden: true })
       .map((cell) => cell.textContent);
     expect(cells).toEqual(['Bar LED Model A', '2', '2', '0']); // expected, received, remaining
   });
@@ -410,11 +427,11 @@ describe('PurchaseOrdersPage', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderPurchaseOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /receive|استلام/i }));
+    await user.click(await screen.findByRole('button', { name: /receive|استلام/i, hidden: true }));
     await selectReceiveLineItem(user, 'Bar LED Model A');
     await scanSerial(user, 'SN-P001');
     await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
-    await user.click(screen.getByRole('button', { name: /done|تم/i }));
+    await user.click(screen.getByRole('button', { name: /done|تم/i, hidden: true }));
 
     expect(await screen.findByText(/partially received|مستلم جزئيًا/i)).toBeInTheDocument();
   });
@@ -441,11 +458,11 @@ describe('PurchaseOrdersPage', () => {
     renderPurchaseOrdersPage();
 
     expect(await screen.findByText(/partially received|مستلم جزئيًا/i)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /receive|استلام/i }));
+    await user.click(screen.getByRole('button', { name: /receive|استلام/i, hidden: true }));
     await selectReceiveLineItem(user, 'Bar LED Model A');
     await scanSerial(user, 'SN-C002');
     await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
-    await user.click(screen.getByRole('button', { name: /done|تم/i }));
+    await user.click(screen.getByRole('button', { name: /done|تم/i, hidden: true }));
 
     expect(await screen.findByText(/^received$|^تم الاستلام$/i)).toBeInTheDocument();
   });
@@ -478,11 +495,11 @@ describe('PurchaseOrdersPage', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderPurchaseOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /receive|استلام/i }));
+    await user.click(await screen.findByRole('button', { name: /receive|استلام/i, hidden: true }));
     await selectReceiveLineItem(user, 'Bar LED Model A');
     await scanSerial(user, 'SN-M001');
     await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
-    await user.click(screen.getByRole('button', { name: /done|تم/i }));
+    await user.click(screen.getByRole('button', { name: /done|تم/i, hidden: true }));
 
     expect(await screen.findByText(/partially received|مستلم جزئيًا/i)).toBeInTheDocument();
   });
@@ -495,7 +512,7 @@ describe('PurchaseOrdersPage', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderPurchaseOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /receive|استلام/i }));
+    await user.click(await screen.findByRole('button', { name: /receive|استلام/i, hidden: true }));
     await selectReceiveLineItem(user, 'Bar LED Model A');
     await scanSerial(user, 'SN-DUP');
     await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));

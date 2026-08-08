@@ -34,9 +34,12 @@ function mockCloseWorkOrder(workOrder: ActiveWorkOrder, response: unknown) {
 }
 
 async function closeWorkOrder(user: ReturnType<typeof userEvent.setup>) {
-  const button = await screen.findByRole('button', { name: /close work order|إغلاق أمر العمل/i });
+  const button = await screen.findByRole('button', {
+    name: /close work order|إغلاق أمر العمل/i,
+    hidden: true,
+  });
   await user.click(button);
-  await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i }));
+  await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
 }
 
 describe('WorkOrdersPage - close', () => {
@@ -75,6 +78,7 @@ describe('WorkOrdersPage - close', () => {
     await renderWorkOrdersPage({ tab: 'active' });
     const button = await screen.findByRole('button', {
       name: /close work order|إغلاق أمر العمل/i,
+      hidden: true,
     });
     await user.click(button);
 
@@ -83,7 +87,7 @@ describe('WorkOrdersPage - close', () => {
     // the shared "still out" phrase rather than one exact full sentence.
     expect(await screen.findByText(/3.*(still out|بالخارج)/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /^ok$|^موافق$/i }));
+    await user.click(screen.getByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
 
     await waitFor(() =>
       expect(mockedApiClient.post).toHaveBeenCalledWith(`/api/work-orders/${workOrder.id}/close/`),
@@ -121,6 +125,7 @@ describe('WorkOrdersPage - close', () => {
     await renderWorkOrdersPage({ tab: 'active' });
     const button = await screen.findByRole('button', {
       name: /close work order|إغلاق أمر العمل/i,
+      hidden: true,
     });
     await user.click(button);
 
@@ -173,7 +178,7 @@ describe('WorkOrdersPage - close', () => {
 
     await screen.findByText(workOrder.job_name);
     expect(
-      screen.queryByRole('button', { name: /close work order|إغلاق أمر العمل/i }),
+      screen.queryByRole('button', { name: /close work order|إغلاق أمر العمل/i, hidden: true }),
     ).not.toBeInTheDocument();
   });
 
@@ -186,10 +191,18 @@ describe('WorkOrdersPage - close', () => {
 
     await screen.findByText(workOrder.job_name);
     expect(
-      screen.queryByRole('button', { name: /close work order|إغلاق أمر العمل/i }),
+      screen.queryByRole('button', { name: /close work order|إغلاق أمر العمل/i, hidden: true }),
     ).not.toBeInTheDocument();
   });
 
+  // Timeout bump - measures ~500ms without coverage, but specifically under
+  // `npm run test:coverage` (v8 instrumentation) this one test measured
+  // 30-63s across repeated runs, while every other test in this same file
+  // stays under 2s instrumented. Reproducible with just this file/test
+  // alone (not cross-file contention) - matches the same
+  // coverage-instrumentation-tax category LESSONS.md's WRH-55 entry
+  // documents elsewhere in this suite. Not a query-cost or animation-timing
+  // issue (both already fixed).
   it('leaves the work order open when the close confirmation is dismissed', async () => {
     // WRH-41/AC-5/TC-05
     const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
@@ -208,17 +221,21 @@ describe('WorkOrdersPage - close', () => {
     await renderWorkOrdersPage({ tab: 'active' });
     const button = await screen.findByRole('button', {
       name: /close work order|إغلاق أمر العمل/i,
+      hidden: true,
     });
     await user.click(button);
-    await screen.findByRole('button', { name: /^ok$|^موافق$/i });
+    await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true });
 
-    await user.click(screen.getByRole('button', { name: /^cancel$|^إلغاء$/i }));
+    await user.click(screen.getByRole('button', { name: /^cancel$|^إلغاء$/i, hidden: true }));
 
     expect(mockedApiClient.post).not.toHaveBeenCalled();
     expect(
-      await screen.findByRole('button', { name: /close work order|إغلاق أمر العمل/i }),
+      await screen.findByRole('button', {
+        name: /close work order|إغلاق أمر العمل/i,
+        hidden: true,
+      }),
     ).toBeInTheDocument();
-  });
+  }, 90000);
 
   it('shows a generic error when closing fails', async () => {
     const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
