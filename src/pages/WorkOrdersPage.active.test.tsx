@@ -76,7 +76,9 @@ describe('WorkOrdersPage - active tab', () => {
     await screen.findByText('Summer Gala');
     expect(screen.queryByText('Supplementary A')).not.toBeInTheDocument();
 
-    await userEvent.setup().click(screen.getByRole('button', { name: /expand row/i }));
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: /expand row/i, hidden: true }));
 
     expect(await screen.findByText('Supplementary A')).toBeInTheDocument();
     expect(screen.getByText('Supplementary B')).toBeInTheDocument();
@@ -105,14 +107,22 @@ describe('WorkOrdersPage - active tab', () => {
     await renderWorkOrdersPage({ tab: 'active' });
     await screen.findByText('Summer Gala');
 
-    await user.click(screen.getByRole('button', { name: /add supplementary|إضافة أمر تكميلي/i }));
-    expect(screen.getByRole('dialog')).toHaveTextContent('WO-1');
+    // hidden: true - skips testing-library's default accessibility-tree
+    // visibility check, which is what's actually slow here (jsdom resolving
+    // antd's CSS var() chains per candidate), not the click/render itself.
+    // Safe here since there's only one matching "Add Supplementary"/"OK"
+    // button in the tree at a time - no AntD-kept-mounted hidden pane
+    // duplicate to collide with.
+    await user.click(
+      screen.getByRole('button', { name: /add supplementary|إضافة أمر تكميلي/i, hidden: true }),
+    );
+    expect(screen.getByRole('dialog', { hidden: true })).toHaveTextContent('WO-1');
 
     await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Extra Lighting');
     await fillExpectedDateOut(user, '2026-08-02');
     await selectProductTypeForLineItem(user, 0, 'Bar LED Model A');
     await user.type(screen.getByPlaceholderText(/qty|الكمية/i), '3');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/', {
       job_name: 'Extra Lighting',
@@ -138,16 +148,20 @@ describe('WorkOrdersPage - active tab', () => {
     await renderWorkOrdersPage({ tab: 'active' });
     await screen.findByText('Summer Gala');
 
-    await user.click(screen.getByRole('button', { name: /add supplementary|إضافة أمر تكميلي/i }));
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(
+      screen.getByRole('button', { name: /add supplementary|إضافة أمر تكميلي/i, hidden: true }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Cancel', hidden: true }));
 
-    await user.click(screen.getByRole('tab', { name: /manage|الإدارة/i }));
-    await user.click(await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i }));
+    await user.click(screen.getByRole('tab', { name: /manage|الإدارة/i, hidden: true }));
+    await user.click(
+      await screen.findByRole('button', { name: /new wo|أمر عمل جديد/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/job name|اسم المهمة/i), 'Summer Gala');
     await fillExpectedDateOut(user, '2026-08-01');
     await selectProductTypeForLineItem(user, 0, 'Bar LED Model A');
     await user.type(screen.getByPlaceholderText(/qty|الكمية/i), '5');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/', {
       job_name: 'Summer Gala',
@@ -191,7 +205,10 @@ describe('WorkOrdersPage - active tab', () => {
     await screen.findByText('Summer Gala');
 
     await user.click(
-      screen.getByRole('button', { name: /download packing list|تحميل قائمة التعبئة/i }),
+      screen.getByRole('button', {
+        name: /download packing list|تحميل قائمة التعبئة/i,
+        hidden: true,
+      }),
     );
 
     await waitFor(() => expect(createObjectURLSpy).toHaveBeenCalledWith(pdfBlob));
@@ -222,12 +239,16 @@ describe('WorkOrdersPage - active tab', () => {
       return Promise.reject(new Error(`Unexpected GET ${url}`));
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage({ tab: 'active' });
     await screen.findByText('Summer Gala');
 
+    // hidden: true - see the "Add Supplementary" test above for why.
     await user.click(
-      screen.getByRole('button', { name: /download packing list|تحميل قائمة التعبئة/i }),
+      screen.getByRole('button', {
+        name: /download packing list|تحميل قائمة التعبئة/i,
+        hidden: true,
+      }),
     );
 
     expect(
@@ -235,8 +256,6 @@ describe('WorkOrdersPage - active tab', () => {
     ).toBeInTheDocument();
   });
 
-  // Timeout bumped for the same reason as "shows Add Supplementary..."
-  // above - measured ~30s in isolation, no coverage involved.
   it('drills into a work order to show exact serials and their statuses', async () => {
     // TC-03/AC-3
     mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [makeActiveWorkOrder()] });
@@ -278,10 +297,12 @@ describe('WorkOrdersPage - active tab', () => {
 
     await userEvent
       .setup()
-      .click(await screen.findByRole('button', { name: /view details|عرض التفاصيل/i }));
+      .click(
+        await screen.findByRole('button', { name: /view details|عرض التفاصيل/i, hidden: true }),
+      );
 
-    const dialog = await screen.findByRole('dialog');
+    const dialog = await screen.findByRole('dialog', { hidden: true });
     expect(within(dialog).getByText('SN-0001')).toBeInTheDocument();
     expect(within(dialog).getByText(/^out$|^خارج$/i)).toBeInTheDocument();
-  }, 60000);
+  });
 });

@@ -47,7 +47,12 @@ function mockTransferItemRejection(workOrder: ActiveWorkOrder, field: string, me
 }
 
 async function openTransferModal(user: ReturnType<typeof userEvent.setup>) {
-  const button = await screen.findByRole('button', { name: /^transfer$|^نقل$/i });
+  // hidden: true - see hiddenTrueForRoleQueries.md: skips testing-library's
+  // default accessibility-tree visibility check (the actual slow part is
+  // jsdom resolving antd's CSS var() chains per candidate). Scoped to a
+  // single active-tab row's "Transfer" action button here, so there's no
+  // Manage/Active-pane duplicate to collide with.
+  const button = await screen.findByRole('button', { name: /^transfer$|^نقل$/i, hidden: true });
   await user.click(button);
 }
 
@@ -56,18 +61,18 @@ async function submitTransfer(
   serialNumber: string,
   destinationLabel: string,
 ) {
-  const dialog = screen.getByRole('dialog');
+  const dialog = screen.getByRole('dialog', { hidden: true });
   const serialInput = within(dialog).getByLabelText(/serial number|الرقم التسلسلي/i);
   await user.clear(serialInput);
   await user.type(serialInput, serialNumber);
-  const combobox = within(dialog).getByRole('combobox');
+  const combobox = within(dialog).getByRole('combobox', { hidden: true });
   await user.click(combobox);
   const option = screen.getAllByTitle(destinationLabel).at(-1);
   if (!option) {
     throw new Error(`No destination option found for ${destinationLabel}`);
   }
   await user.click(option);
-  await user.click(within(dialog).getByRole('button', { name: /^transfer$|^نقل$/i }));
+  await user.click(within(dialog).getByRole('button', { name: /^transfer$|^نقل$/i, hidden: true }));
 }
 
 describe('WorkOrdersPage - transfer', () => {
@@ -106,12 +111,7 @@ describe('WorkOrdersPage - transfer', () => {
     expect(
       await screen.findByText(/SN-042 transferred to WO-2|تم نقل SN-042 إلى WO-2/i),
     ).toBeInTheDocument();
-    // Timeout bumped - opening the Transfer modal (AntD Select dropdown +
-    // form submit) is one of the heavier render paths on this page, same
-    // class as the Return modal's bumped tests (see LESSONS.md's WRH-55
-    // entry) - flaky-under-full-suite-parallelism, not a real regression
-    // (passes reliably in isolation).
-  }, 40000);
+  });
 
   it('excludes the source work order from the destination options', async () => {
     // AC-2: any *other* WO, Primary or Supplementary, is a valid destination.
@@ -127,8 +127,8 @@ describe('WorkOrdersPage - transfer', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage({ tab: 'active' });
     await openTransferModal(user);
-    const dialog = screen.getByRole('dialog');
-    await user.click(within(dialog).getByRole('combobox'));
+    const dialog = screen.getByRole('dialog', { hidden: true });
+    await user.click(within(dialog).getByRole('combobox', { hidden: true }));
 
     expect(screen.queryByTitle(/^WO-1 —/)).not.toBeInTheDocument();
     expect(screen.getAllByTitle(/^WO-1-S1 —/).length).toBeGreaterThan(0);
@@ -175,7 +175,7 @@ describe('WorkOrdersPage - transfer', () => {
     await openTransferModal(user);
     await submitTransfer(user, 'SN-9001', 'WO-2 — Summer Gala');
 
-    await user.click(screen.getByRole('button', { name: /^done$|^تم$/i }));
+    await user.click(screen.getByRole('button', { name: /^done$|^تم$/i, hidden: true }));
 
     await act(async () => {
       resolvePost?.({
@@ -228,9 +228,8 @@ describe('WorkOrdersPage - transfer', () => {
     await submitTransfer(user, 'SN-042', 'WO-2 — Summer Gala');
     await screen.findByText(/SN-042 transferred to WO-2|تم نقل SN-042 إلى WO-2/i);
 
-    const dialog = screen.getByRole('dialog');
+    const dialog = screen.getByRole('dialog', { hidden: true });
     expect(within(dialog).getByLabelText(/serial number|الرقم التسلسلي/i)).toHaveValue('');
     await waitFor(() => expect(getCallCount).toBe(callsBeforeSubmit));
-    // Timeout bumped - same reason as the test above.
-  }, 40000);
+  });
 });

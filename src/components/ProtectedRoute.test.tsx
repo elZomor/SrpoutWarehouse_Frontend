@@ -2,8 +2,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ConfigProvider } from 'antd';
 import { ProtectedRoute } from './ProtectedRoute';
 import { apiClient } from '../lib/apiClient';
+import { motionDisabledTheme } from '../test/motionDisabledTheme';
 
 vi.mock('../lib/apiClient', () => ({
   apiClient: {
@@ -21,21 +23,26 @@ function renderProtectedRoute() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/']}>
-        <Routes>
-          <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<div>Protected Content</div>} />
-          </Route>
-          <Route path="/login" element={<div>Login Page</div>} />
-        </Routes>
-      </MemoryRouter>
+      <ConfigProvider theme={motionDisabledTheme}>
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route element={<ProtectedRoute />}>
+              <Route path="/" element={<div>Protected Content</div>} />
+            </Route>
+            <Route path="/login" element={<div>Login Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </ConfigProvider>
     </QueryClientProvider>,
   );
 }
 
 describe('ProtectedRoute', () => {
   afterEach(() => {
-    vi.clearAllMocks();
+    // resetAllMocks (not clearAllMocks) - both tests chain
+    // mockResolvedValueOnce/mockRejectedValueOnce, and clearAllMocks only
+    // clears call history, not queued once-implementations.
+    vi.resetAllMocks();
   });
 
   it('redirects to /login when there is no active session', async () => {

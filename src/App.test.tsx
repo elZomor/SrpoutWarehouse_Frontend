@@ -22,6 +22,17 @@ vi.mock('./config/env', () => ({
   },
 }));
 
+// AppProviders wires its own ConfigProvider straight from this theme (no
+// prop to override it at the render call site), so disabling the `motion`
+// token for the suite - see motionDisabledTheme.ts for why - has to happen
+// by overriding the module itself.
+vi.mock('./theme/antdTheme', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./theme/antdTheme')>();
+  return {
+    antdTheme: { ...actual.antdTheme, token: { ...actual.antdTheme.token, motion: false } },
+  };
+});
+
 const mockedApiClient = vi.mocked(apiClient, true);
 
 describe('App', () => {
@@ -31,7 +42,10 @@ describe('App', () => {
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    // resetAllMocks (not clearAllMocks) - both tests chain
+    // mockResolvedValueOnce/mockRejectedValueOnce, and clearAllMocks only
+    // clears call history, not queued once-implementations.
+    vi.resetAllMocks();
   });
 
   it('redirects an unauthenticated visitor at "/" to the login page', async () => {
@@ -46,7 +60,9 @@ describe('App', () => {
       </AppProviders>,
     );
 
-    expect(await screen.findByRole('heading', { name: /login|تسجيل الدخول/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: /login|تسجيل الدخول/i, hidden: true }),
+    ).toBeInTheDocument();
   });
 
   it("shows the dashboard with the logged-in user's name in the nav bar for an authenticated visitor", async () => {

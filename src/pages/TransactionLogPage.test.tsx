@@ -3,12 +3,13 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { App as AntApp } from 'antd';
+import { App as AntApp, ConfigProvider } from 'antd';
 import { TransactionLogPage } from './TransactionLogPage';
 import { AppLayout } from '../components/AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
 import type { Transaction } from '../features/transactions/types';
 import { apiClient } from '../lib/apiClient';
+import { motionDisabledTheme } from '../test/motionDisabledTheme';
 import '../i18n';
 
 vi.mock('../lib/apiClient', () => ({
@@ -89,16 +90,18 @@ function renderTransactionLogPage() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <AntApp>
-        <MemoryRouter initialEntries={['/transaction-log']}>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route path="/transaction-log" element={<TransactionLogPage />} />
-            </Route>
-            <Route path="/login" element={<div>Login Page</div>} />
-          </Routes>
-        </MemoryRouter>
-      </AntApp>
+      <ConfigProvider theme={motionDisabledTheme}>
+        <AntApp>
+          <MemoryRouter initialEntries={['/transaction-log']}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route path="/transaction-log" element={<TransactionLogPage />} />
+              </Route>
+              <Route path="/login" element={<div>Login Page</div>} />
+            </Routes>
+          </MemoryRouter>
+        </AntApp>
+      </ConfigProvider>
     </QueryClientProvider>,
   );
 }
@@ -187,9 +190,9 @@ describe('TransactionLogPage', () => {
 
     // Column order is type(0)/reference_number(1)/serial_number(2)/... -
     // see TransactionLogPage.tsx's columns array.
-    const dataRows = screen.getAllByRole('row').slice(1);
+    const dataRows = screen.getAllByRole('row', { hidden: true }).slice(1);
     const referenceCellOrder = dataRows.map(
-      (row) => within(row).getAllByRole('cell')[1]?.textContent,
+      (row) => within(row).getAllByRole('cell', { hidden: true })[1]?.textContent,
     );
     expect(referenceCellOrder).toEqual(['PO-1', 'WO-1']);
   });
@@ -238,9 +241,13 @@ describe('TransactionLogPage', () => {
     renderTransactionLogPage();
     expect(await screen.findAllByText('SN-042')).toHaveLength(2);
 
-    expect(screen.queryByRole('button', { name: /edit|تعديل/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /delete|حذف/i })).not.toBeInTheDocument();
-    const headerCells = screen.getAllByRole('columnheader');
+    expect(
+      screen.queryByRole('button', { name: /edit|تعديل/i, hidden: true }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /delete|حذف/i, hidden: true }),
+    ).not.toBeInTheDocument();
+    const headerCells = screen.getAllByRole('columnheader', { hidden: true });
     expect(headerCells.some((cell) => /actions|إجراءات/i.test(cell.textContent ?? ''))).toBe(false);
   });
 

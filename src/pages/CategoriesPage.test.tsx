@@ -3,12 +3,13 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { App as AntApp } from 'antd';
+import { App as AntApp, ConfigProvider } from 'antd';
 import { CategoriesPage } from './CategoriesPage';
 import { AppLayout } from '../components/AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
 import type { Category } from '../features/categories/types';
 import { apiClient } from '../lib/apiClient';
+import { motionDisabledTheme } from '../test/motionDisabledTheme';
 import '../i18n';
 
 vi.mock('../lib/apiClient', () => ({
@@ -45,16 +46,18 @@ function renderCategoriesPage() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <AntApp>
-        <MemoryRouter initialEntries={['/categories']}>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route path="/categories" element={<CategoriesPage />} />
-            </Route>
-            <Route path="/login" element={<div>Login Page</div>} />
-          </Routes>
-        </MemoryRouter>
-      </AntApp>
+      <ConfigProvider theme={motionDisabledTheme}>
+        <AntApp>
+          <MemoryRouter initialEntries={['/categories']}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route path="/categories" element={<CategoriesPage />} />
+              </Route>
+              <Route path="/login" element={<div>Login Page</div>} />
+            </Routes>
+          </MemoryRouter>
+        </AntApp>
+      </ConfigProvider>
     </QueryClientProvider>,
   );
 }
@@ -83,7 +86,9 @@ describe('CategoriesPage', () => {
     renderCategoriesPage();
 
     expect(await screen.findByText('Jane Doe')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /dashboard|لوحة التحكم/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /dashboard|لوحة التحكم/i, hidden: true }),
+    ).toBeInTheDocument();
   });
 
   it('creates a category with all fields and it appears in the list', async () => {
@@ -99,10 +104,12 @@ describe('CategoriesPage', () => {
     const user = userEvent.setup();
     renderCategoriesPage();
 
-    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new category|فئة جديدة/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Lighting');
     await user.type(screen.getByLabelText(/description|الوصف/i), 'Moving lights and fixtures');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/categories/', {
       name: 'Lighting',
@@ -120,9 +127,11 @@ describe('CategoriesPage', () => {
     const user = userEvent.setup();
     renderCategoriesPage();
 
-    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new category|فئة جديدة/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Lighting');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/categories/', {
       name: 'Lighting',
@@ -145,9 +154,11 @@ describe('CategoriesPage', () => {
     const user = userEvent.setup();
     renderCategoriesPage();
 
-    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new category|فئة جديدة/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Lighting');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(
       await screen.findByText(/already exists|توجد فئة بهذا الاسم بالفعل/i),
@@ -155,7 +166,7 @@ describe('CategoriesPage', () => {
     expect(
       screen.queryByText(/failed to create category|فشل إنشاء الفئة/i),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'OK' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'OK', hidden: true })).toBeInTheDocument();
   });
 
   // "shows the generic create-failed banner for non-name errors" / "shows
@@ -175,13 +186,17 @@ describe('CategoriesPage', () => {
     const user = userEvent.setup();
     renderCategoriesPage();
 
-    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new category|فئة جديدة/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Lighting');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
     await screen.findByText(/already exists|توجد فئة بهذا الاسم بالفعل/i);
 
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
+    await user.click(screen.getByRole('button', { name: 'Cancel', hidden: true }));
+    await user.click(
+      await screen.findByRole('button', { name: /new category|فئة جديدة/i, hidden: true }),
+    );
 
     // AntD's Form.Item help text animates out (rc-motion), so the node can
     // still be present mid-transition - wait for it to actually leave.
@@ -202,13 +217,17 @@ describe('CategoriesPage', () => {
     const user = userEvent.setup();
     renderCategoriesPage();
 
-    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new category|فئة جديدة/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Lighting');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
     await screen.findByText(/failed to create category|فشل إنشاء الفئة/i);
 
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
+    await user.click(screen.getByRole('button', { name: 'Cancel', hidden: true }));
+    await user.click(
+      await screen.findByRole('button', { name: /new category|فئة جديدة/i, hidden: true }),
+    );
 
     expect(
       screen.queryByText(/failed to create category|فشل إنشاء الفئة/i),
@@ -229,9 +248,11 @@ describe('CategoriesPage', () => {
     const user = userEvent.setup();
     renderCategoriesPage();
 
-    await user.click(await screen.findByRole('button', { name: /new category|فئة جديدة/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /new category|فئة جديدة/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Lighting');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
     await screen.findByText(/failed to create category|فشل إنشاء الفئة/i);
 
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), ' Fixtures');
@@ -250,7 +271,9 @@ describe('CategoriesPage', () => {
     const user = userEvent.setup();
     renderCategoriesPage();
 
-    await user.click(await screen.findByRole('button', { name: /logout|تسجيل الخروج/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /logout|تسجيل الخروج/i, hidden: true }),
+    );
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/auth/logout/');
     await waitFor(() => expect(screen.getByText('Login Page')).toBeInTheDocument());
@@ -307,8 +330,8 @@ describe('CategoriesPage', () => {
     renderCategoriesPage();
 
     await screen.findByText('Lighting');
-    await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i }));
-    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i }));
+    await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i, hidden: true }));
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
 
     await waitFor(() => expect(mockedApiClient.delete).toHaveBeenCalledWith('/api/categories/1/'));
     await waitFor(() => expect(screen.queryByText('Lighting')).not.toBeInTheDocument());
@@ -334,8 +357,8 @@ describe('CategoriesPage', () => {
     renderCategoriesPage();
 
     await screen.findByText('Lighting');
-    await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i }));
-    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i }));
+    await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i, hidden: true }));
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
 
     expect(
       await screen.findByText(/cannot delete.*3 product types|لا يمكن الحذف.*3/i),
@@ -353,8 +376,8 @@ describe('CategoriesPage', () => {
     renderCategoriesPage();
 
     await screen.findByText('Lighting');
-    await user.click(screen.getByRole('button', { name: /^archive$|^أرشفة$/i }));
-    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i }));
+    await user.click(screen.getByRole('button', { name: /^archive$|^أرشفة$/i, hidden: true }));
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
 
     await waitFor(() =>
       expect(mockedApiClient.post).toHaveBeenCalledWith('/api/categories/1/archive/'),

@@ -3,12 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ConfigProvider } from 'antd';
 import { ProductTypesPage } from './ProductTypesPage';
 import { AppLayout } from '../components/AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
 import type { Category } from '../features/categories/types';
 import type { ProductType } from '../features/product-types/types';
 import { apiClient } from '../lib/apiClient';
+import { motionDisabledTheme } from '../test/motionDisabledTheme';
 import '../i18n';
 
 vi.mock('../lib/apiClient', () => ({
@@ -90,26 +92,33 @@ function renderProductTypesPage() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/product-types']}>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route path="/product-types" element={<ProductTypesPage />} />
-          </Route>
-          <Route path="/login" element={<div>Login Page</div>} />
-        </Routes>
-      </MemoryRouter>
+      <ConfigProvider theme={motionDisabledTheme}>
+        <MemoryRouter initialEntries={['/product-types']}>
+          <Routes>
+            <Route element={<AppLayout />}>
+              <Route path="/product-types" element={<ProductTypesPage />} />
+            </Route>
+            <Route path="/login" element={<div>Login Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </ConfigProvider>
     </QueryClientProvider>,
   );
 }
 
 async function selectCategory(user: ReturnType<typeof userEvent.setup>, name: string) {
-  await user.click(screen.getByRole('combobox'));
+  await user.click(screen.getByRole('combobox', { hidden: true }));
   await user.click(screen.getByTitle(name));
 }
 
 describe('ProductTypesPage', () => {
   afterEach(() => {
-    vi.clearAllMocks();
+    // resetAllMocks (not clearAllMocks) - this file chains
+    // mockResolvedValueOnce/mockRejectedValueOnce per test, and
+    // clearAllMocks only clears call history, not queued once-
+    // implementations. Any test that doesn't consume its queue exactly
+    // leaked stale values into later tests, causing order-dependent flake.
+    vi.resetAllMocks();
   });
 
   it('renders product types returned from the API', async () => {
@@ -142,7 +151,9 @@ describe('ProductTypesPage', () => {
     renderProductTypesPage();
 
     expect(await screen.findByText('Jane Doe')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /dashboard|لوحة التحكم/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /dashboard|لوحة التحكم/i, hidden: true }),
+    ).toBeInTheDocument();
   });
 
   it('creates a product type with all fields and it appears in the list', async () => {
@@ -157,14 +168,14 @@ describe('ProductTypesPage', () => {
     renderProductTypesPage();
 
     await user.click(
-      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i }),
+      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i, hidden: true }),
     );
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Bar LED Model A');
     await user.type(screen.getByLabelText(/model code|رمز الموديل/i), 'BAR-A');
     await user.type(screen.getByLabelText(/description|الوصف/i), 'Moving bar light');
     await selectCategory(user, 'Lighting');
     productTypes.push(makeProductType({ description: 'Moving bar light' }));
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/product-types/', {
       name: 'Bar LED Model A',
@@ -187,12 +198,12 @@ describe('ProductTypesPage', () => {
     renderProductTypesPage();
 
     await user.click(
-      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i }),
+      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i, hidden: true }),
     );
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Bar LED Model A');
     await selectCategory(user, 'Lighting');
     productTypes.push(makeProductType({ model_code: '' }));
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/product-types/', {
       name: 'Bar LED Model A',
@@ -215,9 +226,9 @@ describe('ProductTypesPage', () => {
     renderProductTypesPage();
 
     await user.click(
-      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i }),
+      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i, hidden: true }),
     );
-    await user.click(screen.getByRole('combobox'));
+    await user.click(screen.getByRole('combobox', { hidden: true }));
 
     expect(screen.getByTitle('Lighting')).toBeInTheDocument();
   });
@@ -233,16 +244,16 @@ describe('ProductTypesPage', () => {
     renderProductTypesPage();
 
     await user.click(
-      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i }),
+      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i, hidden: true }),
     );
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Bar LED Model A');
     await selectCategory(user, 'Lighting');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(
       await screen.findByText(/failed to create product type|فشل إنشاء نوع المنتج/i),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'OK' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'OK', hidden: true })).toBeInTheDocument();
   });
 
   it('clears the create error when the modal is reopened after a failed submit', async () => {
@@ -256,16 +267,16 @@ describe('ProductTypesPage', () => {
     renderProductTypesPage();
 
     await user.click(
-      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i }),
+      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i, hidden: true }),
     );
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Bar LED Model A');
     await selectCategory(user, 'Lighting');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
     await screen.findByText(/failed to create product type|فشل إنشاء نوع المنتج/i);
 
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel', hidden: true }));
     await user.click(
-      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i }),
+      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i, hidden: true }),
     );
 
     expect(
@@ -280,7 +291,9 @@ describe('ProductTypesPage', () => {
     const user = userEvent.setup();
     renderProductTypesPage();
 
-    await user.click(await screen.findByRole('button', { name: /logout|تسجيل الخروج/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /logout|تسجيل الخروج/i, hidden: true }),
+    );
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/auth/logout/');
     await waitFor(() => expect(screen.getByText('Login Page')).toBeInTheDocument());

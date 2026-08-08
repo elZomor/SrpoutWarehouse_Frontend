@@ -3,13 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { App as AntApp } from 'antd';
+import { App as AntApp, ConfigProvider } from 'antd';
 import { SerializedItemsPage } from './SerializedItemsPage';
 import { AppLayout } from '../components/AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
 import type { ProductType } from '../features/product-types/types';
 import type { SerializedItem } from '../features/serialized-items/types';
 import { apiClient } from '../lib/apiClient';
+import { motionDisabledTheme } from '../test/motionDisabledTheme';
 import '../i18n';
 
 vi.mock('../lib/apiClient', () => ({
@@ -107,16 +108,18 @@ function renderSerializedItemsPage() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <AntApp>
-        <MemoryRouter initialEntries={['/serialized-items']}>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route path="/serialized-items" element={<SerializedItemsPage />} />
-            </Route>
-            <Route path="/login" element={<div>Login Page</div>} />
-          </Routes>
-        </MemoryRouter>
-      </AntApp>
+      <ConfigProvider theme={motionDisabledTheme}>
+        <AntApp>
+          <MemoryRouter initialEntries={['/serialized-items']}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route path="/serialized-items" element={<SerializedItemsPage />} />
+              </Route>
+              <Route path="/login" element={<div>Login Page</div>} />
+            </Routes>
+          </MemoryRouter>
+        </AntApp>
+      </ConfigProvider>
     </QueryClientProvider>,
   );
 }
@@ -125,13 +128,13 @@ function renderSerializedItemsPage() {
 // registration form's dropdown inside the modal dialog), so scope to the
 // modal when it's open rather than assuming a single combobox exists.
 async function selectProductTypeInForm(user: ReturnType<typeof userEvent.setup>, name: string) {
-  const dialog = screen.getByRole('dialog');
-  await user.click(within(dialog).getByRole('combobox'));
+  const dialog = screen.getByRole('dialog', { hidden: true });
+  await user.click(within(dialog).getByRole('combobox', { hidden: true }));
   await user.click(screen.getByTitle(name));
 }
 
 async function selectProductTypeFilter(user: ReturnType<typeof userEvent.setup>, name: string) {
-  await user.click(screen.getByRole('combobox'));
+  await user.click(screen.getByRole('combobox', { hidden: true }));
   await user.click(screen.getByTitle(name));
 }
 
@@ -163,11 +166,13 @@ describe('SerializedItemsPage', () => {
     const user = userEvent.setup();
     renderSerializedItemsPage();
 
-    await user.click(await screen.findByRole('button', { name: /register item|تسجيل وحدة/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /register item|تسجيل وحدة/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/serial number|الرقم التسلسلي/i), 'SN-042');
     await selectProductTypeInForm(user, 'Bar LED Model A');
     serializedItems.push(makeSerializedItem());
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/serialized-items/', {
       serial_number: 'SN-042',
@@ -201,13 +206,17 @@ describe('SerializedItemsPage', () => {
     const user = userEvent.setup();
     renderSerializedItemsPage();
 
-    await user.click(await screen.findByRole('button', { name: /register item|تسجيل وحدة/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /register item|تسجيل وحدة/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/serial number|الرقم التسلسلي/i), 'SN-NEW');
     await selectProductTypeInForm(user, 'Bar LED Model A');
     serializedItems.push(newItem);
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
-    await user.click(await screen.findByRole('button', { name: /print qr|طباعة رمز qr/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /print qr|طباعة رمز qr/i, hidden: true }),
+    );
 
     expect(openSpy).toHaveBeenCalled();
     const img = fakePrintWindow.document.querySelector('img');
@@ -256,7 +265,9 @@ describe('SerializedItemsPage', () => {
     await screen.findByText('SN-042');
 
     await selectProductTypeFilter(user, 'Bar LED Model A');
-    await user.click(screen.getByRole('button', { name: /download qr pdf|تنزيل ملصقات qr/i }));
+    await user.click(
+      screen.getByRole('button', { name: /download qr pdf|تنزيل ملصقات qr/i, hidden: true }),
+    );
 
     await waitFor(() => expect(createObjectURLSpy).toHaveBeenCalledWith(pdfBlob));
     expect(clickSpy).toHaveBeenCalled();
@@ -293,7 +304,9 @@ describe('SerializedItemsPage', () => {
     await screen.findByText('SN-042');
 
     await selectProductTypeFilter(user, 'Fog Machine');
-    await user.click(screen.getByRole('button', { name: /download qr pdf|تنزيل ملصقات qr/i }));
+    await user.click(
+      screen.getByRole('button', { name: /download qr pdf|تنزيل ملصقات qr/i, hidden: true }),
+    );
 
     expect(
       await screen.findByText(
@@ -328,10 +341,12 @@ describe('SerializedItemsPage', () => {
     const user = userEvent.setup();
     renderSerializedItemsPage();
 
-    await user.click(await screen.findByRole('button', { name: /register item|تسجيل وحدة/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /register item|تسجيل وحدة/i, hidden: true }),
+    );
     await user.type(screen.getByLabelText(/serial number|الرقم التسلسلي/i), 'SN-042');
     await selectProductTypeInForm(user, 'Bar LED Model A');
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(
       await screen.findByText(
@@ -449,8 +464,8 @@ describe('SerializedItemsPage', () => {
     renderSerializedItemsPage();
 
     await screen.findByText('SN-042');
-    await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i }));
-    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i }));
+    await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i, hidden: true }));
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
 
     await waitFor(() =>
       expect(mockedApiClient.delete).toHaveBeenCalledWith('/api/serialized-items/1/'),
@@ -481,16 +496,16 @@ describe('SerializedItemsPage', () => {
     renderSerializedItemsPage();
 
     await screen.findByText('SN-043');
-    const row = screen.getByRole('row', { name: /SN-042/ });
-    await user.click(within(row).getByRole('button', { name: /^delete$|^حذف$/i }));
-    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i }));
+    const row = screen.getByRole('row', { name: /SN-042/, hidden: true });
+    await user.click(within(row).getByRole('button', { name: /^delete$|^حذف$/i, hidden: true }));
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
 
     await waitFor(() =>
       expect(mockedApiClient.delete).toHaveBeenCalledWith('/api/serialized-items/1/'),
     );
     await waitFor(() => expect(screen.queryByText('SN-042')).not.toBeInTheDocument());
     expect(screen.getByText('SN-043')).toBeInTheDocument();
-  }, 20000);
+  });
 
   it('leaves the item untouched when the delete confirmation is dismissed', async () => {
     // TC-03/AC-3
@@ -500,8 +515,10 @@ describe('SerializedItemsPage', () => {
     renderSerializedItemsPage();
 
     await screen.findByText('SN-042');
-    await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i }));
-    await user.click(await screen.findByRole('button', { name: /^cancel$|^إلغاء$/i }));
+    await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i, hidden: true }));
+    await user.click(
+      await screen.findByRole('button', { name: /^cancel$|^إلغاء$/i, hidden: true }),
+    );
 
     expect(mockedApiClient.delete).not.toHaveBeenCalled();
     expect(screen.getByText('SN-042')).toBeInTheDocument();
@@ -519,8 +536,8 @@ describe('SerializedItemsPage', () => {
     renderSerializedItemsPage();
 
     await screen.findByText('SN-042');
-    await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i }));
-    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i }));
+    await user.click(screen.getByRole('button', { name: /^delete$|^حذف$/i, hidden: true }));
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
 
     expect(await screen.findByText(/failed to delete item|فشل حذف الوحدة/i)).toBeInTheDocument();
     expect(screen.getByText('SN-042')).toBeInTheDocument();
