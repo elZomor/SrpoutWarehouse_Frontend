@@ -293,6 +293,12 @@ describe('WorkOrdersPage - fulfillment', () => {
     expect(screen.getByText(/^draft$|^مسودة$/i)).toBeInTheDocument();
   });
 
+  // WRH-55 lesson (see LESSONS.md): this test needs a 45000ms per-test
+  // timeout override under CI's coverage-instrumented runner - the override
+  // apparently didn't survive WorkOrdersPage.test.tsx later being split
+  // into per-flow files (this test landed here with only the global
+  // 20000ms testTimeout). Restoring the same value WRH-55 established
+  // rather than re-deriving a new one.
   it('does not show a loading state on other draft rows when starting one WO', async () => {
     // Efficiency/altitude regression: a shared mutation instance must not
     // spin every draft row's button when only one row's start is pending.
@@ -311,7 +317,7 @@ describe('WorkOrdersPage - fulfillment', () => {
 
     const rowB = screen.getByRole('row', { name: /job b/i, hidden: true });
     expect(within(rowB).getByRole('button', { hidden: true })).toBeEnabled();
-  });
+  }, 45000);
 
   it('updates the live counter as items are scanned', async () => {
     // TC-02/AC-2
