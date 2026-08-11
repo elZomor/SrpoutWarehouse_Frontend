@@ -405,5 +405,28 @@
     },
     "emptyState": "No transactions found",
     "loadError": "Failed to load transaction log. Please try again."
+  },
+  "missingItems": {
+    "title": "Missing Items",
+    "serialNumberLabel": "Serial",
+    "productTypeLabel": "Product Type",
+    "workOrderLabel": "Work Order",
+    "noWorkOrder": "—",
+    "dateMissingLabel": "Date Missing",
+    "statusLabel": "Status",
+    "status": {
+      "missing": "Missing"
+    },
+    "actionsLabel": "Actions",
+    "markFoundButton": "Mark as Found",
+    "markFoundConfirmTitle": "Mark this item as found?",
+    "markFoundSuccess": "Item marked as found.",
+    "markFoundError": "Failed to mark item as found. Please try again.",
+    "writeOffButton": "Write Off",
+    "writeOffConfirmTitle": "Write off this item permanently?",
+    "writeOffSuccess": "Item written off.",
+    "writeOffError": "Failed to write off item. Please try again.",
+    "emptyState": "No missing items",
+    "loadError": "Failed to load missing items. Please try again."
   }
 }

@@ -6,6 +6,7 @@ import { CategoriesPage } from './pages/CategoriesPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
+import { MissingItemsPage } from './pages/MissingItemsPage';
 import { ProductTypesPage } from './pages/ProductTypesPage';
 import { PurchaseOrdersPage } from './pages/PurchaseOrdersPage';
 import { SerializedItemsPage } from './pages/SerializedItemsPage';
@@ -26,10 +27,7 @@ function App() {
           <Route path={ROUTES.boxes} element={<BoxesPage />} />
           <Route path={ROUTES.purchaseOrders} element={<PurchaseOrdersPage />} />
           <Route path={ROUTES.workOrders} element={<WorkOrdersPage />} />
-          <Route
-            path={ROUTES.missingItems}
-            element={<ComingSoonPage titleKey="nav.missingItems" />}
-          />
+          <Route path={ROUTES.missingItems} element={<MissingItemsPage />} />
           <Route
             path={ROUTES.damageReports}
             element={<ComingSoonPage titleKey="nav.damageReports" />}

@@ -413,5 +413,28 @@
     },
     "emptyState": "لا توجد معاملات",
     "loadError": "فشل تحميل سجل المعاملات. حاول مرة أخرى."
+  },
+  "missingItems": {
+    "title": "العناصر المفقودة",
+    "serialNumberLabel": "الرقم التسلسلي",
+    "productTypeLabel": "نوع المنتج",
+    "workOrderLabel": "أمر العمل",
+    "noWorkOrder": "—",
+    "dateMissingLabel": "تاريخ الفقدان",
+    "statusLabel": "الحالة",
+    "status": {
+      "missing": "مفقود"
+    },
+    "actionsLabel": "الإجراءات",
+    "markFoundButton": "تحديد كموجود",
+    "markFoundConfirmTitle": "هل تريد تحديد هذا العنصر كموجود؟",
+    "markFoundSuccess": "تم تحديد العنصر كموجود.",
+    "markFoundError": "فشل تحديد العنصر كموجود. حاول مرة أخرى.",
+    "writeOffButton": "شطب",
+    "writeOffConfirmTitle": "هل تريد شطب هذا العنصر نهائيًا؟",
+    "writeOffSuccess": "تم شطب العنصر.",
+    "writeOffError": "فشل شطب العنصر. حاول مرة أخرى.",
+    "emptyState": "لا توجد عناصر مفقودة",
+    "loadError": "فشل تحميل العناصر المفقودة. حاول مرة أخرى."
   }
 }
