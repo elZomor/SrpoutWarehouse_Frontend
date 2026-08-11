@@ -64,7 +64,13 @@ export function MissingItemsPage() {
       title: t('missingItems.statusLabel'),
       dataIndex: 'status',
       key: 'status',
-      render: () => <Tag color="orange">{t('missingItems.status.missing')}</Tag>,
+      // Every row is "missing" today (the backend's list queryset only ever
+      // returns SerializedItem.STATUS_MISSING rows), but rendering off
+      // record.status rather than hardcoding avoids silently mislabeling a
+      // row if that filter ever loosens or this columns array gets reused.
+      render: (value: string) => (
+        <Tag color="orange">{t(`missingItems.status.${value}`, { defaultValue: value })}</Tag>
+      ),
     },
     {
       title: t('missingItems.actionsLabel'),

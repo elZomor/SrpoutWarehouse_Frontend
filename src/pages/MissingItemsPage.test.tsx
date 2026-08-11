@@ -55,23 +55,26 @@ function renderMissingItemsPage() {
     last_name: 'Doe',
   });
 
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <ConfigProvider theme={motionDisabledTheme}>
-        <AntApp>
-          <MemoryRouter initialEntries={['/missing-items']}>
-            <Routes>
-              <Route element={<AppLayout />}>
-                <Route path="/missing-items" element={<MissingItemsPage />} />
-                <Route path="/work-orders" element={<div>Work Orders Page</div>} />
-              </Route>
-              <Route path="/login" element={<div>Login Page</div>} />
-            </Routes>
-          </MemoryRouter>
-        </AntApp>
-      </ConfigProvider>
-    </QueryClientProvider>,
-  );
+  return {
+    queryClient,
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <ConfigProvider theme={motionDisabledTheme}>
+          <AntApp>
+            <MemoryRouter initialEntries={['/missing-items']}>
+              <Routes>
+                <Route element={<AppLayout />}>
+                  <Route path="/missing-items" element={<MissingItemsPage />} />
+                  <Route path="/work-orders" element={<div>Work Orders Page</div>} />
+                </Route>
+                <Route path="/login" element={<div>Login Page</div>} />
+              </Routes>
+            </MemoryRouter>
+          </AntApp>
+        </ConfigProvider>
+      </QueryClientProvider>,
+    ),
+  };
 }
 
 describe('MissingItemsPage', () => {
@@ -142,6 +145,37 @@ describe('MissingItemsPage', () => {
       expect(mockedApiClient.post).toHaveBeenCalledWith('/api/missing-items/1/mark-found/'),
     );
     await waitFor(() => expect(screen.queryByText('SN-042')).not.toBeInTheDocument());
+  });
+
+  it('invalidates serialized-items and the product-types stock summary after resolving an item', async () => {
+    // Resolving a missing item flips the same SerializedItem.status field
+    // SerializedItemsPage's list and the Dashboard's stock summary read -
+    // matches useBoxes.ts's useCreateBox() precedent of invalidating
+    // 'serialized-items' alongside its own key so those views don't sit
+    // stale for queryClient's 30s staleTime.
+    const missingItems = [makeMissingItem()];
+    mockMissingItemsEndpoint(missingItems);
+    mockedApiClient.post.mockImplementationOnce(async () => {
+      missingItems.splice(0, 1);
+      return { data: { id: 1, status: 'available' } };
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const { queryClient } = renderMissingItemsPage();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    await screen.findByText('SN-042');
+    await user.click(
+      screen.getByRole('button', { name: /^mark as found$|^تحديد كموجود$/i, hidden: true }),
+    );
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['serialized-items'] }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['product-types', 'stock-summary'],
+    });
   });
 
   it('writes off an item and removes it from the active list (AC-4/TC-03)', async () => {
