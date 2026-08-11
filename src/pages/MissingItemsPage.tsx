@@ -10,6 +10,12 @@ import {
 import type { MissingItem } from '../features/missing-items/types';
 import { ROUTES } from '../routes';
 
+// A Map (not a plain object) avoids eslint-plugin-security's
+// detect-object-injection warning on the dynamic-key lookup below, matching
+// SerializedItemsPage's/WorkOrdersPage's identical STATUS_COLORS convention.
+const STATUS_COLORS = new Map<string, string>([['missing', 'orange']]);
+const DEFAULT_STATUS_COLOR = 'default';
+
 export function MissingItemsPage() {
   const { t } = useTranslation();
   const { message } = App.useApp();
@@ -69,7 +75,9 @@ export function MissingItemsPage() {
       // record.status rather than hardcoding avoids silently mislabeling a
       // row if that filter ever loosens or this columns array gets reused.
       render: (value: string) => (
-        <Tag color="orange">{t(`missingItems.status.${value}`, { defaultValue: value })}</Tag>
+        <Tag color={STATUS_COLORS.get(value) ?? DEFAULT_STATUS_COLOR}>
+          {t(`missingItems.status.${value}`, { defaultValue: value })}
+        </Tag>
       ),
     },
     {
