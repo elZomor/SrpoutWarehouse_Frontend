@@ -428,5 +428,26 @@
     "writeOffError": "Failed to write off item. Please try again.",
     "emptyState": "No missing items",
     "loadError": "Failed to load missing items. Please try again."
+  },
+  "damageReports": {
+    "title": "Damage Reports",
+    "newButton": "New Damage Report",
+    "referenceLabel": "DR #",
+    "dateLabel": "Date",
+    "serialNumberLabel": "Serial Number",
+    "productTypeLabel": "Product Type",
+    "noteLabel": "Note",
+    "noNote": "—",
+    "userLabel": "User",
+    "emptyState": "No damage reports found",
+    "loadError": "Failed to load damage reports. Please try again.",
+    "createSuccess": "{{reference}} created.",
+    "createError": "Failed to create damage report. Please try again.",
+    "form": {
+      "serialNumberRequired": "Serial number is required.",
+      "serialNumberNotFound": "Serial number was not found.",
+      "serialNumberNotAvailable": "This item is not available to report as damaged.",
+      "serialNumberInvalid": "This serial number could not be used."
+    }
   }
 }
