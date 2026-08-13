@@ -2,6 +2,7 @@ import { Alert, App, Button, Popconfirm, Space, Table, Tag, Typography } from 'a
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { getSerializedItemStatusColor } from '../features/serialized-items/logic';
 import {
   useMarkMissingItemFound,
   useMissingItems,
@@ -9,12 +10,6 @@ import {
 } from '../features/missing-items/useMissingItems';
 import type { MissingItem } from '../features/missing-items/types';
 import { ROUTES } from '../routes';
-
-// A Map (not a plain object) avoids eslint-plugin-security's
-// detect-object-injection warning on the dynamic-key lookup below, matching
-// SerializedItemsPage's/WorkOrdersPage's identical STATUS_COLORS convention.
-const STATUS_COLORS = new Map<string, string>([['missing', 'orange']]);
-const DEFAULT_STATUS_COLOR = 'default';
 
 export function MissingItemsPage() {
   const { t } = useTranslation();
@@ -53,12 +48,22 @@ export function MissingItemsPage() {
       title: t('missingItems.workOrderLabel'),
       dataIndex: 'work_order_reference',
       key: 'work_order_reference',
-      // TC-04: "clicking navigates to that WO" - work order rows are shown
-      // (and only reachable) from the Manage tab of the Work Orders page,
-      // which has no per-id deep link today, so this routes there rather
-      // than to a WO detail page that doesn't exist yet.
+      // TC-04: "clicking navigates to that WO" - a missing item's WO is
+      // always closed (see backend's mark_found()/write_off() comment: the
+      // WO is closed by the time an item can go missing), and closed WOs
+      // are excluded from the Work Orders page's Active tab entirely - so
+      // this passes navigate state requesting the Manage tab (which does
+      // list closed WOs) rather than falling through to the default Active
+      // tab a closed WO can never appear on. No per-WO deep link/detail
+      // view exists yet, so this lands on the tab, not the exact row.
       render: (value: string) =>
-        value ? <Link to={ROUTES.workOrders}>{value}</Link> : t('missingItems.noWorkOrder'),
+        value ? (
+          <Link to={ROUTES.workOrders} state={{ initialTab: 'manage' }}>
+            {value}
+          </Link>
+        ) : (
+          t('missingItems.noWorkOrder')
+        ),
     },
     {
       title: t('missingItems.dateMissingLabel'),
@@ -74,8 +79,12 @@ export function MissingItemsPage() {
       // returns SerializedItem.STATUS_MISSING rows), but rendering off
       // record.status rather than hardcoding avoids silently mislabeling a
       // row if that filter ever loosens or this columns array gets reused.
+      // getSerializedItemStatusColor is the shared color map for this same
+      // SerializedItem.status field (SerializedItemsPage uses it too) -
+      // keeps 'missing' rendering the same color on both pages rather than
+      // each page choosing its own.
       render: (value: string) => (
-        <Tag color={STATUS_COLORS.get(value) ?? DEFAULT_STATUS_COLOR}>
+        <Tag color={getSerializedItemStatusColor(value)}>
           {t(`missingItems.status.${value}`, { defaultValue: value })}
         </Tag>
       ),
