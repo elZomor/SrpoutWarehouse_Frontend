@@ -121,7 +121,7 @@ describe('MissingItemsPage', () => {
     expect(rows).toHaveLength(2);
   });
 
-  it('marks an item as found and removes it from the active list (AC-3/TC-02)', async () => {
+  it('marks an item as found and removes it from the active list (AC-3/TC-02; WRH-43/AC-1)', async () => {
     const missingItems = [makeMissingItem()];
     mockMissingItemsEndpoint(missingItems);
     mockedApiClient.post.mockImplementationOnce(async () => {
@@ -178,7 +178,7 @@ describe('MissingItemsPage', () => {
     });
   });
 
-  it('writes off an item and removes it from the active list (AC-4/TC-03)', async () => {
+  it('writes off an item and removes it from the active list (AC-4/TC-03; WRH-43/AC-1/AC-4/TC-05)', async () => {
     const missingItems = [makeMissingItem()];
     mockMissingItemsEndpoint(missingItems);
     mockedApiClient.post.mockImplementationOnce(async () => {
@@ -209,6 +209,25 @@ describe('MissingItemsPage', () => {
     await user.click(
       screen.getByRole('button', { name: /^mark as found$|^تحديد كموجود$/i, hidden: true }),
     );
+    await user.click(
+      await screen.findByRole('button', { name: /^cancel$|^إلغاء$/i, hidden: true }),
+    );
+
+    expect(mockedApiClient.post).not.toHaveBeenCalled();
+    expect(screen.getByText('SN-042')).toBeInTheDocument();
+  });
+
+  it('leaves the item untouched when the write-off confirmation is dismissed (WRH-43/AC-4/TC-04)', async () => {
+    // TC-04: dismissing the confirmation must not finalize the write-off -
+    // the item stays "missing" (still visible in this list) and no request
+    // is made, mirroring the mark-as-found dismiss test above.
+    mockMissingItemsEndpoint([makeMissingItem()]);
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderMissingItemsPage();
+
+    await screen.findByText('SN-042');
+    await user.click(screen.getByRole('button', { name: /^write off$|^شطب$/i, hidden: true }));
     await user.click(
       await screen.findByRole('button', { name: /^cancel$|^إلغاء$/i, hidden: true }),
     );
@@ -249,6 +268,28 @@ describe('MissingItemsPage', () => {
     expect(
       await screen.findByText(/failed to mark item as found|فشل تحديد العنصر كموجود/i),
     ).toBeInTheDocument();
+    expect(screen.getByText('SN-042')).toBeInTheDocument();
+  });
+
+  it('shows an error message when write-off fails (WRH-43/AC-3)', async () => {
+    // Mirrors the mark-as-found failure test above - surfaces the
+    // backend's rejection (e.g. the item is no longer "missing" by the
+    // time the request lands) as a translated error instead of silently
+    // no-op'ing, and leaves the item in the list since nothing changed.
+    mockMissingItemsEndpoint([makeMissingItem()]);
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 400, data: {} },
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderMissingItemsPage();
+
+    await screen.findByText('SN-042');
+    await user.click(screen.getByRole('button', { name: /^write off$|^شطب$/i, hidden: true }));
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
+
+    expect(await screen.findByText(/failed to write off item|فشل شطب العنصر/i)).toBeInTheDocument();
     expect(screen.getByText('SN-042')).toBeInTheDocument();
   });
 });
