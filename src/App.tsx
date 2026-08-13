@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { BoxesPage } from './pages/BoxesPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
+import { DamageReportsPage } from './pages/DamageReportsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { MissingItemsPage } from './pages/MissingItemsPage';
@@ -28,10 +29,7 @@ function App() {
           <Route path={ROUTES.purchaseOrders} element={<PurchaseOrdersPage />} />
           <Route path={ROUTES.workOrders} element={<WorkOrdersPage />} />
           <Route path={ROUTES.missingItems} element={<MissingItemsPage />} />
-          <Route
-            path={ROUTES.damageReports}
-            element={<ComingSoonPage titleKey="nav.damageReports" />}
-          />
+          <Route path={ROUTES.damageReports} element={<DamageReportsPage />} />
           <Route
             path={ROUTES.maintenanceOrders}
             element={<ComingSoonPage titleKey="nav.maintenanceOrders" />}
