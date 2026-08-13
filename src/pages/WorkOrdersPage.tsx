@@ -23,6 +23,7 @@ import dayjs from 'dayjs';
 import { useEffect, useRef, useState } from 'react';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
   classifyReturnRejection,
@@ -100,6 +101,18 @@ const BOX_AMBIGUOUS_LINE_ITEM_MESSAGE =
 export function WorkOrdersPage() {
   const { t } = useTranslation();
   const { message } = App.useApp();
+  const location = useLocation();
+  // WRH-42: a caller (MissingItemsPage's WO reference link) can request
+  // landing on a specific tab via navigate state - the Active tab excludes
+  // closed WOs entirely (see backend's _TERMINAL_STATUSES exclusion), so a
+  // link to a closed WO's Manage-tab row would otherwise open on a tab that
+  // structurally cannot show it. Falls back to the original default when no
+  // state was passed (every other entry point into this page).
+  const initialTab =
+    (location.state as { initialTab?: string } | null)?.initialTab === 'manage'
+      ? 'manage'
+      : 'active';
+  const [activeTabKey, setActiveTabKey] = useState(initialTab);
   const [isModalOpen, setIsModalOpen] = useState(false);
   // WRH-53/AC-1/AC-2: set when the create modal was opened via a Primary
   // row's "Add Supplementary" action rather than the Manage tab's plain
@@ -992,7 +1005,8 @@ export function WorkOrdersPage() {
     <>
       <Typography.Title level={3}>{t('workOrders.title')}</Typography.Title>
       <Tabs
-        defaultActiveKey="active"
+        activeKey={activeTabKey}
+        onChange={setActiveTabKey}
         items={[
           {
             key: 'active',

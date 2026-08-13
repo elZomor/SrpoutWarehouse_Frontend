@@ -33,6 +33,27 @@ describe('WorkOrdersPage - active tab', () => {
     vi.resetAllMocks();
   });
 
+  it('opens on the Manage tab when navigated with initialTab state (WRH-42)', async () => {
+    // MissingItemsPage's WO reference link passes state: { initialTab:
+    // 'manage' } since a missing item's WO is always closed and closed WOs
+    // are excluded from the Active tab entirely - this proves the tab is
+    // selected by that state alone (tab: 'active' below skips the helper's
+    // own auto-click, matching a plain link click with no follow-up
+    // interaction).
+    mockListEndpoints(mockedApiClient.get, { workOrders: [makeWorkOrder({ job_name: 'Job A' })] });
+
+    await renderWorkOrdersPage({
+      tab: 'active',
+      initialEntries: [{ pathname: '/work-orders', state: { initialTab: 'manage' } }],
+    });
+
+    expect(await screen.findByText('Job A')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /manage|الإدارة/i, hidden: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
   it('shows an empty state on the Active tab when no active work orders exist', async () => {
     // TC-04/AC-4
     mockListEndpoints(mockedApiClient.get, {});

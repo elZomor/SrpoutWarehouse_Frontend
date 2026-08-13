@@ -84,7 +84,11 @@ describe('getSerializedItemStatusColor', () => {
     expect(getSerializedItemStatusColor('available')).toBe('green');
   });
 
+  it('returns orange for missing', () => {
+    expect(getSerializedItemStatusColor('missing')).toBe('orange');
+  });
+
   it('falls back to the default color for an unrecognized status', () => {
-    expect(getSerializedItemStatusColor('missing')).toBe('default');
+    expect(getSerializedItemStatusColor('damaged')).toBe('default');
   });
 });

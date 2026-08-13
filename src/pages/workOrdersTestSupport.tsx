@@ -116,8 +116,18 @@ export function mockListEndpoints(
 
 // Active is the default tab (it's the story's intended entry point) - most
 // Manage-tab tests need the switch, so this defaults there. Active-tab
-// tests pass `{ tab: 'active' }` to skip the switch.
-export async function renderWorkOrdersPage({ tab = 'manage' }: { tab?: 'active' | 'manage' } = {}) {
+// tests pass `{ tab: 'active' }` to skip the switch. `initialEntries`
+// defaults to a plain '/work-orders' visit; WRH-42's navigate-state test
+// (MissingItemsPage's WO link requesting the Manage tab) passes its own
+// entry with `state: { initialTab: 'manage' }` and `tab: 'active'` (to skip
+// the auto-click below and prove the tab was selected by state alone).
+export async function renderWorkOrdersPage({
+  tab = 'manage',
+  initialEntries = ['/work-orders'],
+}: {
+  tab?: 'active' | 'manage';
+  initialEntries?: Parameters<typeof MemoryRouter>[0]['initialEntries'];
+} = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -133,7 +143,7 @@ export async function renderWorkOrdersPage({ tab = 'manage' }: { tab?: 'active' 
     <QueryClientProvider client={queryClient}>
       <ConfigProvider theme={motionDisabledTheme}>
         <AntApp>
-          <MemoryRouter initialEntries={['/work-orders']}>
+          <MemoryRouter initialEntries={initialEntries}>
             <Routes>
               <Route element={<AppLayout />}>
                 <Route path="/work-orders" element={<WorkOrdersPage />} />

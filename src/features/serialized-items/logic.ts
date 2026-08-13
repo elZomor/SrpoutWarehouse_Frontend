@@ -5,12 +5,19 @@ import { getFieldErrorMessages } from '../../lib/apiErrors';
 // these were inline error-classification closures in the component,
 // unit-tested only by mounting the whole page. See logic.test.ts.
 
-// Only "available" exists today, but the backend's STATUS_CHOICES is an
-// extensible list - keyed by status so a future value (e.g. "issued",
-// "missing") doesn't silently inherit this color instead of getting its
-// own. A Map (not a plain object) avoids eslint-plugin-security's
+// Keyed by status so a status this map doesn't yet know about falls back to
+// DEFAULT_STATUS_COLOR instead of silently inheriting another status's
+// color. A Map (not a plain object) avoids eslint-plugin-security's
 // detect-object-injection warning on the dynamic-key lookup below.
-export const STATUS_COLORS = new Map<string, string>([['available', 'green']]);
+// WRH-42: 'missing' added here (shared by SerializedItemsPage and
+// MissingItemsPage, both of which render this same SerializedItem.status
+// field) rather than each page keeping its own local color map, which had
+// let 'missing' render inconsistently (grey via this map's old fallback vs.
+// a separately-chosen orange on MissingItemsPage) for the identical value.
+export const STATUS_COLORS = new Map<string, string>([
+  ['available', 'green'],
+  ['missing', 'orange'],
+]);
 export const DEFAULT_STATUS_COLOR = 'default';
 
 export function getSerializedItemStatusColor(status: string): string {
