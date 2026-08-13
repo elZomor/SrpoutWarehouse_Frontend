@@ -49,7 +49,18 @@ function registerDamageReportsRoute(
       if (body.serial_number === 'SN-UNKNOWN') {
         await route.fulfill({
           status: 400,
-          json: { serial_number: [`Serial number ${body.serial_number} was not found.`] },
+          json: { serial_number: ['Serial not found'] },
+        });
+        return;
+      }
+      if (body.serial_number === 'SN-OUT') {
+        await route.fulfill({
+          status: 400,
+          json: {
+            serial_number: [
+              `${body.serial_number} is currently out and cannot be reported damaged directly`,
+            ],
+          },
         });
         return;
       }
@@ -114,5 +125,26 @@ test('shows an inline error when the serial number was not found', async ({ page
 
   await expect(
     page.getByText(/serial number was not found|لم يتم العثور على الرقم التسلسلي/i),
+  ).toBeVisible();
+});
+
+test('shows a status-specific inline error when the item is currently out (AC-1/TC-01)', async ({
+  page,
+}) => {
+  const damageReports: DamageReport[] = [];
+
+  await page.route('**/api/auth/**', stubAuth);
+  await registerDamageReportsRoute(page, damageReports);
+
+  await page.goto('/damage-reports');
+
+  await page.getByRole('button', { name: /new damage report|تقرير تلف جديد/i }).click();
+  await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-OUT');
+  await page.getByRole('button', { name: 'OK' }).click();
+
+  await expect(
+    page.getByText(
+      /currently out and cannot be reported damaged|مصروفة حاليًا ولا يمكن الإبلاغ عن تلفها/i,
+    ),
   ).toBeVisible();
 });
