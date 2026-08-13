@@ -446,6 +446,11 @@
     "form": {
       "serialNumberRequired": "Serial number is required.",
       "serialNumberNotFound": "Serial number was not found.",
+      "serialNumberOutError": "This item is currently out and cannot be reported damaged.",
+      "serialNumberDamagedError": "This item is already reported as damaged.",
+      "serialNumberMissingError": "This item is currently missing and cannot be reported damaged.",
+      "serialNumberInMaintenanceError": "This item is currently in maintenance and cannot be reported damaged.",
+      "serialNumberWrittenOffError": "This item has been written off and cannot be reported damaged.",
       "serialNumberNotAvailable": "This item is not available to report as damaged.",
       "serialNumberInvalid": "This serial number could not be used."
     }

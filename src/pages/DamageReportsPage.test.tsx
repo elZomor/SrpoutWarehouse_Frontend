@@ -178,12 +178,13 @@ describe('DamageReportsPage', () => {
   });
 
   it('shows an inline error when the serial number was not found', async () => {
+    // AC-3
     mockDamageReportsEndpoint([]);
     mockedApiClient.post.mockRejectedValueOnce({
       isAxiosError: true,
       response: {
         status: 400,
-        data: { serial_number: ['Serial number SN-999 was not found.'] },
+        data: { serial_number: ['Serial not found'] },
       },
     });
 
@@ -204,13 +205,16 @@ describe('DamageReportsPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows an inline error when the item is not available to report as damaged', async () => {
+  it('shows a status-specific inline error when the item is currently out', async () => {
+    // AC-1/TC-01
     mockDamageReportsEndpoint([]);
     mockedApiClient.post.mockRejectedValueOnce({
       isAxiosError: true,
       response: {
         status: 400,
-        data: { serial_number: ['SN-042 is not available to report as damaged.'] },
+        data: {
+          serial_number: ['SN-042 is currently out and cannot be reported damaged directly'],
+        },
       },
     });
 
@@ -227,7 +231,43 @@ describe('DamageReportsPage', () => {
     await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(
-      await screen.findByText(/not available to report as damaged|غير متاحة للإبلاغ عن تلفها/i),
+      await screen.findByText(
+        /currently out and cannot be reported damaged|مصروفة حاليًا ولا يمكن الإبلاغ عن تلفها/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a status-specific inline error when the item is in maintenance', async () => {
+    // AC-1
+    mockDamageReportsEndpoint([]);
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: {
+          serial_number: [
+            'SN-043 is currently in maintenance and cannot be reported damaged directly',
+          ],
+        },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderDamageReportsPage();
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: /new damage report|تقرير تلف جديد/i,
+        hidden: true,
+      }),
+    );
+    await user.type(screen.getByLabelText(/serial number|الرقم التسلسلي/i), 'SN-043');
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
+
+    expect(
+      await screen.findByText(
+        /currently in maintenance and cannot be reported damaged|قيد الصيانة حاليًا ولا يمكن الإبلاغ عن تلفها/i,
+      ),
     ).toBeInTheDocument();
   });
 

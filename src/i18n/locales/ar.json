@@ -454,6 +454,11 @@
     "form": {
       "serialNumberRequired": "الرقم التسلسلي مطلوب.",
       "serialNumberNotFound": "لم يتم العثور على الرقم التسلسلي.",
+      "serialNumberOutError": "هذه الوحدة مصروفة حاليًا ولا يمكن الإبلاغ عن تلفها.",
+      "serialNumberDamagedError": "تم الإبلاغ عن تلف هذه الوحدة بالفعل.",
+      "serialNumberMissingError": "هذه الوحدة مفقودة حاليًا ولا يمكن الإبلاغ عن تلفها.",
+      "serialNumberInMaintenanceError": "هذه الوحدة قيد الصيانة حاليًا ولا يمكن الإبلاغ عن تلفها.",
+      "serialNumberWrittenOffError": "تم شطب هذه الوحدة ولا يمكن الإبلاغ عن تلفها.",
       "serialNumberNotAvailable": "هذه الوحدة غير متاحة للإبلاغ عن تلفها.",
       "serialNumberInvalid": "تعذر استخدام هذا الرقم التسلسلي."
     }
