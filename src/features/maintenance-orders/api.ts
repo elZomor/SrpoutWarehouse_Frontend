@@ -14,11 +14,12 @@ export async function createMaintenanceOrder(
   return data;
 }
 
-// AC-1/AC-2/AC-3: resolves one line item and returns the MO's full,
-// updated representation (including the other items' unchanged status and
-// the MO's own recomputed status) - the page uses this directly instead of
-// re-fetching the list, matching createMaintenanceOrder's identical
-// "response is the new/updated resource" shape.
+// AC-1/AC-2/AC-3: resolves one line item; the backend's response is the
+// MO's full, updated representation (other items' unchanged status plus
+// the MO's own recomputed status), matching createMaintenanceOrder's
+// identical "response is the new/updated resource" shape - though the
+// current caller (useResolveMaintenanceOrderItem) discards it and instead
+// invalidates the maintenance-orders query for a real refetch.
 export async function resolveMaintenanceOrderItem(
   maintenanceOrderId: number,
   itemId: number,

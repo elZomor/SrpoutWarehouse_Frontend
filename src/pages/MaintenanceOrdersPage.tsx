@@ -30,6 +30,7 @@ import {
   useMaintenanceOrders,
   useResolveMaintenanceOrderItem,
 } from '../features/maintenance-orders/useMaintenanceOrders';
+import { getSerializedItemStatusColor } from '../features/serialized-items/logic';
 import { useSerializedItems } from '../features/serialized-items/useSerializedItems';
 
 // AC-1/AC-2: only an item still awaiting resolution ("in_maintenance",
@@ -126,7 +127,11 @@ export function MaintenanceOrdersPage() {
       title: t('maintenanceOrders.items.statusLabel'),
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => <Tag>{t(`serializedItems.status.${status}`)}</Tag>,
+      render: (status: string) => (
+        <Tag color={getSerializedItemStatusColor(status)}>
+          {t(`serializedItems.status.${status}`)}
+        </Tag>
+      ),
     },
     {
       title: t('maintenanceOrders.items.actionsLabel'),
