@@ -465,7 +465,9 @@
     "itemsPlaceholder": "Select damaged items",
     "itemCountLabel": "Items",
     "status": {
-      "open": "Open"
+      "open": "Open",
+      "in_progress": "In progress",
+      "completed": "Completed"
     },
     "emptyState": "No maintenance orders found",
     "loadError": "Failed to load maintenance orders. Please try again.",
@@ -476,6 +478,17 @@
       "itemsRequired": "Select at least one item",
       "itemAlreadyOnMaintenanceOrderError": "{{serial}} is already on maintenance order {{reference}}",
       "itemClaimedOnWorkOrderError": "{{serial}} is currently claimed on a work order"
+    },
+    "items": {
+      "serialNumberLabel": "Serial Number",
+      "statusLabel": "Status",
+      "actionsLabel": "Actions",
+      "markFixedButton": "Mark Fixed",
+      "markFixedConfirmTitle": "Mark this item as fixed?",
+      "markNotFixableButton": "Mark Not Fixable",
+      "markNotFixableConfirmTitle": "Mark this item as not fixable?",
+      "resolveSuccess": "Item resolved.",
+      "resolveError": "Failed to resolve item. Please try again."
     }
   }
 }

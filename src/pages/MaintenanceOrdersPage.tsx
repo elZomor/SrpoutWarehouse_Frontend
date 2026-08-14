@@ -1,6 +1,18 @@
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, App, Button, Form, Modal, Select, Table, Tag, Typography } from 'antd';
+import {
+  Alert,
+  App,
+  Button,
+  Form,
+  Modal,
+  Popconfirm,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { classifyItemRejection, type ItemRejection } from '../features/maintenance-orders/logic';
@@ -8,12 +20,25 @@ import {
   maintenanceOrderSchema,
   type MaintenanceOrderFormValues,
 } from '../features/maintenance-orders/schema';
-import type { MaintenanceOrder } from '../features/maintenance-orders/types';
+import type {
+  MaintenanceOrder,
+  MaintenanceOrderItem,
+  MaintenanceOrderResolution,
+} from '../features/maintenance-orders/types';
 import {
   useCreateMaintenanceOrder,
   useMaintenanceOrders,
+  useResolveMaintenanceOrderItem,
 } from '../features/maintenance-orders/useMaintenanceOrders';
 import { useSerializedItems } from '../features/serialized-items/useSerializedItems';
+
+// AC-1/AC-2: only an item still awaiting resolution ("in_maintenance",
+// set by MaintenanceOrderSerializer.create() at MO-creation time) offers
+// the resolve actions - an item already flipped to available/written_off
+// renders as a plain status tag. Re-resolving an already-resolved item is
+// WRH-47's separate guard; this is purely a UI affordance so the actions
+// aren't offered for a state they can't meaningfully apply to twice.
+const RESOLVABLE_ITEM_STATUS = 'in_maintenance';
 
 export function MaintenanceOrdersPage() {
   const { t } = useTranslation();
@@ -21,6 +46,7 @@ export function MaintenanceOrdersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { data: maintenanceOrders, isLoading, isError: isListError } = useMaintenanceOrders();
   const createMutation = useCreateMaintenanceOrder();
+  const resolveMutation = useResolveMaintenanceOrderItem();
   // AC-1: "one or more items have status damaged" - the item picker fetches
   // every serialized item (no product_type scoping like BoxesPage, since an
   // MO isn't scoped to one product type) and filters to damaged ones
@@ -73,6 +99,78 @@ export function MaintenanceOrdersPage() {
     });
   };
 
+  const handleResolve = (
+    maintenanceOrderId: number,
+    itemId: number,
+    resolution: MaintenanceOrderResolution,
+  ) => {
+    resolveMutation.mutate(
+      { maintenanceOrderId, itemId, resolution },
+      {
+        onSuccess: () => message.success(t('maintenanceOrders.items.resolveSuccess')),
+        onError: () => message.error(t('maintenanceOrders.items.resolveError')),
+      },
+    );
+  };
+
+  // AntD column `render` only gets (value, record, index) - the target MO's
+  // id isn't part of an item row, so it's captured via closure instead of
+  // threaded through render's signature.
+  const buildItemColumns = (maintenanceOrderId: number) => [
+    {
+      title: t('maintenanceOrders.items.serialNumberLabel'),
+      dataIndex: 'serial_number',
+      key: 'serial_number',
+    },
+    {
+      title: t('maintenanceOrders.items.statusLabel'),
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => <Tag>{t(`serializedItems.status.${status}`)}</Tag>,
+    },
+    {
+      title: t('maintenanceOrders.items.actionsLabel'),
+      key: 'actions',
+      render: (_: unknown, item: MaintenanceOrderItem) => {
+        if (item.status !== RESOLVABLE_ITEM_STATUS) return null;
+        // Tracked per-resolution (not just per-item) so clicking "fixed"
+        // doesn't also spin up the "not fixable" button's loading state on
+        // the same row - matches MissingItemsPage's two-separate-mutations
+        // precedent, adapted for this page's one-shared-mutation shape.
+        const isPendingFor = (resolution: MaintenanceOrderResolution) =>
+          resolveMutation.isPending &&
+          resolveMutation.variables?.itemId === item.id &&
+          resolveMutation.variables?.resolution === resolution;
+        return (
+          <Space>
+            <Popconfirm
+              title={t('maintenanceOrders.items.markFixedConfirmTitle')}
+              onConfirm={() => handleResolve(maintenanceOrderId, item.id, 'fixed')}
+              okText={t('common.ok')}
+              cancelText={t('common.cancel')}
+              okButtonProps={{ loading: isPendingFor('fixed') }}
+            >
+              <Button size="small" type="primary">
+                {t('maintenanceOrders.items.markFixedButton')}
+              </Button>
+            </Popconfirm>
+            <Popconfirm
+              title={t('maintenanceOrders.items.markNotFixableConfirmTitle')}
+              onConfirm={() => handleResolve(maintenanceOrderId, item.id, 'not_fixable')}
+              okText={t('common.ok')}
+              cancelText={t('common.cancel')}
+              okButtonProps={{ loading: isPendingFor('not_fixable') }}
+            >
+              <Button size="small" danger>
+                {t('maintenanceOrders.items.markNotFixableButton')}
+              </Button>
+            </Popconfirm>
+          </Space>
+        );
+      },
+    },
+  ];
+
   const columns = [
     {
       title: t('maintenanceOrders.referenceLabel'),
@@ -114,6 +212,26 @@ export function MaintenanceOrdersPage() {
           dataSource={maintenanceOrders}
           loading={isLoading}
           locale={{ emptyText: t('maintenanceOrders.emptyState') }}
+          expandable={{
+            // AC-1/AC-2: line items (and their resolve actions) live behind
+            // the same click-to-expand row toggle as WorkOrdersPage's
+            // identical nested-Table pattern for a parent/line-item
+            // relationship (see its "expand row" test) - a controlled
+            // `expandedRowKeys` recomputed every render was tried first but
+            // caused an infinite Table-internal re-render loop (caught by a
+            // hung test run, not lint/typecheck), so this sticks to the
+            // proven, uncontrolled default instead.
+            rowExpandable: (record) => record.items.length > 0,
+            expandedRowRender: (record) => (
+              <Table<MaintenanceOrderItem>
+                rowKey="id"
+                size="small"
+                pagination={false}
+                columns={buildItemColumns(record.id)}
+                dataSource={record.items}
+              />
+            ),
+          }}
         />
       )}
       <Modal

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -81,22 +81,25 @@ function renderMaintenanceOrdersPage() {
     last_name: 'Doe',
   });
 
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <ConfigProvider theme={motionDisabledTheme}>
-        <AntApp>
-          <MemoryRouter initialEntries={['/maintenance-orders']}>
-            <Routes>
-              <Route element={<AppLayout />}>
-                <Route path="/maintenance-orders" element={<MaintenanceOrdersPage />} />
-              </Route>
-              <Route path="/login" element={<div>Login Page</div>} />
-            </Routes>
-          </MemoryRouter>
-        </AntApp>
-      </ConfigProvider>
-    </QueryClientProvider>,
-  );
+  return {
+    queryClient,
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <ConfigProvider theme={motionDisabledTheme}>
+          <AntApp>
+            <MemoryRouter initialEntries={['/maintenance-orders']}>
+              <Routes>
+                <Route element={<AppLayout />}>
+                  <Route path="/maintenance-orders" element={<MaintenanceOrdersPage />} />
+                </Route>
+                <Route path="/login" element={<div>Login Page</div>} />
+              </Routes>
+            </MemoryRouter>
+          </AntApp>
+        </ConfigProvider>
+      </QueryClientProvider>,
+    ),
+  };
 }
 
 async function selectItemInForm(user: ReturnType<typeof userEvent.setup>, name: string) {
@@ -104,6 +107,14 @@ async function selectItemInForm(user: ReturnType<typeof userEvent.setup>, name: 
   const combobox = within(dialog).getByRole('combobox', { hidden: true });
   await user.click(combobox);
   await user.click(screen.getByTitle(name));
+}
+
+// Line items (and their resolve actions) live behind the row's expand
+// toggle - matches WorkOrdersPage.active.test.tsx's identical "expand row"
+// interaction for its own parent/line-item nested Table.
+async function expandFirstRow(user: ReturnType<typeof userEvent.setup>) {
+  await screen.findByText('MO-0001');
+  await user.click(screen.getByRole('button', { name: /expand row/i, hidden: true }));
 }
 
 describe('MaintenanceOrdersPage', () => {
@@ -259,5 +270,197 @@ describe('MaintenanceOrdersPage', () => {
     expect(
       await screen.findByText(/failed to load maintenance orders|فشل تحميل أوامر الصيانة/i),
     ).toBeInTheDocument();
+  });
+
+  it('marks a line item as fixed - item goes available, MO goes in_progress (AC-1/TC-01)', async () => {
+    const maintenanceOrder = makeMaintenanceOrder({
+      items: [
+        { id: 1, serial_number: 'SN-042', status: 'in_maintenance' },
+        { id: 2, serial_number: 'SN-099', status: 'in_maintenance' },
+      ],
+    });
+    const maintenanceOrders = [maintenanceOrder];
+    mockListEndpoints({ maintenanceOrders });
+    mockedApiClient.post.mockImplementationOnce(async () => {
+      maintenanceOrder.status = 'in_progress';
+      maintenanceOrder.items = [
+        { id: 1, serial_number: 'SN-042', status: 'available' },
+        { id: 2, serial_number: 'SN-099', status: 'in_maintenance' },
+      ];
+      return { data: maintenanceOrder };
+    });
+
+    // Popconfirm's rc-motion enter animation leaves the confirm button's
+    // pointer-events: none for a moment after it mounts - matches
+    // MissingItemsPage.test.tsx's identical resolve-Popconfirm workaround.
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderMaintenanceOrdersPage();
+
+    await expandFirstRow(user);
+    await screen.findByText('SN-042');
+    const [markFixedButton] = screen.getAllByRole('button', {
+      name: /^mark fixed$|^تحديد كمُصلح$/i,
+      hidden: true,
+    });
+    await user.click(markFixedButton!);
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/api/maintenance-orders/1/resolve/', {
+      item_id: 1,
+      resolution: 'fixed',
+    });
+    expect(await screen.findByText(/^available$|^متاح$/i)).toBeInTheDocument();
+    expect(await screen.findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
+  });
+
+  it('marks a line item as not fixable - item goes written_off (AC-2/TC-02)', async () => {
+    const maintenanceOrder = makeMaintenanceOrder();
+    const maintenanceOrders = [maintenanceOrder];
+    mockListEndpoints({ maintenanceOrders });
+    mockedApiClient.post.mockImplementationOnce(async () => {
+      maintenanceOrder.status = 'completed';
+      maintenanceOrder.items = [{ id: 1, serial_number: 'SN-042', status: 'written_off' }];
+      return { data: maintenanceOrder };
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderMaintenanceOrdersPage();
+
+    await expandFirstRow(user);
+    await screen.findByText('SN-042');
+    await user.click(
+      screen.getByRole('button', {
+        name: /^mark not fixable$|^تحديد كغير قابل للإصلاح$/i,
+        hidden: true,
+      }),
+    );
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/api/maintenance-orders/1/resolve/', {
+      item_id: 1,
+      resolution: 'not_fixable',
+    });
+    expect(await screen.findByText(/^written off$|^شطب$/i)).toBeInTheDocument();
+  });
+
+  it('shows the MO as completed once every line item is resolved (AC-3/TC-03/TC-04)', async () => {
+    const maintenanceOrder = makeMaintenanceOrder({
+      status: 'in_progress',
+      items: [
+        { id: 1, serial_number: 'SN-042', status: 'available' },
+        { id: 2, serial_number: 'SN-099', status: 'in_maintenance' },
+      ],
+    });
+    const maintenanceOrders = [maintenanceOrder];
+    mockListEndpoints({ maintenanceOrders });
+    mockedApiClient.post.mockImplementationOnce(async () => {
+      maintenanceOrder.status = 'completed';
+      maintenanceOrder.items = [
+        { id: 1, serial_number: 'SN-042', status: 'available' },
+        { id: 2, serial_number: 'SN-099', status: 'written_off' },
+      ];
+      return { data: maintenanceOrder };
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderMaintenanceOrdersPage();
+
+    await expandFirstRow(user);
+    await screen.findByText('SN-099');
+    await user.click(
+      screen.getByRole('button', {
+        name: /^mark not fixable$|^تحديد كغير قابل للإصلاح$/i,
+        hidden: true,
+      }),
+    );
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
+
+    expect(await screen.findByText(/^completed$|^مكتمل$/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^mark fixed$|^تحديد كمُصلح$/i, hidden: true }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: /^mark not fixable$|^تحديد كغير قابل للإصلاح$/i,
+        hidden: true,
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not offer resolve actions for an already-resolved item', async () => {
+    mockListEndpoints({
+      maintenanceOrders: [
+        makeMaintenanceOrder({
+          items: [{ id: 1, serial_number: 'SN-042', status: 'available' }],
+        }),
+      ],
+    });
+
+    const user = userEvent.setup();
+    renderMaintenanceOrdersPage();
+
+    await expandFirstRow(user);
+    await screen.findByText('SN-042');
+    expect(
+      screen.queryByRole('button', { name: /^mark fixed$|^تحديد كمُصلح$/i, hidden: true }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: /^mark not fixable$|^تحديد كغير قابل للإصلاح$/i,
+        hidden: true,
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a generic error banner when resolving fails', async () => {
+    mockListEndpoints({ maintenanceOrders: [makeMaintenanceOrder()] });
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 500, data: {} },
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderMaintenanceOrdersPage();
+
+    await expandFirstRow(user);
+    await screen.findByText('SN-042');
+    await user.click(
+      screen.getByRole('button', { name: /^mark fixed$|^تحديد كمُصلح$/i, hidden: true }),
+    );
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
+
+    expect(await screen.findByText(/failed to resolve item|فشل حل العنصر/i)).toBeInTheDocument();
+  });
+
+  it('invalidates serialized-items and the product-types stock summary after resolving an item', async () => {
+    // Resolving flips SerializedItem.status - the same field
+    // SerializedItemsPage's list and the Dashboard's stock summary read,
+    // matching MissingItemsPage.test.tsx's identical invalidation
+    // assertion for the sibling resolve flow.
+    const maintenanceOrder = makeMaintenanceOrder();
+    mockListEndpoints({ maintenanceOrders: [maintenanceOrder] });
+    mockedApiClient.post.mockImplementationOnce(async () => {
+      maintenanceOrder.status = 'completed';
+      maintenanceOrder.items = [{ id: 1, serial_number: 'SN-042', status: 'available' }];
+      return { data: maintenanceOrder };
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const { queryClient } = renderMaintenanceOrdersPage();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    await expandFirstRow(user);
+    await screen.findByText('SN-042');
+    await user.click(
+      screen.getByRole('button', { name: /^mark fixed$|^تحديد كمُصلح$/i, hidden: true }),
+    );
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['serialized-items'] }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['product-types', 'stock-summary'],
+    });
   });
 });
