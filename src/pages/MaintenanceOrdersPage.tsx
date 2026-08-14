@@ -145,11 +145,19 @@ export function MaintenanceOrdersPage() {
       key: 'actions',
       render: (_: unknown, item: MaintenanceOrderItem) => {
         if (item.status !== RESOLVABLE_ITEM_STATUS) return null;
-        // No manual loading/disabled wiring needed here - onConfirm returns
-        // handleResolve's promise, so antd's Popconfirm natively disables
-        // and spins the OK button for the request's duration (see
-        // handleResolve's comment for why a plain `.mutate()` couldn't do
-        // this).
+        // onConfirm returning handleResolve's promise lets antd's
+        // Popconfirm natively disable/spin the OK button that was actually
+        // clicked - but that state is local to just that one ActionButton
+        // instance, so it does nothing for this row's *other* action while
+        // the first is in flight (same item, still showing as resolvable
+        // until the post-request refetch lands - the backend has no "not
+        // already in_maintenance" guard either, that's WRH-47's separate
+        // scope, so two concurrent requests would both succeed and
+        // silently race). `disabled` on both trigger buttons, keyed off
+        // this item's id, closes that window regardless of which one
+        // started the request.
+        const isItemPending =
+          resolveMutation.isPending && resolveMutation.variables?.itemId === item.id;
         return (
           <Space>
             <Popconfirm
@@ -158,7 +166,7 @@ export function MaintenanceOrdersPage() {
               okText={t('common.ok')}
               cancelText={t('common.cancel')}
             >
-              <Button size="small" type="primary">
+              <Button size="small" type="primary" disabled={isItemPending}>
                 {t('maintenanceOrders.items.markFixedButton')}
               </Button>
             </Popconfirm>
@@ -168,7 +176,7 @@ export function MaintenanceOrdersPage() {
               okText={t('common.ok')}
               cancelText={t('common.cancel')}
             >
-              <Button size="small" danger>
+              <Button size="small" danger disabled={isItemPending}>
                 {t('maintenanceOrders.items.markNotFixableButton')}
               </Button>
             </Popconfirm>

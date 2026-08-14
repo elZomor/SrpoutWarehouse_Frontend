@@ -313,6 +313,47 @@ describe('MaintenanceOrdersPage', () => {
     expect(await screen.findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
   });
 
+  it('disables the sibling resolve action on the same item while a request is in flight', async () => {
+    // Regression: a plain resolveMutation.mutate() call left onConfirm not
+    // returning a promise, so antd's Popconfirm closed before isPending
+    // could ever flip true - and even once fixed to mutateAsync, antd's
+    // own loading state is scoped to just the one clicked ActionButton, not
+    // this row's *other* action. Without an explicit `disabled` keyed off
+    // isPending for this item, "Mark Not Fixable" stayed clickable while
+    // "Mark Fixed" was still in flight for the same item, letting both fire
+    // concurrently.
+    const maintenanceOrder = makeMaintenanceOrder();
+    mockListEndpoints({ maintenanceOrders: [maintenanceOrder] });
+    let resolvePost!: () => void;
+    mockedApiClient.post.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolvePost = () => resolve({ data: maintenanceOrder });
+        }),
+    );
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderMaintenanceOrdersPage();
+
+    await expandFirstRow(user);
+    await screen.findByText('SN-042');
+    await user.click(
+      screen.getByRole('button', { name: /^mark fixed$|^تحديد كمُصلح$/i, hidden: true }),
+    );
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', {
+          name: /^mark not fixable$|^تحديد كغير قابل للإصلاح$/i,
+          hidden: true,
+        }),
+      ).toBeDisabled(),
+    );
+
+    resolvePost();
+  });
+
   it('marks a line item as not fixable - item goes written_off (AC-2/TC-02)', async () => {
     const maintenanceOrder = makeMaintenanceOrder();
     const maintenanceOrders = [maintenanceOrder];
