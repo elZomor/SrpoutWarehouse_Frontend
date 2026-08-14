@@ -17,6 +17,9 @@ import { getFieldErrorMessages } from '../../lib/apiErrors';
 export const STATUS_COLORS = new Map<string, string>([
   ['available', 'green'],
   ['missing', 'orange'],
+  // WRH-46: added the same way 'missing' was (WRH-42) - shared by every
+  // page that renders this status rather than a page-local map.
+  ['in_maintenance', 'purple'],
 ]);
 export const DEFAULT_STATUS_COLOR = 'default';
 
