@@ -125,7 +125,8 @@
       "out": "Out",
       "damaged": "Damaged",
       "missing": "Missing",
-      "written_off": "Written off"
+      "written_off": "Written off",
+      "in_maintenance": "In Maintenance"
     },
     "lastWorkOrderLabel": "Last Work Order",
     "noWorkOrder": "—",
@@ -453,6 +454,28 @@
       "serialNumberWrittenOffError": "This item has been written off and cannot be reported damaged.",
       "serialNumberNotAvailable": "This item is not available to report as damaged.",
       "serialNumberInvalid": "This serial number could not be used."
+    }
+  },
+  "maintenanceOrders": {
+    "title": "Maintenance Orders",
+    "newButton": "Create Maintenance Order",
+    "referenceLabel": "Reference",
+    "statusLabel": "Status",
+    "itemsLabel": "Items",
+    "itemsPlaceholder": "Select damaged items",
+    "itemCountLabel": "Items",
+    "status": {
+      "open": "Open"
+    },
+    "emptyState": "No maintenance orders found",
+    "loadError": "Failed to load maintenance orders. Please try again.",
+    "loadItemsError": "Failed to load items. Please try again.",
+    "createSuccess": "{{reference}} created.",
+    "createError": "Failed to create maintenance order. Please try again.",
+    "form": {
+      "itemsRequired": "Select at least one item",
+      "itemAlreadyOnMaintenanceOrderError": "{{serial}} is already on maintenance order {{reference}}",
+      "itemClaimedOnWorkOrderError": "{{serial}} is currently claimed on a work order"
     }
   }
 }
