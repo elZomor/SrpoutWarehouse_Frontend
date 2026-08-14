@@ -100,19 +100,26 @@ export function MaintenanceOrdersPage() {
     });
   };
 
+  // Returns (rather than fires-and-forgets) the mutation's promise so
+  // Popconfirm's onConfirm can await it - antd's ActionButton then handles
+  // the OK button's loading/disabled state natively for the duration of the
+  // request, closing only once it settles. A `.mutate()` call with no
+  // returned promise (tried first) left onConfirm racing ahead of
+  // `isPending` ever flipping true - the popup already closes before
+  // pending state exists to read, so a manual `okButtonProps.loading` keyed
+  // off it can never actually render, and nothing blocks a second click
+  // from firing a concurrent request for the same item. Both outcomes are
+  // swallowed (not rethrown) so the popup always closes rather than
+  // reopening on failure with no visible pending state of its own.
   const handleResolve = (
     maintenanceOrderId: number,
     itemId: number,
     resolution: MaintenanceOrderResolution,
-  ) => {
-    resolveMutation.mutate(
-      { maintenanceOrderId, itemId, resolution },
-      {
-        onSuccess: () => message.success(t('maintenanceOrders.items.resolveSuccess')),
-        onError: () => message.error(t('maintenanceOrders.items.resolveError')),
-      },
+  ) =>
+    resolveMutation.mutateAsync({ maintenanceOrderId, itemId, resolution }).then(
+      () => message.success(t('maintenanceOrders.items.resolveSuccess')),
+      () => message.error(t('maintenanceOrders.items.resolveError')),
     );
-  };
 
   // AntD column `render` only gets (value, record, index) - the target MO's
   // id isn't part of an item row, so it's captured via closure instead of
@@ -138,14 +145,11 @@ export function MaintenanceOrdersPage() {
       key: 'actions',
       render: (_: unknown, item: MaintenanceOrderItem) => {
         if (item.status !== RESOLVABLE_ITEM_STATUS) return null;
-        // Tracked per-resolution (not just per-item) so clicking "fixed"
-        // doesn't also spin up the "not fixable" button's loading state on
-        // the same row - matches MissingItemsPage's two-separate-mutations
-        // precedent, adapted for this page's one-shared-mutation shape.
-        const isPendingFor = (resolution: MaintenanceOrderResolution) =>
-          resolveMutation.isPending &&
-          resolveMutation.variables?.itemId === item.id &&
-          resolveMutation.variables?.resolution === resolution;
+        // No manual loading/disabled wiring needed here - onConfirm returns
+        // handleResolve's promise, so antd's Popconfirm natively disables
+        // and spins the OK button for the request's duration (see
+        // handleResolve's comment for why a plain `.mutate()` couldn't do
+        // this).
         return (
           <Space>
             <Popconfirm
@@ -153,7 +157,6 @@ export function MaintenanceOrdersPage() {
               onConfirm={() => handleResolve(maintenanceOrderId, item.id, 'fixed')}
               okText={t('common.ok')}
               cancelText={t('common.cancel')}
-              okButtonProps={{ loading: isPendingFor('fixed') }}
             >
               <Button size="small" type="primary">
                 {t('maintenanceOrders.items.markFixedButton')}
@@ -164,7 +167,6 @@ export function MaintenanceOrdersPage() {
               onConfirm={() => handleResolve(maintenanceOrderId, item.id, 'not_fixable')}
               okText={t('common.ok')}
               cancelText={t('common.cancel')}
-              okButtonProps={{ loading: isPendingFor('not_fixable') }}
             >
               <Button size="small" danger>
                 {t('maintenanceOrders.items.markNotFixableButton')}
