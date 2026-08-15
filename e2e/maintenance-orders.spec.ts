@@ -160,3 +160,69 @@ test('shows a translated, interpolated message when an item is rejected', async 
     ),
   ).toBeVisible();
 });
+
+test('resolves a line item as fixed and reflects the MO progressing to in_progress', async ({
+  page,
+}) => {
+  // AC-1/AC-3/TC-01: marking one of an MO's two items "fixed" flips that
+  // item to "available" and moves the MO from "open" to "in_progress"
+  // (not every item resolved yet).
+  const maintenanceOrder: MaintenanceOrder = {
+    id: 1,
+    reference: 'MO-0001',
+    status: 'open',
+    items: [
+      { id: 1, serial_number: 'SN-042', status: 'in_maintenance' },
+      { id: 2, serial_number: 'SN-099', status: 'in_maintenance' },
+    ],
+  };
+
+  await page.route('**/api/auth/**', stubAuth);
+  await page.route('**/api/serialized-items/**', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, json: [] });
+      return;
+    }
+    await route.continue();
+  });
+  await page.route('**/api/maintenance-orders/**', async (route) => {
+    const method = route.request().method();
+    const url = route.request().url();
+
+    if (method === 'GET' && url.endsWith('/api/maintenance-orders/')) {
+      await route.fulfill({ status: 200, json: [maintenanceOrder] });
+      return;
+    }
+    if (method === 'POST' && url.endsWith('/resolve/')) {
+      const body = route.request().postDataJSON();
+      maintenanceOrder.items = maintenanceOrder.items.map((item) =>
+        item.id === body.item_id
+          ? { ...item, status: body.resolution === 'fixed' ? 'available' : 'written_off' }
+          : item,
+      );
+      maintenanceOrder.status = maintenanceOrder.items.every(
+        (item) => item.status === 'available' || item.status === 'written_off',
+      )
+        ? 'completed'
+        : 'in_progress';
+      await route.fulfill({ status: 200, json: maintenanceOrder });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto('/maintenance-orders');
+
+  await expect(page.getByText('MO-0001')).toBeVisible();
+  await page.getByRole('button', { name: /expand row/i }).click();
+  await expect(page.getByText('SN-042')).toBeVisible();
+
+  await page
+    .getByRole('button', { name: /^mark fixed$|^تحديد كمُصلح$/i })
+    .first()
+    .click();
+  await page.getByRole('button', { name: /^ok$|^موافق$/i }).click();
+
+  await expect(page.getByText(/^available$|^متاح$/i)).toBeVisible();
+  await expect(page.getByText(/^in progress$|^قيد التنفيذ$/i)).toBeVisible();
+});

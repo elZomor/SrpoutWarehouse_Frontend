@@ -473,7 +473,9 @@
     "itemsPlaceholder": "اختر العناصر التالفة",
     "itemCountLabel": "العناصر",
     "status": {
-      "open": "مفتوح"
+      "open": "مفتوح",
+      "in_progress": "قيد التنفيذ",
+      "completed": "مكتمل"
     },
     "emptyState": "لم يتم العثور على أوامر صيانة",
     "loadError": "فشل تحميل أوامر الصيانة. حاول مرة أخرى.",
@@ -484,6 +486,17 @@
       "itemsRequired": "اختر عنصرًا واحدًا على الأقل",
       "itemAlreadyOnMaintenanceOrderError": "{{serial}} موجود بالفعل في أمر الصيانة {{reference}}",
       "itemClaimedOnWorkOrderError": "{{serial}} مرتبط حاليًا بأمر عمل"
+    },
+    "items": {
+      "serialNumberLabel": "الرقم التسلسلي",
+      "statusLabel": "الحالة",
+      "actionsLabel": "الإجراءات",
+      "markFixedButton": "تحديد كمُصلح",
+      "markFixedConfirmTitle": "هل تريد تحديد هذا العنصر كمُصلح؟",
+      "markNotFixableButton": "تحديد كغير قابل للإصلاح",
+      "markNotFixableConfirmTitle": "هل تريد تحديد هذا العنصر كغير قابل للإصلاح؟",
+      "resolveSuccess": "تم حل العنصر.",
+      "resolveError": "فشل حل العنصر. حاول مرة أخرى."
     }
   }
 }
