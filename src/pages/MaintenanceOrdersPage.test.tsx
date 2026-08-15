@@ -20,6 +20,17 @@ vi.mock('../lib/apiClient', () => ({
   },
 }));
 
+// This page's item picker pulls in useSerializedItems -> serialized-items/
+// api.ts, which reads env directly (not through apiClient) - matches
+// BoxesPage.test.tsx/SerializedItemsPage.test.tsx's identical env mock,
+// since CI has no VITE_API_BASE_URL and env.ts throws at import time
+// without it.
+vi.mock('../config/env', () => ({
+  env: {
+    VITE_API_BASE_URL: 'http://localhost:8000',
+  },
+}));
+
 const mockedApiClient = vi.mocked(apiClient, true);
 
 function makeSerializedItem(overrides: Partial<SerializedItem> = {}): SerializedItem {
