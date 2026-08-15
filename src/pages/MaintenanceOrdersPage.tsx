@@ -67,6 +67,17 @@ export function MaintenanceOrdersPage() {
   // free-text identifiers into a translated template, matching
   // BoxesPage/classifyItemRejection's identical reasoning.
   const [itemRejection, setItemRejection] = useState<ItemRejection | null>(null);
+  // Which items currently have a resolve request in flight. Deliberately
+  // local state, not `resolveMutation.isPending`/`.variables` - a single
+  // shared `useMutation` instance only remembers the *most recent* call's
+  // variables, so it can't represent "item A is still pending" once a
+  // second, different item's resolve starts (it would incorrectly read as
+  // not-pending for A again). A Set correctly tracks however many items are
+  // genuinely in flight at once. Cleared only once the item's own request's
+  // promise settles - which, per useResolveMaintenanceOrderItem's onSuccess
+  // now awaiting its invalidateQueries() calls, is after the refetched data
+  // has actually landed, not just after the response arrived.
+  const [pendingItemIds, setPendingItemIds] = useState<ReadonlySet<number>>(new Set());
 
   const {
     control,
@@ -102,24 +113,36 @@ export function MaintenanceOrdersPage() {
 
   // Returns (rather than fires-and-forgets) the mutation's promise so
   // Popconfirm's onConfirm can await it - antd's ActionButton then handles
-  // the OK button's loading/disabled state natively for the duration of the
-  // request, closing only once it settles. A `.mutate()` call with no
-  // returned promise (tried first) left onConfirm racing ahead of
-  // `isPending` ever flipping true - the popup already closes before
-  // pending state exists to read, so a manual `okButtonProps.loading` keyed
-  // off it can never actually render, and nothing blocks a second click
-  // from firing a concurrent request for the same item. Both outcomes are
-  // swallowed (not rethrown) so the popup always closes rather than
-  // reopening on failure with no visible pending state of its own.
+  // the *clicked* OK button's own loading/disabled state for the duration
+  // of the request. That alone isn't enough to block every duplicate (it's
+  // scoped to one ActionButton instance, and `resolveMutation.isPending`
+  // can't distinguish "this item" from "some other item" once a second
+  // resolve starts) - `pendingItemIds` above is the actual guard the
+  // buttons below gate on; this just adds/removes this one item's id
+  // around the request, including the invalidated queries' refetch since
+  // the hook's onSuccess now awaits those too. Both outcomes are swallowed
+  // (not rethrown) so the popup always closes rather than reopening on
+  // failure with no visible pending state of its own.
   const handleResolve = (
     maintenanceOrderId: number,
     itemId: number,
     resolution: MaintenanceOrderResolution,
-  ) =>
-    resolveMutation.mutateAsync({ maintenanceOrderId, itemId, resolution }).then(
-      () => message.success(t('maintenanceOrders.items.resolveSuccess')),
-      () => message.error(t('maintenanceOrders.items.resolveError')),
-    );
+  ) => {
+    setPendingItemIds((current) => new Set(current).add(itemId));
+    return resolveMutation
+      .mutateAsync({ maintenanceOrderId, itemId, resolution })
+      .then(
+        () => message.success(t('maintenanceOrders.items.resolveSuccess')),
+        () => message.error(t('maintenanceOrders.items.resolveError')),
+      )
+      .finally(() => {
+        setPendingItemIds((current) => {
+          const next = new Set(current);
+          next.delete(itemId);
+          return next;
+        });
+      });
+  };
 
   // AntD column `render` only gets (value, record, index) - the target MO's
   // id isn't part of an item row, so it's captured via closure instead of
@@ -154,10 +177,11 @@ export function MaintenanceOrdersPage() {
         // already in_maintenance" guard either, that's WRH-47's separate
         // scope, so two concurrent requests would both succeed and
         // silently race). `disabled` on both trigger buttons, keyed off
-        // this item's id, closes that window regardless of which one
-        // started the request.
-        const isItemPending =
-          resolveMutation.isPending && resolveMutation.variables?.itemId === item.id;
+        // `pendingItemIds` (not the shared mutation's own state - see its
+        // declaration above), closes that window regardless of which
+        // action started the request or how many other items are also
+        // mid-resolve at the same time.
+        const isItemPending = pendingItemIds.has(item.id);
         return (
           <Space>
             <Popconfirm
