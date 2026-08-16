@@ -21,7 +21,7 @@ import {
 } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useRef, useState } from 'react';
-import { Controller, useFieldArray, useForm } from 'react-hook-form';
+import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { useProductTypes } from '../features/product-types/useProductTypes';
@@ -291,12 +291,23 @@ export function WorkOrdersPage() {
     control: transferControl,
     handleSubmit: handleTransferSubmit,
     reset: resetTransferForm,
+    resetField: resetTransferField,
     setError: setTransferError,
     setFocus: setTransferFocus,
     formState: { errors: transferErrors },
   } = useForm<TransferItemFormValues>({
     resolver: zodResolver(transferItemSchema),
-    defaultValues: { serial_number: '', destination_work_order: undefined },
+    defaultValues: {
+      serial_number: '',
+      destination_work_order: undefined,
+      destination_line_item: undefined,
+    },
+  });
+  // WRH-68: drives transferDestinationLineItemOptions below - the picked
+  // destination WO determines which of its line items can be selected.
+  const watchedTransferDestinationWorkOrder = useWatch({
+    control: transferControl,
+    name: 'destination_work_order',
   });
   const [transferErrorParams, setTransferErrorParams] = useState<{ workOrderId?: string }>({});
   const [pendingTransferSubmission, setPendingTransferSubmission] =
@@ -635,7 +646,11 @@ export function WorkOrdersPage() {
   const openTransferModal = (workOrder: ActiveWorkOrder | ActiveWorkOrderSupplementary) => {
     transferSessionGenerationRef.current += 1;
     setTransferSourceWorkOrder({ id: workOrder.id, reference: workOrder.reference });
-    resetTransferForm({ serial_number: '', destination_work_order: undefined });
+    resetTransferForm({
+      serial_number: '',
+      destination_work_order: undefined,
+      destination_line_item: undefined,
+    });
     setTransferErrorParams({});
     setLastTransferResult(null);
     transferMutation.reset();
@@ -671,7 +686,11 @@ export function WorkOrdersPage() {
           return;
         }
         setLastTransferResult(result);
-        resetTransferForm({ serial_number: '', destination_work_order: undefined });
+        resetTransferForm({
+          serial_number: '',
+          destination_work_order: undefined,
+          destination_line_item: undefined,
+        });
         setTransferErrorParams({});
         setTransferFocus('serial_number');
       },
@@ -682,9 +701,15 @@ export function WorkOrdersPage() {
         const serialErrors = getFieldErrorMessages(error, 'serial_number');
         const statusErrors = getFieldErrorMessages(error, 'status');
         const destinationErrors = getFieldErrorMessages(error, 'destination_work_order');
+        const destinationLineItemErrors = getFieldErrorMessages(error, 'destination_line_item');
         setTransferErrorParams({});
 
-        const rejection = classifyTransferRejection(serialErrors, statusErrors, destinationErrors);
+        const rejection = classifyTransferRejection(
+          serialErrors,
+          statusErrors,
+          destinationErrors,
+          destinationLineItemErrors,
+        );
         if (rejection) {
           setTransferErrorParams(rejection.params ?? {});
           setTransferError(rejection.field, { type: 'server', message: rejection.messageKey });
@@ -723,6 +748,18 @@ export function WorkOrdersPage() {
       value: workOrder.id,
       label: `${workOrder.reference} — ${workOrder.job_name}`,
     }));
+
+  // WRH-68: the backend now needs a destination line item chosen (product
+  // type + quantity cap checked server-side, matching scan()'s cap guard),
+  // so options are the selected destination WO's own line items with
+  // remaining capacity - same computeScannableLineItemOptions helper the
+  // scan modal uses for the identical "remaining_quantity > 0" filter.
+  const transferDestinationWorkOrder = (workOrders ?? []).find(
+    (workOrder) => workOrder.id === watchedTransferDestinationWorkOrder,
+  );
+  const transferDestinationLineItemOptions = computeScannableLineItemOptions(
+    transferDestinationWorkOrder?.line_items ?? [],
+  );
 
   // Shared by the Manage tab's table and the Active tab's (both primary and
   // nested supplementary) tables - every WorkOrder/ActiveWorkOrder shape
@@ -1579,13 +1616,45 @@ export function WorkOrdersPage() {
                     id="transfer-destination_work_order"
                     placeholder={t('workOrders.transfer.destinationPlaceholder')}
                     options={transferDestinationOptions}
+                    onChange={(value: number) => {
+                      field.onChange(value);
+                      // WRH-68: the previously-selected line item may not
+                      // even exist on the newly-picked destination WO -
+                      // clear it rather than leave a stale/invalid value.
+                      resetTransferField('destination_line_item');
+                    }}
+                  />
+                )}
+              />
+            </Form.Item>
+            <Form.Item
+              label={t('workOrders.transfer.destinationLineItemLabel')}
+              htmlFor="transfer-destination_line_item"
+              validateStatus={transferErrors.destination_line_item ? 'error' : ''}
+              help={
+                transferErrors.destination_line_item
+                  ? t(transferErrors.destination_line_item.message ?? '')
+                  : undefined
+              }
+            >
+              <Controller
+                name="destination_line_item"
+                control={transferControl}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    id="transfer-destination_line_item"
+                    placeholder={t('workOrders.transfer.destinationLineItemPlaceholder')}
+                    options={transferDestinationLineItemOptions}
+                    disabled={!watchedTransferDestinationWorkOrder}
                   />
                 )}
               />
             </Form.Item>
             {transferMutation.isError &&
               !transferErrors.serial_number &&
-              !transferErrors.destination_work_order && (
+              !transferErrors.destination_work_order &&
+              !transferErrors.destination_line_item && (
                 <Alert
                   type="error"
                   message={t('workOrders.transfer.genericError')}

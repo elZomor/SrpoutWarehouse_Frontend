@@ -194,6 +194,48 @@ describe('classifyTransferRejection', () => {
     );
   });
 
+  it('WRH-68: classifies a destination line item on the wrong work order', () => {
+    expect(
+      classifyTransferRejection(
+        [],
+        [],
+        [],
+        ['Destination line item does not belong to the destination work order.'],
+      ),
+    ).toEqual({
+      field: 'destination_line_item',
+      messageKey: 'workOrders.transfer.destinationLineItemWrongWorkOrderError',
+    });
+  });
+
+  it('WRH-68: classifies a destination line item with a mismatched product type', () => {
+    expect(
+      classifyTransferRejection(
+        [],
+        [],
+        [],
+        ["Destination line item's product type does not match the transferred item."],
+      ),
+    ).toEqual({
+      field: 'destination_line_item',
+      messageKey: 'workOrders.transfer.destinationLineItemProductTypeMismatchError',
+    });
+  });
+
+  it('WRH-68: classifies a destination line item that reached its requested quantity', () => {
+    expect(
+      classifyTransferRejection(
+        [],
+        [],
+        [],
+        ['This line item has already reached its requested quantity.'],
+      ),
+    ).toEqual({
+      field: 'destination_line_item',
+      messageKey: 'workOrders.transfer.destinationLineItemOverCapError',
+    });
+  });
+
   it('returns null when nothing matches', () => {
     expect(classifyTransferRejection([], [], [])).toBeNull();
   });
