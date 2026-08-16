@@ -3,6 +3,7 @@ import { createBox, getBox, listBoxes } from './api';
 import type { BoxFormValues } from './schema';
 
 const boxesBaseKey = ['boxes'] as const;
+const boxQueryKey = (id: number | undefined) => [...boxesBaseKey, id] as const;
 
 export function useBoxes() {
   return useQuery({
@@ -19,7 +20,7 @@ export function useBoxes() {
 // contents that changed in between.
 export function useBox(id: number | undefined, enabled: boolean) {
   return useQuery({
-    queryKey: [...boxesBaseKey, id],
+    queryKey: boxQueryKey(id),
     queryFn: () => getBox(id!),
     enabled: enabled && id !== undefined,
     staleTime: 0,
