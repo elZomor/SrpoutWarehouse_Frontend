@@ -581,7 +581,18 @@ test('transfers an item from one work order to another', async ({ page }) => {
     status: 'in_progress',
     created_by: 1,
     created_by_username: 'jane',
-    line_items: [],
+    // WRH-68: transfer() now needs a destination line item chosen - the
+    // modal's second Select is scoped to this WO's own line items.
+    line_items: [
+      {
+        id: 7,
+        product_type: 1,
+        product_type_name: 'Bar LED Model A',
+        quantity: 1,
+        scanned_quantity: 0,
+        remaining_quantity: 1,
+      },
+    ],
   };
 
   await page.route('**/api/auth/**', stubAuth);
@@ -594,6 +605,7 @@ test('transfers an item from one work order to another', async ({ page }) => {
       const body = route.request().postDataJSON() as {
         serial_number: string;
         destination_work_order: number;
+        destination_line_item: number;
       };
       await route.fulfill({
         status: 201,
@@ -630,8 +642,11 @@ test('transfers an item from one work order to another', async ({ page }) => {
     .click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-042');
-  await dialog.getByRole('combobox').click();
+  // WRH-68: two comboboxes now - destination WO, then its own line item.
+  await dialog.getByRole('combobox').nth(0).click();
   await page.getByTitle(/WO-2 — Winter Expo/).click();
+  await dialog.getByRole('combobox').nth(1).click();
+  await page.getByTitle('Bar LED Model A').click();
   await dialog.getByRole('button', { name: /^transfer$|^نقل$/i }).click();
 
   await expect(

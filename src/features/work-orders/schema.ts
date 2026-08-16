@@ -69,6 +69,9 @@ export type ReturnBoxFormValues = z.infer<typeof returnBoxSchema>;
 // plus its destination WO - mirrors scanItemSchema's line_item
 // required-via-refine pattern for the same reason (a Select's "nothing
 // chosen yet" state is `undefined`, not an empty string).
+// WRH-68: destination_line_item is required too, same required-via-refine
+// shape - the backend now needs it to reassign the item's claim onto the
+// destination WO's line item.
 export const transferItemSchema = z.object({
   serial_number: z.string().min(1, 'workOrders.transfer.serialNumberRequired'),
   destination_work_order: z
@@ -76,6 +79,12 @@ export const transferItemSchema = z.object({
     .optional()
     .refine((value): value is number => value !== undefined, {
       message: 'workOrders.transfer.destinationRequired',
+    }),
+  destination_line_item: z
+    .number()
+    .optional()
+    .refine((value): value is number => value !== undefined, {
+      message: 'workOrders.transfer.destinationLineItemRequired',
     }),
 });
 

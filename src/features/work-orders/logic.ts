@@ -160,10 +160,17 @@ export function stillOutCount(lineItems: ActiveWorkOrderLineItem[]): number {
 }
 
 export interface TransferRejection {
-  field: 'serial_number' | 'destination_work_order';
+  field: 'serial_number' | 'destination_work_order' | 'destination_line_item';
   messageKey: string;
   params?: { workOrderId?: string };
 }
+
+// WRH-68: fixed constants (no free text in either), same exact-equality
+// reasoning as CLOSED_DESTINATION_MESSAGE above.
+const DESTINATION_LINE_ITEM_WRONG_WORK_ORDER_MESSAGE =
+  'Destination line item does not belong to the destination work order.';
+const DESTINATION_LINE_ITEM_PRODUCT_TYPE_MISMATCH_MESSAGE =
+  "Destination line item's product type does not match the transferred item.";
 
 // WRH-36: mirrors classifyReturnRejection's first-match-wins shape.
 // statusErrors (the source WO's own eligibility, {"status": [...]}) has no
@@ -173,6 +180,7 @@ export function classifyTransferRejection(
   serialErrors: string[],
   statusErrors: string[],
   destinationErrors: string[],
+  destinationLineItemErrors: string[] = [],
 ): TransferRejection | null {
   if (serialErrors.some((message) => message === 'Serial not found')) {
     return { field: 'serial_number', messageKey: 'workOrders.transfer.notFoundError' };
@@ -200,6 +208,32 @@ export function classifyTransferRejection(
     return {
       field: 'destination_work_order',
       messageKey: 'workOrders.transfer.sameWorkOrderError',
+    };
+  }
+  if (
+    destinationLineItemErrors.some(
+      (message) => message === DESTINATION_LINE_ITEM_WRONG_WORK_ORDER_MESSAGE,
+    )
+  ) {
+    return {
+      field: 'destination_line_item',
+      messageKey: 'workOrders.transfer.destinationLineItemWrongWorkOrderError',
+    };
+  }
+  if (
+    destinationLineItemErrors.some(
+      (message) => message === DESTINATION_LINE_ITEM_PRODUCT_TYPE_MISMATCH_MESSAGE,
+    )
+  ) {
+    return {
+      field: 'destination_line_item',
+      messageKey: 'workOrders.transfer.destinationLineItemProductTypeMismatchError',
+    };
+  }
+  if (destinationLineItemErrors.some((message) => message.includes('already reached'))) {
+    return {
+      field: 'destination_line_item',
+      messageKey: 'workOrders.transfer.destinationLineItemOverCapError',
     };
   }
   if (statusErrors.length > 0) {

@@ -56,22 +56,44 @@ async function openTransferModal(user: ReturnType<typeof userEvent.setup>) {
   await user.click(button);
 }
 
+// WRH-68: destination_line_item is now a second, dependent Select - always
+// rendered (disabled until a destination WO is picked), so there are two
+// comboboxes in the dialog from the start. Selected by index, matching
+// WorkOrdersPage.create.test.tsx's selectProductTypeForLineItem precedent,
+// rather than by role alone (which would now match more than one element).
 async function submitTransfer(
   user: ReturnType<typeof userEvent.setup>,
   serialNumber: string,
   destinationLabel: string,
+  destinationLineItemLabel = 'Bar LED Model A',
 ) {
   const dialog = screen.getByRole('dialog', { hidden: true });
   const serialInput = within(dialog).getByLabelText(/serial number|الرقم التسلسلي/i);
   await user.clear(serialInput);
   await user.type(serialInput, serialNumber);
-  const combobox = within(dialog).getByRole('combobox', { hidden: true });
-  await user.click(combobox);
-  const option = screen.getAllByTitle(destinationLabel).at(-1);
-  if (!option) {
+
+  const destinationCombobox = within(dialog).getAllByRole('combobox', { hidden: true })[0];
+  if (!destinationCombobox) {
+    throw new Error('No destination work order combobox found');
+  }
+  await user.click(destinationCombobox);
+  const destinationOption = screen.getAllByTitle(destinationLabel).at(-1);
+  if (!destinationOption) {
     throw new Error(`No destination option found for ${destinationLabel}`);
   }
-  await user.click(option);
+  await user.click(destinationOption);
+
+  const lineItemCombobox = within(dialog).getAllByRole('combobox', { hidden: true })[1];
+  if (!lineItemCombobox) {
+    throw new Error('No destination line item combobox found');
+  }
+  await user.click(lineItemCombobox);
+  const lineItemOption = screen.getAllByTitle(destinationLineItemLabel).at(-1);
+  if (!lineItemOption) {
+    throw new Error(`No destination line item option found for ${destinationLineItemLabel}`);
+  }
+  await user.click(lineItemOption);
+
   await user.click(within(dialog).getByRole('button', { name: /^transfer$|^نقل$/i, hidden: true }));
 }
 
@@ -107,6 +129,7 @@ describe('WorkOrdersPage - transfer', () => {
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/1/transfer/', {
       serial_number: 'SN-042',
       destination_work_order: 2,
+      destination_line_item: 1,
     });
     expect(
       await screen.findByText(/SN-042 transferred to WO-2|تم نقل SN-042 إلى WO-2/i),
@@ -128,10 +151,61 @@ describe('WorkOrdersPage - transfer', () => {
     await renderWorkOrdersPage({ tab: 'active' });
     await openTransferModal(user);
     const dialog = screen.getByRole('dialog', { hidden: true });
-    await user.click(within(dialog).getByRole('combobox', { hidden: true }));
+    const destinationCombobox = within(dialog).getAllByRole('combobox', { hidden: true })[0];
+    if (!destinationCombobox) {
+      throw new Error('No destination work order combobox found');
+    }
+    await user.click(destinationCombobox);
 
     expect(screen.queryByTitle(/^WO-1 —/)).not.toBeInTheDocument();
     expect(screen.getAllByTitle(/^WO-1-S1 —/).length).toBeGreaterThan(0);
+  });
+
+  it('WRH-68: disables the destination line item select until a destination WO is chosen, then scopes options to it', async () => {
+    const sourceWorkOrder = makeActiveWorkOrder({ id: 1, reference: 'WO-1', status: 'fulfilled' });
+    mockListEndpoints(mockedApiClient.get, {
+      activeWorkOrders: [sourceWorkOrder],
+      workOrders: [
+        makeWorkOrder({
+          id: 2,
+          reference: 'WO-2',
+          line_items: [
+            {
+              id: 5,
+              product_type: 1,
+              product_type_name: 'Bar LED Model A',
+              quantity: 3,
+              scanned_quantity: 0,
+              remaining_quantity: 3,
+            },
+          ],
+        }),
+      ],
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openTransferModal(user);
+    const dialog = screen.getByRole('dialog', { hidden: true });
+    const [destinationCombobox, lineItemCombobox] = within(dialog).getAllByRole('combobox', {
+      hidden: true,
+    });
+    if (!destinationCombobox || !lineItemCombobox) {
+      throw new Error('Expected two comboboxes in the transfer dialog');
+    }
+
+    expect(lineItemCombobox).toBeDisabled();
+
+    await user.click(destinationCombobox);
+    const destinationOption = screen.getAllByTitle('WO-2 — Summer Gala').at(-1);
+    if (!destinationOption) {
+      throw new Error('No destination option found for WO-2 — Summer Gala');
+    }
+    await user.click(destinationOption);
+
+    expect(lineItemCombobox).not.toBeDisabled();
+    await user.click(lineItemCombobox);
+    expect(screen.getAllByTitle('Bar LED Model A').length).toBeGreaterThan(0);
   });
 
   it('names the other work order when a transferred serial is not currently out on this one', async () => {
@@ -152,6 +226,28 @@ describe('WorkOrdersPage - transfer', () => {
     await submitTransfer(user, 'SN-042', 'WO-2 — Summer Gala');
 
     expect(await screen.findByText(/WO-17/)).toBeInTheDocument();
+  });
+
+  it('WRH-68: surfaces a quantity-cap rejection on the destination line item', async () => {
+    const sourceWorkOrder = makeActiveWorkOrder({ id: 1, reference: 'WO-1', status: 'fulfilled' });
+    mockListEndpoints(mockedApiClient.get, {
+      activeWorkOrders: [sourceWorkOrder],
+      workOrders: [makeWorkOrder({ id: 2, reference: 'WO-2' })],
+    });
+    mockTransferItemRejection(
+      sourceWorkOrder,
+      'destination_line_item',
+      'This line item has already reached its requested quantity.',
+    );
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage({ tab: 'active' });
+    await openTransferModal(user);
+    await submitTransfer(user, 'SN-042', 'WO-2 — Summer Gala');
+
+    expect(
+      await screen.findByText(/already reached its requested quantity|وصل.*الكمية المطلوبة/i),
+    ).toBeInTheDocument();
   });
 
   it('does not reopen the Transfer modal if its response lands after the modal was closed', async () => {
