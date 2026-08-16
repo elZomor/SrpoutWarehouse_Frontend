@@ -78,6 +78,7 @@ import {
   useWorkOrders,
 } from '../features/work-orders/useWorkOrders';
 import { getFieldErrorMessages } from '../lib/apiErrors';
+import { colors } from '../theme/tokens';
 
 const DATE_FORMAT = 'YYYY-MM-DD';
 const EMPTY_LINE_ITEM = { product_type: undefined, quantity: undefined };
@@ -104,11 +105,13 @@ export function WorkOrdersPage() {
   const { message } = App.useApp();
   const location = useLocation();
   // WRH-42: a caller (MissingItemsPage's WO reference link) can request
-  // landing on a specific tab via navigate state - the Active tab excludes
-  // closed WOs entirely (see backend's _TERMINAL_STATUSES exclusion), so a
-  // link to a closed WO's Manage-tab row would otherwise open on a tab that
-  // structurally cannot show it. Falls back to the original default when no
-  // state was passed (every other entry point into this page).
+  // landing on a specific tab via navigate state - a closed WO with no
+  // still-active Supplementary is excluded from the Active tab (WRH-40's
+  // _TERMINAL_STATUSES exclusion; WRH-69 only keeps a closed/returned
+  // Primary visible there when it still has one), so a link to a closed
+  // WO's Manage-tab row would otherwise usually open on a tab that can't
+  // show it. Falls back to the original default when no state was passed
+  // (every other entry point into this page).
   const initialTab =
     (location.state as { initialTab?: string } | null)?.initialTab === 'manage'
       ? 'manage'
@@ -1063,14 +1066,21 @@ export function WorkOrdersPage() {
                 loading={isActiveLoading}
                 locale={{ emptyText: t('workOrders.active.emptyState') }}
                 // WRH-69: a terminal Primary only stays on this list to
-                // nest a still-active Supplementary - grayed out via this
-                // class (see index.css) so it reads as done/read-only
-                // rather than another actionable row. Only the top-level
-                // Table needs this - a nested supplementary Table's rows
-                // are never terminal (the backend's own nested Prefetch
-                // already excludes them).
-                rowClassName={(record) =>
-                  isTerminalWorkOrder(record.status) ? 'wo-terminal-row' : ''
+                // nest a still-active Supplementary - grayed out (via
+                // tokens.ts, not a hardcoded hex) so it reads as done/
+                // read-only rather than another actionable row. Only the
+                // top-level Table needs this - a nested supplementary
+                // Table's rows are never terminal (the backend's own
+                // nested Prefetch already excludes them).
+                onRow={(record) =>
+                  isTerminalWorkOrder(record.status)
+                    ? {
+                        style: {
+                          backgroundColor: colors.surfaceMuted,
+                          color: colors.textMuted,
+                        },
+                      }
+                    : {}
                 }
                 expandable={{
                   rowExpandable: (record) => record.supplementaries.length > 0,

@@ -301,7 +301,7 @@ describe('WorkOrdersPage - active tab', () => {
 
     const row = (await screen.findByText('Summer Gala')).closest('tr');
     expect(row).not.toBeNull();
-    expect(row).toHaveClass('wo-terminal-row');
+    expect(row).toHaveStyle({ backgroundColor: '#F1F5F9', color: '#64748B' });
     // Plain text queries, not getByRole/queryByRole - role queries compute
     // each candidate's accessible name, which on this row (for reasons not
     // fully pinned down - possibly an aria-describedby/aria-owns reference
