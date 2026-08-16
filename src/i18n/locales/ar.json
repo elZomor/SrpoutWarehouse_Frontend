@@ -483,9 +483,10 @@
     "createSuccess": "تم إنشاء {{reference}}.",
     "createError": "فشل إنشاء أمر الصيانة. حاول مرة أخرى.",
     "form": {
-      "itemsRequired": "اختر عنصرًا واحدًا على الأقل",
+      "itemsRequired": "اختر عنصرًا تالفًا واحدًا على الأقل",
       "itemAlreadyOnMaintenanceOrderError": "{{serial}} موجود بالفعل في أمر الصيانة {{reference}}",
-      "itemClaimedOnWorkOrderError": "{{serial}} مرتبط حاليًا بأمر عمل"
+      "itemClaimedOnWorkOrderError": "{{serial}} مرتبط حاليًا بأمر عمل",
+      "itemNotDamagedError": "{{serial}} يجب أن يكون تالفًا لإضافته إلى أمر صيانة"
     },
     "items": {
       "serialNumberLabel": "الرقم التسلسلي",

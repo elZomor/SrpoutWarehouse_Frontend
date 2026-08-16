@@ -28,6 +28,17 @@ describe('classifyItemRejection', () => {
     });
   });
 
+  it('classifies a "must be damaged" rejection, extracting the serial', () => {
+    const error = makeAxiosError({
+      item_ids: ['SN-007 must be damaged to be added to a maintenance order'],
+    });
+
+    expect(classifyItemRejection(error)).toEqual({
+      messageKey: 'maintenanceOrders.form.itemNotDamagedError',
+      params: { serial: 'SN-007' },
+    });
+  });
+
   it('returns null for a generic DRF field error with no free-text identifier', () => {
     const error = makeAxiosError({ item_ids: ['Select an item that exists.'] });
 

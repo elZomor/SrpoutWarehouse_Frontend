@@ -212,7 +212,9 @@ describe('MaintenanceOrdersPage', () => {
     await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
 
     expect(
-      await screen.findByText(/select at least one item|اختر عنصرًا واحدًا على الأقل/i),
+      await screen.findByText(
+        /select at least one damaged item|اختر عنصرًا تالفًا واحدًا على الأقل/i,
+      ),
     ).toBeInTheDocument();
     expect(mockedApiClient.post).not.toHaveBeenCalled();
   });
@@ -266,6 +268,38 @@ describe('MaintenanceOrdersPage', () => {
     expect(
       await screen.findByText(
         /SN-042 is already on maintenance order MO-0001|SN-042 موجود بالفعل في أمر الصيانة MO-0001/i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/failed to create maintenance order|فشل إنشاء أمر الصيانة/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a translated, interpolated message when an item is rejected for not being damaged', async () => {
+    mockListEndpoints({ serializedItems: [makeSerializedItem()] });
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: { item_ids: ['SN-042 must be damaged to be added to a maintenance order'] },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderMaintenanceOrdersPage();
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: /create maintenance order|إنشاء أمر صيانة/i,
+        hidden: true,
+      }),
+    );
+    await selectItemInForm(user, 'SN-042');
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
+
+    expect(
+      await screen.findByText(
+        /SN-042 must be damaged to be added to a maintenance order|SN-042 يجب أن يكون تالفًا لإضافته إلى أمر صيانة/i,
       ),
     ).toBeInTheDocument();
     expect(

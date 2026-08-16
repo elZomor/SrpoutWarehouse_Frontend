@@ -475,9 +475,10 @@
     "createSuccess": "{{reference}} created.",
     "createError": "Failed to create maintenance order. Please try again.",
     "form": {
-      "itemsRequired": "Select at least one item",
+      "itemsRequired": "Select at least one damaged item",
       "itemAlreadyOnMaintenanceOrderError": "{{serial}} is already on maintenance order {{reference}}",
-      "itemClaimedOnWorkOrderError": "{{serial}} is currently claimed on a work order"
+      "itemClaimedOnWorkOrderError": "{{serial}} is currently claimed on a work order",
+      "itemNotDamagedError": "{{serial}} must be damaged to be added to a maintenance order"
     },
     "items": {
       "serialNumberLabel": "Serial Number",

@@ -34,6 +34,20 @@ export function classifyItemRejection(error: unknown): ItemRejection | null {
         params: { serial: claimedOnWoMatch[1]! },
       };
     }
+    // WRH-47/AC-1: item picker already filters to status "damaged" only, so
+    // this is only reachable via a race (item stopped being damaged between
+    // opening the picker and submitting) - still needs the same anchored
+    // classification as its siblings above rather than falling through to
+    // the generic banner.
+    const notDamagedMatch = message.match(
+      /^(.+) must be damaged to be added to a maintenance order$/,
+    );
+    if (notDamagedMatch) {
+      return {
+        messageKey: 'maintenanceOrders.form.itemNotDamagedError',
+        params: { serial: notDamagedMatch[1]! },
+      };
+    }
   }
   return null;
 }
