@@ -86,7 +86,19 @@ test('registers a box with available items and prints its QR', async ({ page }) 
     const url = new URL(route.request().url());
     const method = route.request().method();
     const qrMatch = url.pathname.match(/\/api\/boxes\/(\d+)\/qr-code\/$/);
+    const detailMatch = url.pathname.match(/\/api\/boxes\/(\d+)\/$/);
 
+    if (method === 'GET' && detailMatch) {
+      // WRH-71/AC-1: retrieve-by-id returns a single Box, not the list -
+      // distinct route from plain "GET /api/boxes/" below.
+      const box = boxes.find((b) => b.id === Number(detailMatch[1]));
+      if (!box) {
+        await route.fulfill({ status: 404, json: { detail: 'Not found.' } });
+        return;
+      }
+      await route.fulfill({ status: 200, json: box });
+      return;
+    }
     if (method === 'GET' && !qrMatch) {
       await route.fulfill({ status: 200, json: boxes });
       return;
@@ -208,4 +220,65 @@ test('shows a translated, interpolated message when an item is rejected', async 
   await expect(
     page.getByText(/SN-042 is already in box BX-001|SN-042 موجود بالفعل في الصندوق BX-001/i),
   ).toBeVisible();
+});
+
+test('shows box items when a box row is clicked, and returns to the list on close', async ({
+  page,
+}) => {
+  // WRH-71/AC-1/AC-2/AC-3/AC-4/TC-01/TC-02/TC-03
+  const boxes: Box[] = [
+    {
+      id: 1,
+      code: 'BX-001',
+      uuid: '00000000-0000-0000-0000-000000000001',
+      product_type: 1,
+      product_type_name: 'Bar LED Model A',
+      items: [{ id: 1, serial_number: 'SN-042', status: 'available' }],
+    },
+    {
+      id: 2,
+      code: 'BX-002',
+      uuid: '00000000-0000-0000-0000-000000000002',
+      product_type: 1,
+      product_type_name: 'Bar LED Model A',
+      items: [],
+    },
+  ];
+
+  await page.route('**/api/auth/**', stubAuth);
+  await registerProductTypesRoute(page);
+  await page.route('**/api/boxes/**', async (route) => {
+    const url = new URL(route.request().url());
+    const method = route.request().method();
+    const detailMatch = url.pathname.match(/\/api\/boxes\/(\d+)\/$/);
+
+    if (method === 'GET' && detailMatch) {
+      const box = boxes.find((b) => b.id === Number(detailMatch[1]));
+      await route.fulfill({ status: 200, json: box });
+      return;
+    }
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, json: boxes });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto('/boxes');
+
+  await page.getByText('BX-001').click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('SN-042')).toBeVisible();
+
+  // Scoped to the footer, not the whole dialog - AntD's built-in "X" close
+  // icon also carries an (untranslated) "Close" aria-label.
+  await dialog.locator('.ant-modal-footer').getByRole('button').click();
+  await expect(page.getByRole('dialog')).toBeHidden();
+  // AntD's modal title text stays in the DOM (display: none), so scope to
+  // the table cell rather than the ambiguous plain-text query used to open it.
+  await expect(page.getByRole('cell', { name: 'BX-001' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'BX-002' })).toBeVisible();
+
+  await page.getByRole('cell', { name: 'BX-002' }).click();
+  await expect(page.getByText(/no items in this box|لا توجد عناصر في هذا الصندوق/i)).toBeVisible();
 });

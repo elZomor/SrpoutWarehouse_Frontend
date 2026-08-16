@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -80,11 +80,15 @@ function mockListEndpoints({
   productTypes = [makeProductType()],
   serializedItems = [],
   boxesError = false,
+  boxDetail,
+  boxDetailError = false,
 }: {
   boxes?: Box[];
   productTypes?: ProductType[];
   serializedItems?: SerializedItem[];
   boxesError?: boolean;
+  boxDetail?: Box;
+  boxDetailError?: boolean;
 }) {
   mockedApiClient.get.mockImplementation(
     (url: string, config?: { params?: { product_type?: number } }) => {
@@ -103,6 +107,13 @@ function mockListEndpoints({
           (item) => productTypeFilter == null || item.product_type === productTypeFilter,
         );
         return Promise.resolve({ data: results });
+      }
+      const boxDetailMatch = /^\/api\/boxes\/(\d+)\/$/.exec(url);
+      if (boxDetailMatch) {
+        if (boxDetailError) {
+          return Promise.reject({ isAxiosError: true, response: { status: 404, data: {} } });
+        }
+        return Promise.resolve({ data: boxDetail ?? makeBox() });
       }
       return Promise.reject(new Error(`Unexpected GET ${url}`));
     },
@@ -373,5 +384,79 @@ describe('BoxesPage', () => {
     renderBoxesPage();
 
     expect(await screen.findByText(/failed to load boxes|فشل تحميل الصناديق/i)).toBeInTheDocument();
+  });
+
+  it('shows the box detail with its items when a box row is clicked', async () => {
+    // TC-01/AC-1/AC-2
+    const detail = makeBox({
+      items: [
+        { id: 1, serial_number: 'SN-042', status: 'available' },
+        { id: 2, serial_number: 'SN-043', status: 'out' },
+      ],
+    });
+    mockListEndpoints({ boxes: [makeBox()], boxDetail: detail });
+
+    const user = userEvent.setup();
+    renderBoxesPage();
+
+    await user.click(await screen.findByText('BX-001'));
+
+    const dialog = await screen.findByRole('dialog', { hidden: true });
+    expect(within(dialog).getByText('SN-042')).toBeInTheDocument();
+    expect(within(dialog).getByText('SN-043')).toBeInTheDocument();
+    expect(mockedApiClient.get).toHaveBeenCalledWith('/api/boxes/1/');
+  });
+
+  it('shows an empty-state message for a box with no items', async () => {
+    // TC-02/AC-3
+    mockListEndpoints({ boxes: [makeBox()], boxDetail: makeBox({ items: [] }) });
+
+    const user = userEvent.setup();
+    renderBoxesPage();
+
+    await user.click(await screen.findByText('BX-001'));
+
+    expect(
+      await screen.findByText(/no items in this box|لا توجد عناصر في هذا الصندوق/i),
+    ).toBeInTheDocument();
+  });
+
+  it('closes the detail view and leaves the box list intact, with no reload', async () => {
+    // TC-03/AC-4
+    mockListEndpoints({ boxes: [makeBox()] });
+
+    const user = userEvent.setup();
+    renderBoxesPage();
+
+    await user.click(await screen.findByText('BX-001'));
+    const dialog = await screen.findByRole('dialog', { hidden: true });
+    // Scoped to the footer, not the whole dialog - AntD's built-in "X"
+    // close icon also carries an (untranslated) "Close" aria-label, which
+    // would otherwise collide with our own translated footer button.
+    const footer = dialog.querySelector('.ant-modal-footer') as HTMLElement;
+    await user.click(within(footer).getByRole('button', { hidden: true }));
+
+    // No `hidden: true` here (unlike the other dialog queries in this file)
+    // - AntD keeps a closed Modal's markup in the DOM with `display: none`
+    // rather than unmounting it, so an explicitly-hidden query would still
+    // match it after close.
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(screen.getAllByText('BX-001').length).toBeGreaterThan(0);
+  });
+
+  it('shows an error message when the box detail fails to load (e.g. deleted box)', async () => {
+    // TC-05/AC-1
+    mockListEndpoints({ boxes: [makeBox()], boxDetailError: true });
+
+    const user = userEvent.setup();
+    renderBoxesPage();
+
+    await user.click(await screen.findByText('BX-001'));
+
+    expect(
+      await screen.findByText(/failed to load box items|فشل تحميل عناصر الصندوق/i),
+    ).toBeInTheDocument();
   });
 });

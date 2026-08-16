@@ -1,21 +1,30 @@
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, Button, Form, Input, Modal, Select, Table, Typography } from 'antd';
+import { Alert, Button, Form, Input, Modal, Select, Spin, Table, Typography } from 'antd';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { classifyItemRejection, type ItemRejection } from '../features/boxes/logic';
 import { boxSchema, type BoxFormValues } from '../features/boxes/schema';
 import { printBoxLabel } from '../features/boxes/printLabel';
-import type { Box } from '../features/boxes/types';
-import { useBoxes, useCreateBox } from '../features/boxes/useBoxes';
+import type { Box, BoxItem } from '../features/boxes/types';
+import { useBox, useBoxes, useCreateBox } from '../features/boxes/useBoxes';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import { useSerializedItems } from '../features/serialized-items/useSerializedItems';
 
 export function BoxesPage() {
   const { t } = useTranslation();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // WRH-71/AC-1: the clicked row is kept only for its code (the detail
+  // modal's title) - the items list itself comes from useBox's own fresh
+  // fetch below, not this stale list row.
+  const [detailBox, setDetailBox] = useState<Box | null>(null);
   const { data: boxes, isLoading, isError: isListError } = useBoxes();
   const createMutation = useCreateBox();
+  const {
+    data: boxDetail,
+    isLoading: isDetailLoading,
+    isError: isDetailError,
+  } = useBox(detailBox?.id, detailBox !== null);
   const { data: productTypes, isError: isProductTypesError } = useProductTypes('');
   // WRH-27/AC-1/AC-2/AC-5: item_ids rejections name a specific item (and,
   // for AC-2, the specific other box) - classifyItemRejection anchors on
@@ -95,16 +104,33 @@ export function BoxesPage() {
         <Button
           type="link"
           size="small"
-          onClick={() =>
+          onClick={(event) => {
+            // WRH-71: the row itself now opens the detail view on click -
+            // without this, the click would bubble up to the row and pop
+            // the detail modal open behind the QR print window too.
+            event.stopPropagation();
             printBoxLabel(record, {
               qrAlt: t('boxes.qrCodeLabel'),
               loadError: t('boxes.printQrLoadError'),
-            })
-          }
+            });
+          }}
         >
           {t('boxes.printQrButton')}
         </Button>
       ),
+    },
+  ];
+
+  const detailColumns = [
+    {
+      title: t('boxes.detail.serialNumberHeader'),
+      dataIndex: 'serial_number',
+      key: 'serial_number',
+    },
+    {
+      title: t('boxes.detail.statusHeader'),
+      key: 'status',
+      render: (_: unknown, record: BoxItem) => t(`serializedItems.status.${record.status}`),
     },
   ];
 
@@ -125,8 +151,41 @@ export function BoxesPage() {
           dataSource={boxes}
           loading={isLoading}
           locale={{ emptyText: t('boxes.emptyState') }}
+          onRow={(record) => ({
+            onClick: () => setDetailBox(record),
+            style: { cursor: 'pointer' },
+          })}
         />
       )}
+      <Modal
+        title={t('boxes.detail.title', { code: detailBox?.code ?? '' })}
+        open={detailBox !== null}
+        onCancel={() => setDetailBox(null)}
+        footer={[
+          <Button key="close" onClick={() => setDetailBox(null)}>
+            {t('boxes.detail.closeButton')}
+          </Button>,
+        ]}
+        width={640}
+      >
+        {isDetailLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
+            <Spin />
+          </div>
+        ) : isDetailError ? (
+          <Alert type="error" message={t('boxes.detail.loadError')} showIcon />
+        ) : (
+          <Table<BoxItem>
+            rowKey="id"
+            size="small"
+            pagination={false}
+            scroll={{ y: 320 }}
+            columns={detailColumns}
+            dataSource={boxDetail?.items}
+            locale={{ emptyText: t('boxes.detail.emptyState') }}
+          />
+        )}
+      </Modal>
       <Modal
         title={t('boxes.newButton')}
         open={isModalOpen}

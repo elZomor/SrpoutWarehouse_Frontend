@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createBox, listBoxes } from './api';
+import { createBox, getBox, listBoxes } from './api';
 import type { BoxFormValues } from './schema';
 
 const boxesBaseKey = ['boxes'] as const;
@@ -8,6 +8,17 @@ export function useBoxes() {
   return useQuery({
     queryKey: boxesBaseKey,
     queryFn: () => listBoxes(),
+  });
+}
+
+// WRH-71/AC-1: only fetches once a box detail view is opened (`enabled`) -
+// matches useSerializedItems' identical opt-in-fetch shape for the
+// dashboard's stock-summary detail modal.
+export function useBox(id: number | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: [...boxesBaseKey, id],
+    queryFn: () => getBox(id!),
+    enabled: enabled && id !== undefined,
   });
 }
 
