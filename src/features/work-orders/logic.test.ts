@@ -8,6 +8,7 @@ import {
   isPackingListEligible,
   isPrimaryWorkOrder,
   isReturnEligible,
+  isTerminalWorkOrder,
   scannableLineItemOptions,
   stillOutCount,
 } from './logic';
@@ -260,6 +261,24 @@ describe('isReturnEligible', () => {
 
   it('is not eligible for a closed WO (WRH-40)', () => {
     expect(isReturnEligible('closed')).toBe(false);
+  });
+});
+
+describe('isTerminalWorkOrder', () => {
+  it('is terminal for a closed WO', () => {
+    expect(isTerminalWorkOrder('closed')).toBe(true);
+  });
+
+  it('is terminal for a returned WO', () => {
+    expect(isTerminalWorkOrder('returned')).toBe(true);
+  });
+
+  it('is not terminal for a partially_returned WO (WRH-69: still needs attention)', () => {
+    expect(isTerminalWorkOrder('partially_returned')).toBe(false);
+  });
+
+  it('is not terminal for a draft WO', () => {
+    expect(isTerminalWorkOrder('draft')).toBe(false);
   });
 });
 

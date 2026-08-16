@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WorkOrder } from '../features/work-orders/types';
 import { apiClient } from '../lib/apiClient';
+import { colors } from '../theme/tokens';
 import '../i18n';
 import {
   fillExpectedDateOut,
@@ -202,6 +203,10 @@ describe('WorkOrdersPage - active tab', () => {
   it('downloads the packing list PDF when the button is clicked', async () => {
     // AC-1: clicking "Download Packing List" on a Primary WO triggers a
     // browser download of the PDF the backend returns.
+    // WRH-69: this file's coverage-instrumentation overhead applies to
+    // every test in it (LESSONS.md's WRH-55 entry), not just new ones -
+    // adding the WRH-69 test pushed this and the "drills into..." test
+    // below over the global testTimeout under `npm run test:coverage`.
     const primary = makeActiveWorkOrder();
     mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [primary] });
     const pdfBlob = new Blob(['%PDF-fake'], { type: 'application/pdf' });
@@ -239,7 +244,7 @@ describe('WorkOrdersPage - active tab', () => {
     createObjectURLSpy.mockRestore();
     revokeObjectURLSpy.mockRestore();
     clickSpy.mockRestore();
-  });
+  }, 45000);
 
   it('shows a generic error message when the packing list download fails', async () => {
     const primary = makeActiveWorkOrder();
@@ -274,6 +279,53 @@ describe('WorkOrdersPage - active tab', () => {
 
     expect(
       await screen.findByText(/failed to download the packing list|فشل تحميل قائمة التعبئة/i),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a closed Primary read-only when it still has an active Supplementary (WRH-69)', async () => {
+    // WRH-69: the backend now keeps a terminal Primary visible purely to
+    // nest a still-active Supplementary - it must render grayed out/
+    // read-only (no Add Supplementary/Return/Transfer/Close), not as a
+    // normal actionable row. Four `within(row)` role queries against this
+    // file's heaviest page (see LESSONS.md's WRH-55 entry) push this past
+    // the global testTimeout even with `hidden: true` - same per-test
+    // override precedent as that entry's two tests.
+    const closedPrimary = makeActiveWorkOrder({
+      status: 'closed',
+      supplementaries: [
+        makeActiveWorkOrder({ id: 2, job_name: 'Supp A', status: 'partially_returned' }),
+      ],
+    });
+    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [closedPrimary] });
+
+    await renderWorkOrdersPage({ tab: 'active' });
+
+    const row = (await screen.findByText('Summer Gala')).closest('tr');
+    expect(row).not.toBeNull();
+    expect(row).toHaveStyle({
+      backgroundColor: colors.surfaceMuted,
+      color: colors.textMuted,
+    });
+    // Plain text queries, not getByRole/queryByRole - role queries compute
+    // each candidate's accessible name, which on this row (for reasons not
+    // fully pinned down - possibly an aria-describedby/aria-owns reference
+    // out to a portal-rendered element elsewhere in the document) costs
+    // ~16s per call instead of the usual sub-second cost `hidden: true`
+    // normally gets (see LESSONS.md's WRH-55 entry / feedback_fe_test_perf_
+    // root_causes). Button text is unique enough within one row's cell to
+    // stand in for role queries here.
+    expect(
+      within(row as HTMLElement).queryByText(/add supplementary|إضافة أمر تكميلي/i),
+    ).not.toBeInTheDocument();
+    // Anchored on both ends - "إرجاع" (the Return button's own label) is
+    // also a substring of "تم إرجاعه" ("returned"), which the per-type
+    // summary column always renders regardless of this row's terminal
+    // state, so an unanchored match would false-positive against that.
+    expect(within(row as HTMLElement).queryByText(/^return$|^إرجاع$/i)).not.toBeInTheDocument();
+    // Still present: informational/non-mutating actions.
+    expect(within(row as HTMLElement).getByText(/view details|عرض التفاصيل/i)).toBeInTheDocument();
+    expect(
+      within(row as HTMLElement).getByText(/download packing list|تحميل قائمة التعبئة/i),
     ).toBeInTheDocument();
   });
 
@@ -325,5 +377,5 @@ describe('WorkOrdersPage - active tab', () => {
     const dialog = await screen.findByRole('dialog', { hidden: true });
     expect(within(dialog).getByText('SN-0001')).toBeInTheDocument();
     expect(within(dialog).getByText(/^out$|^خارج$/i)).toBeInTheDocument();
-  });
+  }, 45000);
 });
