@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Form, Input, Modal, Select, Spin, Table, Typography } from 'antd';
 import { Controller, useForm } from 'react-hook-form';
@@ -153,6 +153,19 @@ export function BoxesPage() {
           locale={{ emptyText: t('boxes.emptyState') }}
           onRow={(record) => ({
             onClick: () => setDetailBox(record),
+            // Keyboard/screen-reader equivalent of the mouse-only onClick
+            // above - a plain onRow onClick has no focus/activation path
+            // otherwise.
+            onKeyDown: (event: KeyboardEvent) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setDetailBox(record);
+              }
+            },
+            // Not role="button" - that would clobber the row's own
+            // semantic "row" role inside the table and break the row/cell
+            // accessible-name computation table libraries rely on.
+            tabIndex: 0,
             style: { cursor: 'pointer' },
           })}
         />

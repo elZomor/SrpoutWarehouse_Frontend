@@ -407,6 +407,21 @@ describe('BoxesPage', () => {
     expect(mockedApiClient.get).toHaveBeenCalledWith('/api/boxes/1/');
   });
 
+  it('opens the box detail from the keyboard (Enter on a focused row)', async () => {
+    // Keyboard/screen-reader equivalent of the mouse-only row click above.
+    mockListEndpoints({ boxes: [makeBox()], boxDetail: makeBox() });
+
+    const user = userEvent.setup();
+    renderBoxesPage();
+
+    const row = await screen.findByRole('row', { name: /BX-001/, hidden: true });
+    row.focus();
+    await user.keyboard('{Enter}');
+
+    const dialog = await screen.findByRole('dialog', { hidden: true });
+    expect(within(dialog).getByText('SN-042')).toBeInTheDocument();
+  });
+
   it('shows an empty-state message for a box with no items', async () => {
     // TC-02/AC-3
     mockListEndpoints({ boxes: [makeBox()], boxDetail: makeBox({ items: [] }) });
