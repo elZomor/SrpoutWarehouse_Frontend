@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WorkOrder } from '../features/work-orders/types';
 import { apiClient } from '../lib/apiClient';
+import { colors } from '../theme/tokens';
 import '../i18n';
 import {
   fillExpectedDateOut,
@@ -301,7 +302,10 @@ describe('WorkOrdersPage - active tab', () => {
 
     const row = (await screen.findByText('Summer Gala')).closest('tr');
     expect(row).not.toBeNull();
-    expect(row).toHaveStyle({ backgroundColor: '#F1F5F9', color: '#64748B' });
+    expect(row).toHaveStyle({
+      backgroundColor: colors.surfaceMuted,
+      color: colors.textMuted,
+    });
     // Plain text queries, not getByRole/queryByRole - role queries compute
     // each candidate's accessible name, which on this row (for reasons not
     // fully pinned down - possibly an aria-describedby/aria-owns reference
