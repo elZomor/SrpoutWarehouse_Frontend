@@ -422,6 +422,32 @@ describe('BoxesPage', () => {
     expect(within(dialog).getByText('SN-042')).toBeInTheDocument();
   });
 
+  it('does not open the detail modal when pressing Enter on the Print QR button', async () => {
+    // A bubbled keydown from a nested interactive element shouldn't also
+    // trigger the row's own Enter/Space activation - only a direct mouse
+    // click or keypress on the row itself should.
+    mockListEndpoints({ boxes: [makeBox()] });
+    const printSpy = vi.fn();
+    const fakePrintWindow = {
+      document: window.document.implementation.createHTMLDocument(),
+      focus: vi.fn(),
+      print: printSpy,
+    };
+    vi.spyOn(window, 'open').mockReturnValue(fakePrintWindow as never);
+
+    const user = userEvent.setup();
+    renderBoxesPage();
+
+    const printButton = await screen.findByRole('button', {
+      name: /print qr|طباعة رمز qr/i,
+      hidden: true,
+    });
+    printButton.focus();
+    await user.keyboard('{Enter}');
+
+    expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument();
+  });
+
   it('shows an empty-state message for a box with no items', async () => {
     // TC-02/AC-3
     mockListEndpoints({ boxes: [makeBox()], boxDetail: makeBox({ items: [] }) });

@@ -22,7 +22,12 @@ export function BoxesPage() {
   const createMutation = useCreateBox();
   const {
     data: boxDetail,
-    isLoading: isDetailLoading,
+    // isFetching (not isLoading) - useBox's staleTime: 0 means reopening an
+    // already-cached box triggers a background refetch that isLoading
+    // wouldn't reflect, which would otherwise render the previous,
+    // possibly-stale item list for a moment before the fresh one swaps in
+    // (AC-5).
+    isFetching: isDetailLoading,
     isError: isDetailError,
   } = useBox(detailBox?.id, detailBox !== null);
   const { data: productTypes, isError: isProductTypesError } = useProductTypes('');
@@ -157,7 +162,15 @@ export function BoxesPage() {
             // above - a plain onRow onClick has no focus/activation path
             // otherwise.
             onKeyDown: (event: KeyboardEvent) => {
-              if (event.key === 'Enter' || event.key === ' ') {
+              // Only react when the row itself is the key's target, not a
+              // bubbled keydown from a nested interactive element (e.g. the
+              // Print QR button) - otherwise pressing Enter/Space on that
+              // button both prints the QR and opens the detail modal,
+              // while a mouse click on it only does the former.
+              if (
+                (event.key === 'Enter' || event.key === ' ') &&
+                event.target === event.currentTarget
+              ) {
                 event.preventDefault();
                 setDetailBox(record);
               }
