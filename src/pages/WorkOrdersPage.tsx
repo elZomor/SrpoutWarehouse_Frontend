@@ -34,6 +34,7 @@ import {
   isPackingListEligible,
   isPrimaryWorkOrder,
   isReturnEligible,
+  isTerminalWorkOrder,
   scannableLineItemOptions as computeScannableLineItemOptions,
   stillOutCount,
 } from '../features/work-orders/logic';
@@ -940,8 +941,12 @@ export function WorkOrdersPage() {
               restriction) - `supplementaries` only exists on
               ActiveWorkOrder, never on ActiveWorkOrderSupplementary, so
               this also narrows `record` for openSupplementaryModal's
-              ActiveWorkOrder-only parameter. */}
-          {isPrimaryWorkOrder(record) && (
+              ActiveWorkOrder-only parameter. WRH-69: a terminal Primary is
+              a newly-reachable case on this list (kept visible only to nest
+              a still-active Supplementary) - excluded here since it's
+              read-only, same reasoning as isReturnEligible already gating
+              Return/Transfer/Close below. */}
+          {isPrimaryWorkOrder(record) && !isTerminalWorkOrder(record.status) && (
             <Button size="small" onClick={() => openSupplementaryModal(record)}>
               {t('workOrders.active.addSupplementaryButton')}
             </Button>
@@ -1057,6 +1062,16 @@ export function WorkOrdersPage() {
                 dataSource={activeWorkOrders}
                 loading={isActiveLoading}
                 locale={{ emptyText: t('workOrders.active.emptyState') }}
+                // WRH-69: a terminal Primary only stays on this list to
+                // nest a still-active Supplementary - grayed out via this
+                // class (see index.css) so it reads as done/read-only
+                // rather than another actionable row. Only the top-level
+                // Table needs this - a nested supplementary Table's rows
+                // are never terminal (the backend's own nested Prefetch
+                // already excludes them).
+                rowClassName={(record) =>
+                  isTerminalWorkOrder(record.status) ? 'wo-terminal-row' : ''
+                }
                 expandable={{
                   rowExpandable: (record) => record.supplementaries.length > 0,
                   expandedRowRender: (record) => (

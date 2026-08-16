@@ -206,7 +206,12 @@ describe('WorkOrdersPage - fulfillment', () => {
   // on those queries below); after that fix it's ~16.5s plain, but
   // `npm run test:coverage`'s v8 instrumentation (the actual CI command)
   // measured ~35.4s for this one test - hence the bump, not the 150000ms it
-  // used to carry.
+  // used to carry. WRH-69: bumped 60000->90000 - an unrelated diff
+  // elsewhere in WorkOrdersPage.tsx pushed the whole run's per-file
+  // instrumentation overhead up enough to fail this already-once-bumped
+  // test at exactly its old ceiling, matching LESSONS.md's WRH-55 entry
+  // ("a big-enough diff can push a completely unrelated pre-existing test
+  // over its already-bumped timeout too").
   it('refreshes the Active tab after starting a WO from the Manage tab', async () => {
     // Regression: the Active tab's query is a separate cache from the
     // flat work-orders list and doesn't remount on tab switch (AntD keeps
@@ -265,7 +270,7 @@ describe('WorkOrdersPage - fulfillment', () => {
       hidden: true,
     });
     expect(await within(activeRow).findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
-  }, 60000);
+  }, 90000);
 
   it('shows a toast when starting fulfillment fails, leaving the WO as draft', async () => {
     const workOrder = makeWorkOrder();

@@ -150,6 +150,18 @@ export function isReturnEligible(status: WorkOrderStatus): boolean {
   return RETURN_ELIGIBLE_STATUSES.has(status);
 }
 
+// WRH-69: mirrors the backend's _TERMINAL_STATUSES - a terminal Primary can
+// now still appear on the Active tab (kept visible purely to nest a
+// still-active Supplementary), so the row needs its own "done, read-only"
+// visual treatment distinct from every other Active-tab row, which was
+// never possible before this ticket since a terminal WO never reached the
+// Active tab at all.
+export const TERMINAL_STATUSES = new Set<WorkOrderStatus>(['returned', 'closed']);
+
+export function isTerminalWorkOrder(status: WorkOrderStatus): boolean {
+  return TERMINAL_STATUSES.has(status);
+}
+
 // WRH-40/AC-1: the close-confirmation warning's "N items are still out"
 // count - summed client-side from data the Active tab already has
 // (ActiveWorkOrderLineItem.still_out_quantity), no separate preview

@@ -10,3 +10,12 @@ body {
   margin: 0;
   font-family: 'Cairo', sans-serif;
 }
+
+/* WRH-69: a terminal (closed/returned) Primary WO kept visible on the
+   Active tab purely to still nest a non-terminal Supplementary - grayed
+   out to signal it's read-only, matching tokens.ts's surfaceMuted/
+   textMuted. */
+.wo-terminal-row > td {
+  background-color: #f1f5f9 !important;
+  color: #64748b;
+}
