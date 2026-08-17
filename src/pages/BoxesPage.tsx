@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Form, Input, Modal, Select, Spin, Table, Typography } from 'antd';
 import { Controller, useForm } from 'react-hook-form';
@@ -24,6 +24,14 @@ export function BoxesPage() {
   // below), so the title/table don't flash blank underneath the still-
   // visible, animating-out modal.
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  // afterOpenChange(false) fires asynchronously once the close animation
+  // ends - if the user re-opens a different box before that fires (close
+  // row 1, then immediately click row 2), a stale callback from the
+  // *earlier* close would otherwise wipe out the newly-set detailBox. A
+  // ref (always current, unlike the closure's captured isDetailOpen) lets
+  // the callback check whether a reopen has happened in the meantime.
+  const isDetailOpenRef = useRef(isDetailOpen);
+  isDetailOpenRef.current = isDetailOpen;
   const { data: boxes, isLoading, isError: isListError } = useBoxes();
   const createMutation = useCreateBox();
   const {
@@ -201,7 +209,7 @@ export function BoxesPage() {
         // actually finished, not on click - otherwise the title/table
         // flash blank underneath the still-visible, animating-out modal.
         afterOpenChange={(open) => {
-          if (!open) {
+          if (!open && !isDetailOpenRef.current) {
             setDetailBox(null);
           }
         }}
