@@ -44,6 +44,7 @@ function makeStockSummaryRow(
     damaged: 1,
     missing: 1,
     available: 1,
+    written_off: 0,
     ...overrides,
   };
 }
@@ -137,7 +138,7 @@ describe('DashboardPage', () => {
     const cells = within(row)
       .getAllByRole('cell', { hidden: true })
       .map((cell) => cell.textContent);
-    expect(cells).toEqual(['Bar LED Model A', '4', '1', '1', '1', '1']);
+    expect(cells).toEqual(['Bar LED Model A', '4', '1', '1', '1', '1', '0']);
   });
 
   it('shows Available exactly as returned by the backend (AC-2)', async () => {
@@ -151,6 +152,7 @@ describe('DashboardPage', () => {
           damaged: 5,
           missing: 2,
           available: 62,
+          written_off: 1,
         }),
       ],
     });
@@ -159,6 +161,21 @@ describe('DashboardPage', () => {
 
     const row = await screen.findByRole('row', { name: /bar led model a/i, hidden: true });
     expect(within(row).getByText('62')).toBeInTheDocument();
+  });
+
+  it('shows the written-off count per product type (WRH-74/AC-2)', async () => {
+    mockGetEndpoints({
+      stockSummary: [makeStockSummaryRow({ written_off: 3 })],
+    });
+
+    renderDashboardPage();
+
+    expect(await screen.findByText(/written-off|مشطوب/i, { selector: 'th' })).toBeInTheDocument();
+    const row = await screen.findByRole('row', { name: /bar led model a/i, hidden: true });
+    const cells = within(row)
+      .getAllByRole('cell', { hidden: true })
+      .map((cell) => cell.textContent);
+    expect(cells).toEqual(['Bar LED Model A', '4', '1', '1', '1', '1', '3']);
   });
 
   it('drills into a product type to show its serials and statuses', async () => {
@@ -221,6 +238,7 @@ describe('DashboardPage', () => {
           damaged: 0,
           missing: 0,
           available: 0,
+          written_off: 0,
         }),
       ],
     });
@@ -231,7 +249,7 @@ describe('DashboardPage', () => {
     const cells = within(row)
       .getAllByRole('cell', { hidden: true })
       .map((cell) => cell.textContent);
-    expect(cells).toEqual(['Bar LED Model A', '0', '0', '0', '0', '0']);
+    expect(cells).toEqual(['Bar LED Model A', '0', '0', '0', '0', '0', '0']);
   });
 
   it('shows an empty state when no product types exist', async () => {

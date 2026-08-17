@@ -17,4 +17,5 @@ export interface ProductTypeStockSummary {
   damaged: number;
   missing: number;
   available: number;
+  written_off: number;
 }

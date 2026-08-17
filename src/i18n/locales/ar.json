@@ -41,6 +41,7 @@
       "damagedHeader": "تالف",
       "missingHeader": "مفقود",
       "availableHeader": "متاح",
+      "writtenOffHeader": "مشطوب",
       "emptyState": "لا توجد أنواع منتجات",
       "loadError": "فشل تحميل ملخص المخزون. حاول مرة أخرى.",
       "detail": {

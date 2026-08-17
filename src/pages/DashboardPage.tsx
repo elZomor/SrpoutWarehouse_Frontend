@@ -62,6 +62,11 @@ export function DashboardPage() {
       dataIndex: 'available',
       key: 'available',
     },
+    {
+      title: t('dashboard.stockSummary.writtenOffHeader'),
+      dataIndex: 'written_off',
+      key: 'written_off',
+    },
   ];
 
   const detailColumns = [

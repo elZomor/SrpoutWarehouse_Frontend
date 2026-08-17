@@ -41,6 +41,7 @@
       "damagedHeader": "Damaged",
       "missingHeader": "Missing",
       "availableHeader": "Available",
+      "writtenOffHeader": "Written-off",
       "emptyState": "No product types found",
       "loadError": "Failed to load stock summary. Please try again.",
       "detail": {
