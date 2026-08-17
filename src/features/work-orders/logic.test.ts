@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildActiveWorkOrderLookup,
   classifyReturnRejection,
   classifyScanRejection,
   classifyTransferRejection,
@@ -349,6 +350,50 @@ function makeSupplementary(
     ...overrides,
   };
 }
+
+describe('buildActiveWorkOrderLookup', () => {
+  it('indexes a Primary and its supplementaries by id, and records the Primary id', () => {
+    const supplementaryLineItems: ActiveWorkOrderLineItem[] = [
+      {
+        id: 10,
+        product_type: 1,
+        product_type_name: 'Bar LED Model A',
+        quantity: 1,
+        returned_quantity: 0,
+        damaged_quantity: 0,
+        still_out_quantity: 1,
+      },
+    ];
+    const primaryLineItems: ActiveWorkOrderLineItem[] = [
+      {
+        id: 20,
+        product_type: 1,
+        product_type_name: 'Bar LED Model A',
+        quantity: 2,
+        returned_quantity: 1,
+        damaged_quantity: 0,
+        still_out_quantity: 1,
+      },
+    ];
+    const primary = makePrimary({
+      line_items: primaryLineItems,
+      supplementaries: [makeSupplementary({ id: 2, line_items: supplementaryLineItems })],
+    });
+
+    const { lineItemsById, primaryWorkOrderIds } = buildActiveWorkOrderLookup([primary]);
+
+    expect(lineItemsById.get(primary.id)).toBe(primaryLineItems);
+    expect(lineItemsById.get(2)).toBe(supplementaryLineItems);
+    expect(primaryWorkOrderIds).toEqual(new Set([primary.id]));
+  });
+
+  it('returns empty structures for an empty input', () => {
+    const { lineItemsById, primaryWorkOrderIds } = buildActiveWorkOrderLookup([]);
+
+    expect(lineItemsById.size).toBe(0);
+    expect(primaryWorkOrderIds.size).toBe(0);
+  });
+});
 
 describe('isPrimaryWorkOrder', () => {
   it('is true for a Primary work order', () => {

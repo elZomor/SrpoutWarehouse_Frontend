@@ -266,6 +266,10 @@
     "startButton": "بدء التنفيذ",
     "startError": "فشل بدء التنفيذ. حاول مرة أخرى.",
     "scanButton": "مسح",
+    "viewDetailsButton": "عرض التفاصيل",
+    "addSupplementaryButton": "إضافة أمر تكميلي",
+    "downloadPackingListButton": "تحميل قائمة التعبئة",
+    "downloadPackingListError": "فشل تحميل قائمة التعبئة. حاول مرة أخرى.",
     "form": {
       "jobNameRequired": "اسم المهمة مطلوب",
       "expectedDateOutRequired": "تاريخ الخروج المتوقع مطلوب",
@@ -313,12 +317,6 @@
       "boxScanGenericError": "فشل مسح هذا الصندوق. حاول مرة أخرى.",
       "boxSummaryMessage": "تم توسيع الصندوق {{code}}: تمت إضافة {{count}} عنصر",
       "boxSummaryMessageFlagged": "تم توسيع الصندوق {{code}}: تمت إضافة {{count}} عنصر (تم تمييز {{flaggedCount}})"
-    },
-    "active": {
-      "viewDetailsButton": "عرض التفاصيل",
-      "addSupplementaryButton": "إضافة أمر تكميلي",
-      "downloadPackingListButton": "تحميل قائمة التعبئة",
-      "downloadPackingListError": "فشل تحميل قائمة التعبئة. حاول مرة أخرى."
     },
     "detail": {
       "title": "{{reference}} — {{jobName}}",

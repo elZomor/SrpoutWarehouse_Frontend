@@ -286,6 +286,39 @@ export function scannableLineItemOptions(
     .map((item) => ({ value: item.id, label: item.product_type_name }));
 }
 
+// WRH-75: the merged screen's single table is driven by useWorkOrders()
+// (every WO, every status, flat), since useActiveWorkOrders() only ever
+// returns non-terminal Primaries (nested supplementaries, excluded once
+// terminal - see the backend's active queryset comment) and can't stand in
+// as "all WOs". Its richer per-line-item returned/damaged/still-out counts
+// are still the only source for the Return/Transfer/Close actions though,
+// so this flattens Primary + supplementaries into one id-keyed lookup a
+// row's kebab menu can read from when one of those actions opens. Every
+// status that gates those actions (isReturnEligible) is by construction
+// non-terminal, so it's always present in this map - a miss only happens
+// for terminal rows, which never read from it. primaryWorkOrderIds is the
+// companion "is this row a Primary" set the Add Supplementary action needs
+// (only a Primary can be a supplementary's parent).
+export interface ActiveWorkOrderLookup {
+  lineItemsById: Map<number, ActiveWorkOrderLineItem[]>;
+  primaryWorkOrderIds: Set<number>;
+}
+
+export function buildActiveWorkOrderLookup(
+  activeWorkOrders: ActiveWorkOrder[],
+): ActiveWorkOrderLookup {
+  const lineItemsById = new Map<number, ActiveWorkOrderLineItem[]>();
+  const primaryWorkOrderIds = new Set<number>();
+  for (const primary of activeWorkOrders) {
+    lineItemsById.set(primary.id, primary.line_items);
+    primaryWorkOrderIds.add(primary.id);
+    for (const supplementary of primary.supplementaries) {
+      lineItemsById.set(supplementary.id, supplementary.line_items);
+    }
+  }
+  return { lineItemsById, primaryWorkOrderIds };
+}
+
 export interface WorkOrderDetailRow {
   key: number;
   product_type_name: string;

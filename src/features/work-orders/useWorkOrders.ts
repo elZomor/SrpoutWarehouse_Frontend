@@ -215,20 +215,27 @@ export function useDownloadWorkOrderPackingList() {
   });
 }
 
-// WorkOrdersPage's closeFulfillmentModal: every scan/complete during that
-// session already patched workOrdersBaseKey directly (see
-// useScanWorkOrderItem/useCompleteWorkOrder above), so this only needs to
-// catch up activeWorkOrdersKey once the session ends - invalidating
-// workOrdersBaseKey too would just be a redundant refetch.
-export function useInvalidateActiveWorkOrders() {
-  const queryClient = useQueryClient();
-  return (workOrderId?: number) => invalidateActiveWorkOrders(queryClient, workOrderId);
-}
-
-// WorkOrdersPage's closeReturnModal: return_item()/return_box() never patch
-// workOrdersBaseKey (see invalidateWorkOrderCaches's own comment), so that
-// cache needs invalidating here too, not just activeWorkOrdersKey.
+// WorkOrdersPage's closeFulfillmentModal/closeReturnModal both call this
+// once their respective session ends - `includeFlatList` is a required
+// argument (not a second, similarly-named hook) so each call site has to
+// state its own answer to "did this session's mutations already patch
+// workOrdersBaseKey directly?" instead of a future caller picking between
+// two easily-confused hook names from memory:
+// - closeFulfillmentModal: every scan/complete during that session already
+//   patched workOrdersBaseKey directly (see useScanWorkOrderItem/
+//   useCompleteWorkOrder above) - pass `includeFlatList: false`, since
+//   invalidating it too would just be a redundant refetch.
+// - closeReturnModal: return_item()/return_box() never patch
+//   workOrdersBaseKey (their response, WorkOrderReturnResult, doesn't
+//   match its flat WorkOrder shape) - pass `includeFlatList: true`, or the
+//   merged screen's Status column for that row goes stale.
 export function useInvalidateWorkOrders() {
   const queryClient = useQueryClient();
-  return (workOrderId?: number) => invalidateWorkOrderCaches(queryClient, workOrderId);
+  return (workOrderId: number | undefined, { includeFlatList }: { includeFlatList: boolean }) => {
+    if (includeFlatList) {
+      invalidateWorkOrderCaches(queryClient, workOrderId);
+      return;
+    }
+    invalidateActiveWorkOrders(queryClient, workOrderId);
+  };
 }

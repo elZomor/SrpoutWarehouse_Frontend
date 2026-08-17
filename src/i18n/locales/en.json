@@ -262,6 +262,10 @@
     "startButton": "Start Fulfillment",
     "startError": "Failed to start fulfillment. Please try again.",
     "scanButton": "Scan",
+    "viewDetailsButton": "View Details",
+    "addSupplementaryButton": "Add Supplementary",
+    "downloadPackingListButton": "Download Packing List",
+    "downloadPackingListError": "Failed to download the packing list. Please try again.",
     "form": {
       "jobNameRequired": "Job name is required",
       "expectedDateOutRequired": "Expected date out is required",
@@ -309,12 +313,6 @@
       "boxScanGenericError": "Failed to scan this box. Please try again.",
       "boxSummaryMessage": "Box {{code}} expanded: {{count}} items added",
       "boxSummaryMessageFlagged": "Box {{code}} expanded: {{count}} items added ({{flaggedCount}} flagged)"
-    },
-    "active": {
-      "viewDetailsButton": "View Details",
-      "addSupplementaryButton": "Add Supplementary",
-      "downloadPackingListButton": "Download Packing List",
-      "downloadPackingListError": "Failed to download the packing list. Please try again."
     },
     "detail": {
       "title": "{{reference}} — {{jobName}}",

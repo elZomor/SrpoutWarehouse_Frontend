@@ -1,5 +1,18 @@
-export type WorkOrderStatus =
-  'draft' | 'in_progress' | 'fulfilled' | 'returned' | 'partially_returned' | 'closed';
+// WRH-75: the single source of truth for every status this model can carry
+// - WorkOrderStatus is derived FROM this array (not the other way round) so
+// a new status can't be added to one without the other, unlike a
+// hand-written union type + a separately hand-written array of its values
+// (e.g. a status-column filter's options) that can silently drift apart.
+export const WORK_ORDER_STATUSES = [
+  'draft',
+  'in_progress',
+  'fulfilled',
+  'partially_returned',
+  'returned',
+  'closed',
+] as const;
+
+export type WorkOrderStatus = (typeof WORK_ORDER_STATUSES)[number];
 
 export interface WorkOrderLineItem {
   id: number;

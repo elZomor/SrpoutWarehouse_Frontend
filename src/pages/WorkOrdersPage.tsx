@@ -21,11 +21,12 @@ import {
   Typography,
 } from 'antd';
 import dayjs from 'dayjs';
-import { useEffect, useRef, useState, type Key } from 'react';
+import { useEffect, useMemo, useRef, useState, type Key } from 'react';
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
+  buildActiveWorkOrderLookup,
   classifyReturnRejection,
   classifyScanRejection,
   classifyTransferRejection,
@@ -51,13 +52,12 @@ import {
   type TransferItemFormValues,
   type WorkOrderFormValues,
 } from '../features/work-orders/schema';
-import type {
-  ActiveWorkOrderLineItem,
-  BoxScanSummary,
-  WorkOrder,
-  WorkOrderReturnResult,
-  WorkOrderStatus,
-  WorkOrderTransferResult,
+import {
+  WORK_ORDER_STATUSES,
+  type BoxScanSummary,
+  type WorkOrder,
+  type WorkOrderReturnResult,
+  type WorkOrderTransferResult,
 } from '../features/work-orders/types';
 import {
   useActiveWorkOrders,
@@ -65,7 +65,6 @@ import {
   useCompleteWorkOrder,
   useCreateWorkOrder,
   useDownloadWorkOrderPackingList,
-  useInvalidateActiveWorkOrders,
   useInvalidateWorkOrders,
   useReturnWorkOrderBox,
   useReturnWorkOrderItem,
@@ -90,16 +89,6 @@ const SERIALIZED_ITEM_STATUS_COLORS = new Map<string, string>([
   ['out', 'red'],
 ]);
 const DEFAULT_STATUS_COLOR = 'default';
-// WRH-75/AC-6: the merged screen's status-column filter options - every
-// status this model can carry, matching WorkOrderStatus's own union.
-const WORK_ORDER_STATUSES: WorkOrderStatus[] = [
-  'draft',
-  'in_progress',
-  'fulfilled',
-  'partially_returned',
-  'returned',
-  'closed',
-];
 // WRH-26/AC-2: scan-box/return-box's box_code rejections are fixed
 // constants (no interpolated free text like the per-serial patterns
 // classifyScanRejection/classifyReturnRejection handle), so exact equality
@@ -135,7 +124,6 @@ export function WorkOrdersPage() {
   const completeMutation = useCompleteWorkOrder();
   const closeMutation = useCloseWorkOrder();
   const downloadPackingListMutation = useDownloadWorkOrderPackingList();
-  const invalidateActiveWorkOrders = useInvalidateActiveWorkOrders();
   const invalidateWorkOrders = useInvalidateWorkOrders();
   const { data: productTypes, isError: isProductTypesError } = useProductTypes('');
   const {
@@ -157,27 +145,14 @@ export function WorkOrdersPage() {
   const fulfillingWorkOrder =
     workOrders?.find((workOrder) => workOrder.id === fulfillingWorkOrderId) ?? null;
 
-  // WRH-75: the merged screen's single table is driven by useWorkOrders()
-  // (every WO, every status, flat - the old Manage tab's source), since
-  // useActiveWorkOrders() only ever returns non-terminal Primaries (nested
-  // supplementaries, excluded once terminal - see its own comment) and
-  // can't stand in as "all WOs". Its richer per-line-item returned/damaged/
-  // still-out counts are still the only source for the Return/Transfer/
-  // Close actions though, so they're indexed here by id (flattening
-  // Primary + supplementaries into one map) and looked up by the row's id
-  // when one of those actions opens. Every status that gates those actions
-  // (isReturnEligible) is by construction non-terminal, so it's always
-  // present in this map - a miss only happens for terminal rows, which
-  // never read from it.
-  const activeLineItemsById = new Map<number, ActiveWorkOrderLineItem[]>();
-  const primaryWorkOrderIds = new Set<number>();
-  for (const primary of activeWorkOrders ?? []) {
-    activeLineItemsById.set(primary.id, primary.line_items);
-    primaryWorkOrderIds.add(primary.id);
-    for (const supplementary of primary.supplementaries) {
-      activeLineItemsById.set(supplementary.id, supplementary.line_items);
-    }
-  }
+  // See buildActiveWorkOrderLookup's own comment for why this exists and
+  // what it's for. Memoized since ~10 pieces of unrelated local state
+  // (scan/return/transfer form fields, modal flags) can re-render this
+  // component without activeWorkOrders itself changing.
+  const { lineItemsById: activeLineItemsById, primaryWorkOrderIds } = useMemo(
+    () => buildActiveWorkOrderLookup(activeWorkOrders ?? []),
+    [activeWorkOrders],
+  );
 
   const {
     control,
@@ -375,7 +350,7 @@ export function WorkOrdersPage() {
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 0);
       },
-      onError: () => message.error(t('workOrders.active.downloadPackingListError')),
+      onError: () => message.error(t('workOrders.downloadPackingListError')),
     });
   };
 
@@ -403,7 +378,7 @@ export function WorkOrdersPage() {
     // lookup up now that the session's over, rather than on every single
     // scan.
     if (fulfillingWorkOrderId !== null) {
-      invalidateActiveWorkOrders(fulfillingWorkOrderId);
+      invalidateWorkOrders(fulfillingWorkOrderId, { includeFlatList: false });
     }
     setFulfillingWorkOrderId(null);
     resetScanForm();
@@ -533,11 +508,11 @@ export function WorkOrdersPage() {
   const closeReturnModal = () => {
     // Mirrors closeFulfillmentModal's end-of-session invalidation - every
     // return_item call during this session only updated local state (see
-    // returnSession's comment), so the Active tab's cache needs to catch up
-    // now rather than on every single scan.
+    // returnSession's comment) and never patched workOrdersBaseKey, so
+    // both caches need to catch up now rather than on every single scan.
     returnSessionGenerationRef.current += 1;
     if (returnSession !== null) {
-      invalidateWorkOrders(returnSession.id);
+      invalidateWorkOrders(returnSession.id, { includeFlatList: true });
     }
     setReturnSession(null);
     resetReturnForm();
@@ -900,7 +875,7 @@ export function WorkOrdersPage() {
                     setDetailWorkOrderId(record.id);
                   }}
                 >
-                  {t('workOrders.active.viewDetailsButton')}
+                  {t('workOrders.viewDetailsButton')}
                 </Menu.Item>
                 {/* WRH-53/AC-1/AC-2: only a Primary can be a supplementary's
                     parent (see the backend's parent_work_order queryset
@@ -917,7 +892,7 @@ export function WorkOrdersPage() {
                       openSupplementaryModal(record);
                     }}
                   >
-                    {t('workOrders.active.addSupplementaryButton')}
+                    {t('workOrders.addSupplementaryButton')}
                   </Menu.Item>
                 )}
                 {isPackingListEligible(record) && (
@@ -932,7 +907,7 @@ export function WorkOrdersPage() {
                       handleDownloadPackingList(record);
                     }}
                   >
-                    {t('workOrders.active.downloadPackingListButton')}
+                    {t('workOrders.downloadPackingListButton')}
                   </Menu.Item>
                 )}
                 {isReturnEligible(record.status) && (
