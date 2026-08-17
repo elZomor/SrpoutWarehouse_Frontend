@@ -33,6 +33,7 @@ test('shows per-product-type stock counts and drills into a product type', async
       damaged: 5,
       missing: 2,
       available: 62,
+      written_off: 1,
     },
   ];
   const serializedItems = [
@@ -64,6 +65,7 @@ test('shows per-product-type stock counts and drills into a product type', async
   await expect(row).toContainText('5');
   await expect(row).toContainText('2');
   await expect(row).toContainText('62');
+  await expect(row).toContainText('1');
 
   await row.click();
 
@@ -98,6 +100,7 @@ test('refreshes counts on demand and shows an empty state with no product types'
       damaged: 0,
       missing: 0,
       available: 0,
+      written_off: 0,
     },
   ];
   const requestsBeforeRefresh = requestCount;
@@ -109,5 +112,5 @@ test('refreshes counts on demand and shows an empty state with no product types'
   // AC-5/TC-05: a product type with zero items shows all zeros, not blank.
   const row = page.getByRole('row', { name: /bar led model a/i });
   const cells = await row.locator('td').allTextContents();
-  expect(cells).toEqual(['Bar LED Model A', '0', '0', '0', '0', '0']);
+  expect(cells).toEqual(['Bar LED Model A', '0', '0', '0', '0', '0', '0']);
 });
