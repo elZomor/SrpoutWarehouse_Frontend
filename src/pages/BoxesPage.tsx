@@ -18,6 +18,12 @@ export function BoxesPage() {
   // modal's title) - the items list itself comes from useBox's own fresh
   // fetch below, not this stale list row.
   const [detailBox, setDetailBox] = useState<Box | null>(null);
+  // Tracks open/closed separately from detailBox itself - closing sets
+  // this false immediately (driving the Modal's close animation) but
+  // detailBox is only cleared once that animation finishes (afterOpenChange
+  // below), so the title/table don't flash blank underneath the still-
+  // visible, animating-out modal.
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const { data: boxes, isLoading, isError: isListError } = useBoxes();
   const createMutation = useCreateBox();
   const {
@@ -29,7 +35,7 @@ export function BoxesPage() {
     // (AC-5).
     isFetching: isDetailLoading,
     isError: isDetailError,
-  } = useBox(detailBox?.id, detailBox !== null);
+  } = useBox(detailBox?.id, isDetailOpen);
   const { data: productTypes, isError: isProductTypesError } = useProductTypes('');
   // WRH-27/AC-1/AC-2/AC-5: item_ids rejections name a specific item (and,
   // for AC-2, the specific other box) - classifyItemRejection anchors on
@@ -157,7 +163,10 @@ export function BoxesPage() {
           loading={isLoading}
           locale={{ emptyText: t('boxes.emptyState') }}
           onRow={(record) => ({
-            onClick: () => setDetailBox(record),
+            onClick: () => {
+              setDetailBox(record);
+              setIsDetailOpen(true);
+            },
             // Keyboard/screen-reader equivalent of the mouse-only onClick
             // above - a plain onRow onClick has no focus/activation path
             // otherwise.
@@ -173,6 +182,7 @@ export function BoxesPage() {
               ) {
                 event.preventDefault();
                 setDetailBox(record);
+                setIsDetailOpen(true);
               }
             },
             // Not role="button" - that would clobber the row's own
@@ -185,10 +195,18 @@ export function BoxesPage() {
       )}
       <Modal
         title={t('boxes.detail.title', { code: detailBox?.code ?? '' })}
-        open={detailBox !== null}
-        onCancel={() => setDetailBox(null)}
+        open={isDetailOpen}
+        onCancel={() => setIsDetailOpen(false)}
+        // Clears the underlying record only once the close animation has
+        // actually finished, not on click - otherwise the title/table
+        // flash blank underneath the still-visible, animating-out modal.
+        afterOpenChange={(open) => {
+          if (!open) {
+            setDetailBox(null);
+          }
+        }}
         footer={[
-          <Button key="close" onClick={() => setDetailBox(null)}>
+          <Button key="close" onClick={() => setIsDetailOpen(false)}>
             {t('boxes.detail.closeButton')}
           </Button>,
         ]}
