@@ -1,4 +1,4 @@
-import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { MinusCircleOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
@@ -6,33 +6,33 @@ import {
   Button,
   DatePicker,
   Divider,
+  Dropdown,
   Form,
   Input,
   InputNumber,
+  Menu,
   Modal,
   Popconfirm,
   Select,
   Space,
   Spin,
   Table,
-  Tabs,
   Tag,
   Typography,
 } from 'antd';
 import dayjs from 'dayjs';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type Key } from 'react';
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useLocation } from 'react-router-dom';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
+  buildActiveWorkOrderLookup,
   classifyReturnRejection,
   classifyScanRejection,
   classifyTransferRejection,
   flattenWorkOrderDetailRows,
   isFullyScanned as computeIsFullyScanned,
   isPackingListEligible,
-  isPrimaryWorkOrder,
   isReturnEligible,
   isTerminalWorkOrder,
   scannableLineItemOptions as computeScannableLineItemOptions,
@@ -52,14 +52,12 @@ import {
   type TransferItemFormValues,
   type WorkOrderFormValues,
 } from '../features/work-orders/schema';
-import type {
-  ActiveWorkOrder,
-  ActiveWorkOrderLineItem,
-  ActiveWorkOrderSupplementary,
-  BoxScanSummary,
-  WorkOrder,
-  WorkOrderReturnResult,
-  WorkOrderTransferResult,
+import {
+  WORK_ORDER_STATUSES,
+  type BoxScanSummary,
+  type WorkOrder,
+  type WorkOrderReturnResult,
+  type WorkOrderTransferResult,
 } from '../features/work-orders/types';
 import {
   useActiveWorkOrders,
@@ -67,7 +65,7 @@ import {
   useCompleteWorkOrder,
   useCreateWorkOrder,
   useDownloadWorkOrderPackingList,
-  useInvalidateActiveWorkOrders,
+  useInvalidateWorkOrders,
   useReturnWorkOrderBox,
   useReturnWorkOrderItem,
   useScanWorkOrderBox,
@@ -103,20 +101,9 @@ const BOX_AMBIGUOUS_LINE_ITEM_MESSAGE =
 export function WorkOrdersPage() {
   const { t } = useTranslation();
   const { message } = App.useApp();
-  const location = useLocation();
-  // WRH-42: a caller (MissingItemsPage's WO reference link) can request
-  // landing on a specific tab via navigate state - a closed WO with no
-  // still-active Supplementary is excluded from the Active tab (WRH-40's
-  // _TERMINAL_STATUSES exclusion; WRH-69 only keeps a closed/returned
-  // Primary visible there when it still has one), so a link to a closed
-  // WO's Manage-tab row would otherwise usually open on a tab that can't
-  // show it. Falls back to the original default when no state was passed
-  // (every other entry point into this page).
-  const initialTab =
-    (location.state as { initialTab?: string } | null)?.initialTab === 'manage'
-      ? 'manage'
-      : 'active';
-  const [activeTabKey, setActiveTabKey] = useState(initialTab);
+  // WRH-75: the Active/Managing tabs are gone - every WO lives in one
+  // table, so only one row's kebab menu can be open at a time.
+  const [openMenuRowId, setOpenMenuRowId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   // WRH-53/AC-1/AC-2: set when the create modal was opened via a Primary
   // row's "Add Supplementary" action rather than the Manage tab's plain
@@ -137,7 +124,7 @@ export function WorkOrdersPage() {
   const completeMutation = useCompleteWorkOrder();
   const closeMutation = useCloseWorkOrder();
   const downloadPackingListMutation = useDownloadWorkOrderPackingList();
-  const invalidateActiveWorkOrders = useInvalidateActiveWorkOrders();
+  const invalidateWorkOrders = useInvalidateWorkOrders();
   const { data: productTypes, isError: isProductTypesError } = useProductTypes('');
   const {
     data: activeWorkOrders,
@@ -157,6 +144,15 @@ export function WorkOrdersPage() {
   // scan - matches PurchaseOrdersPage's receivingPurchaseOrder pattern.
   const fulfillingWorkOrder =
     workOrders?.find((workOrder) => workOrder.id === fulfillingWorkOrderId) ?? null;
+
+  // See buildActiveWorkOrderLookup's own comment for why this exists and
+  // what it's for. Memoized since ~10 pieces of unrelated local state
+  // (scan/return/transfer form fields, modal flags) can re-render this
+  // component without activeWorkOrders itself changing.
+  const { lineItemsById: activeLineItemsById, primaryWorkOrderIds } = useMemo(
+    () => buildActiveWorkOrderLookup(activeWorkOrders ?? []),
+    [activeWorkOrders],
+  );
 
   const {
     control,
@@ -335,7 +331,7 @@ export function WorkOrdersPage() {
   // WRH-53/AC-1/AC-2: entry point for creating a supplementary - clicking
   // this on a Primary row both opens the (otherwise identical) create modal
   // and records which Primary it's linked to.
-  const openSupplementaryModal = (primary: ActiveWorkOrder) => {
+  const openSupplementaryModal = (primary: WorkOrder) => {
     setSupplementaryParent({ id: primary.id, reference: primary.reference });
     setIsModalOpen(true);
   };
@@ -344,7 +340,7 @@ export function WorkOrdersPage() {
   // backend resolves a supplementary's request to its Primary's
   // consolidated document, so this fires the same mutation either way.
   // Mirrors SerializedItemsPage's handleDownloadQrPdf blob-download pattern.
-  const handleDownloadPackingList = (record: ActiveWorkOrder | ActiveWorkOrderSupplementary) => {
+  const handleDownloadPackingList = (record: WorkOrder) => {
     downloadPackingListMutation.mutate(record.id, {
       onSuccess: (blob) => {
         const url = URL.createObjectURL(blob);
@@ -354,7 +350,7 @@ export function WorkOrdersPage() {
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 0);
       },
-      onError: () => message.error(t('workOrders.active.downloadPackingListError')),
+      onError: () => message.error(t('workOrders.downloadPackingListError')),
     });
   };
 
@@ -378,10 +374,11 @@ export function WorkOrdersPage() {
 
   const closeFulfillmentModal = () => {
     // Any scans made during this session only patched workOrdersBaseKey
-    // (see useScanWorkOrderItem's comment) - catch the Active tab's cache
-    // up now that the session's over, rather than on every single scan.
+    // (see useScanWorkOrderItem's comment) - catch the active-work-orders
+    // lookup up now that the session's over, rather than on every single
+    // scan.
     if (fulfillingWorkOrderId !== null) {
-      invalidateActiveWorkOrders(fulfillingWorkOrderId);
+      invalidateWorkOrders(fulfillingWorkOrderId, { includeFlatList: false });
     }
     setFulfillingWorkOrderId(null);
     resetScanForm();
@@ -484,7 +481,7 @@ export function WorkOrdersPage() {
     });
   };
 
-  const openReturnModal = (workOrder: ActiveWorkOrder | ActiveWorkOrderSupplementary) => {
+  const openReturnModal = (workOrder: WorkOrder) => {
     // Starting a new session (even re-opening the same WO) invalidates
     // any earlier in-flight submission - see returnSessionGenerationRef's
     // comment.
@@ -493,7 +490,12 @@ export function WorkOrdersPage() {
       id: workOrder.id,
       job_name: workOrder.job_name,
       status: workOrder.status,
-      line_items: workOrder.line_items,
+      // WRH-75: WorkOrder's own line_items track scanned/remaining, not
+      // returned/damaged/still-out - the richer shape only lives in the
+      // active-work-orders lookup (see activeLineItemsById's comment).
+      // isReturnEligible only opens this from a non-terminal row, which is
+      // always present there.
+      line_items: activeLineItemsById.get(workOrder.id) ?? [],
     });
     resetReturnForm({ serial_number: '' });
     setReturnErrorParams({});
@@ -506,11 +508,11 @@ export function WorkOrdersPage() {
   const closeReturnModal = () => {
     // Mirrors closeFulfillmentModal's end-of-session invalidation - every
     // return_item call during this session only updated local state (see
-    // returnSession's comment), so the Active tab's cache needs to catch up
-    // now rather than on every single scan.
+    // returnSession's comment) and never patched workOrdersBaseKey, so
+    // both caches need to catch up now rather than on every single scan.
     returnSessionGenerationRef.current += 1;
     if (returnSession !== null) {
-      invalidateActiveWorkOrders(returnSession.id);
+      invalidateWorkOrders(returnSession.id, { includeFlatList: true });
     }
     setReturnSession(null);
     resetReturnForm();
@@ -647,7 +649,7 @@ export function WorkOrdersPage() {
 
   // WRH-36/AC-1/AC-2: entry point for transferring an item off this
   // (source) WO - mirrors openReturnModal's session-start bookkeeping.
-  const openTransferModal = (workOrder: ActiveWorkOrder | ActiveWorkOrderSupplementary) => {
+  const openTransferModal = (workOrder: WorkOrder) => {
     transferSessionGenerationRef.current += 1;
     setTransferSourceWorkOrder({ id: workOrder.id, reference: workOrder.reference });
     resetTransferForm({
@@ -765,12 +767,9 @@ export function WorkOrdersPage() {
     transferDestinationWorkOrder?.line_items ?? [],
   );
 
-  // Shared by the Manage tab's table and the Active tab's (both primary and
-  // nested supplementary) tables - every WorkOrder/ActiveWorkOrder shape
-  // carries the same reference/job_name/client_name/expected_date_out/
-  // status fields, and none of these five columns read anything beyond the
-  // cell value.
-  const baseWorkOrderColumns = [
+  // WRH-75: single table for every WO (all statuses) - all five column
+  // definitions below read straight off WorkOrder's own flat fields.
+  const columns = [
     {
       // WRH-53/AC-1/AC-2: "WO-0042"/"WO-0042-S1" - server-computed, see
       // WorkOrder.reference's own comment.
@@ -794,16 +793,6 @@ export function WorkOrdersPage() {
       key: 'expected_date_out',
     },
     {
-      title: t('workOrders.statusLabel'),
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => <Tag>{t(`workOrders.status.${status}`)}</Tag>,
-    },
-  ];
-
-  const columns = [
-    ...baseWorkOrderColumns,
-    {
       title: t('workOrders.createdByLabel'),
       dataIndex: 'created_by_username',
       key: 'created_by_username',
@@ -820,38 +809,169 @@ export function WorkOrdersPage() {
       ),
     },
     {
+      // WRH-75/AC-3/AC-6: status stays its own column (badge) so a row's
+      // active/terminal state reads at a glance even with every status now
+      // sharing one list, plus a built-in column filter narrowing to one
+      // status at a time (replaces the old Active-tab-as-a-filter).
+      title: t('workOrders.statusLabel'),
+      dataIndex: 'status',
+      key: 'status',
+      filters: WORK_ORDER_STATUSES.map((status) => ({
+        text: t(`workOrders.status.${status}`),
+        value: status,
+      })),
+      onFilter: (value: boolean | Key, record: WorkOrder) => record.status === value,
+      render: (status: string) => <Tag>{t(`workOrders.status.${status}`)}</Tag>,
+    },
+    {
+      // WRH-75/AC-7/AC-8/AC-9: every row action from the old Active +
+      // Manage tabs, consolidated into one kebab menu per row - only the
+      // actions valid for that row's own status are ever rendered (nothing
+      // disabled/dead), and the Dropdown's `open` is controlled here so
+      // exactly one row's menu is open at a time and it closes on
+      // selection or an outside click.
       title: t('workOrders.actionsLabel'),
       key: 'actions',
       render: (_: unknown, record: WorkOrder) => {
-        if (record.status === 'draft') {
-          return (
+        const closeMenu = () => setOpenMenuRowId(null);
+        const stillOut = stillOutCount(activeLineItemsById.get(record.id) ?? []);
+
+        return (
+          <Dropdown
+            trigger={['click']}
+            open={openMenuRowId === record.id}
+            onOpenChange={(nextOpen) => setOpenMenuRowId(nextOpen ? record.id : null)}
+            popupRender={() => (
+              <Menu>
+                {record.status === 'draft' && (
+                  <Menu.Item
+                    key="start"
+                    disabled={startMutation.isPending && startMutation.variables === record.id}
+                    onClick={() => {
+                      closeMenu();
+                      startMutation.mutate(record.id, {
+                        onError: () => message.error(t('workOrders.startError')),
+                      });
+                    }}
+                  >
+                    {t('workOrders.startButton')}
+                  </Menu.Item>
+                )}
+                {record.status === 'in_progress' && (
+                  <Menu.Item
+                    key="scan"
+                    onClick={() => {
+                      closeMenu();
+                      openFulfillmentModal(record);
+                    }}
+                  >
+                    {t('workOrders.scanButton')}
+                  </Menu.Item>
+                )}
+                <Menu.Item
+                  key="view-details"
+                  onClick={() => {
+                    closeMenu();
+                    setDetailWorkOrderId(record.id);
+                  }}
+                >
+                  {t('workOrders.viewDetailsButton')}
+                </Menu.Item>
+                {/* WRH-53/AC-1/AC-2: only a Primary can be a supplementary's
+                    parent (see the backend's parent_work_order queryset
+                    restriction) - primaryWorkOrderIds is the active-work-
+                    orders top-level id set (see its own comment). WRH-69: a
+                    terminal Primary is excluded here since it's read-only,
+                    same reasoning as isReturnEligible already gating
+                    Return/Transfer/Close below. */}
+                {primaryWorkOrderIds.has(record.id) && !isTerminalWorkOrder(record.status) && (
+                  <Menu.Item
+                    key="add-supplementary"
+                    onClick={() => {
+                      closeMenu();
+                      openSupplementaryModal(record);
+                    }}
+                  >
+                    {t('workOrders.addSupplementaryButton')}
+                  </Menu.Item>
+                )}
+                {isPackingListEligible(record) && (
+                  <Menu.Item
+                    key="download-packing-list"
+                    disabled={
+                      downloadPackingListMutation.isPending &&
+                      downloadPackingListMutation.variables === record.id
+                    }
+                    onClick={() => {
+                      closeMenu();
+                      handleDownloadPackingList(record);
+                    }}
+                  >
+                    {t('workOrders.downloadPackingListButton')}
+                  </Menu.Item>
+                )}
+                {isReturnEligible(record.status) && (
+                  <Menu.Item
+                    key="return"
+                    onClick={() => {
+                      closeMenu();
+                      openReturnModal(record);
+                    }}
+                  >
+                    {t('workOrders.return.button')}
+                  </Menu.Item>
+                )}
+                {isReturnEligible(record.status) && (
+                  <Menu.Item
+                    key="transfer"
+                    onClick={() => {
+                      closeMenu();
+                      openTransferModal(record);
+                    }}
+                  >
+                    {t('workOrders.transfer.button')}
+                  </Menu.Item>
+                )}
+                {/* WRH-40/AC-1/AC-4: Popconfirm owns this item's click - it
+                    deliberately has no onClick of its own, so the Dropdown
+                    (fully controlled above) stays open until the Popconfirm
+                    itself confirms/cancels, rather than closing on the
+                    first click the way every other item above does. */}
+                {isReturnEligible(record.status) && (
+                  <Menu.Item key="close" danger>
+                    <Popconfirm
+                      title={
+                        stillOut > 0
+                          ? t('workOrders.close.warning', { count: stillOut })
+                          : t('workOrders.close.confirmTitle')
+                      }
+                      onConfirm={() => {
+                        closeMenu();
+                        closeMutation.mutate(record.id, {
+                          onError: () => message.error(t('workOrders.close.error')),
+                        });
+                      }}
+                      onCancel={closeMenu}
+                      okText={t('common.ok')}
+                      cancelText={t('common.cancel')}
+                      okButtonProps={{
+                        loading: closeMutation.isPending && closeMutation.variables === record.id,
+                      }}
+                    >
+                      <span>{t('workOrders.close.button')}</span>
+                    </Popconfirm>
+                  </Menu.Item>
+                )}
+              </Menu>
+            )}
+          >
             <Button
               size="small"
-              // Scoped to this row's own id via the mutation's `variables`
-              // (the last id passed to mutate()) rather than the shared
-              // `startMutation.isPending` alone - otherwise starting one
-              // draft WO would show every other draft row's Start button
-              // as loading/disabled too, since they'd all read the same
-              // page-level mutation instance's pending flag.
-              loading={startMutation.isPending && startMutation.variables === record.id}
-              onClick={() =>
-                startMutation.mutate(record.id, {
-                  onError: () => message.error(t('workOrders.startError')),
-                })
-              }
-            >
-              {t('workOrders.startButton')}
-            </Button>
-          );
-        }
-        if (record.status === 'in_progress') {
-          return (
-            <Button size="small" onClick={() => openFulfillmentModal(record)}>
-              {t('workOrders.scanButton')}
-            </Button>
-          );
-        }
-        return null;
+              icon={<MoreOutlined />}
+              aria-label={t('workOrders.actionsLabel')}
+            />
+          </Dropdown>
+        );
       },
     },
   ];
@@ -907,120 +1027,6 @@ export function WorkOrdersPage() {
     },
   ];
 
-  // Shared by the Primary row table and the nested supplementary table -
-  // both carry the same per-WO summary shape (see
-  // WorkOrderActiveSupplementarySerializer's backend comment: one level of
-  // nesting only, a supplementary never has its own supplementaries).
-  const activeColumns = [
-    ...baseWorkOrderColumns,
-    {
-      title: t('workOrders.active.productTypesHeader'),
-      key: 'line_items',
-      render: (_: unknown, record: ActiveWorkOrder | ActiveWorkOrderSupplementary) => (
-        <Space direction="vertical" size={0}>
-          {record.line_items.map((item: ActiveWorkOrderLineItem) => (
-            <span key={item.id}>
-              {t('workOrders.active.productTypeSummary', {
-                productType: item.product_type_name,
-                returned: item.returned_quantity,
-                damaged: item.damaged_quantity,
-                stillOut: item.still_out_quantity,
-              })}
-            </span>
-          ))}
-        </Space>
-      ),
-    },
-    {
-      title: t('workOrders.actionsLabel'),
-      key: 'actions',
-      render: (_: unknown, record: ActiveWorkOrder | ActiveWorkOrderSupplementary) => (
-        <Space size="small">
-          <Button size="small" onClick={() => setDetailWorkOrderId(record.id)}>
-            {t('workOrders.active.viewDetailsButton')}
-          </Button>
-          {/* WRH-53/AC-1/AC-2: only a Primary can be a supplementary's
-              parent (see the backend's parent_work_order queryset
-              restriction) - `supplementaries` only exists on
-              ActiveWorkOrder, never on ActiveWorkOrderSupplementary, so
-              this also narrows `record` for openSupplementaryModal's
-              ActiveWorkOrder-only parameter. WRH-69: a terminal Primary is
-              a newly-reachable case on this list (kept visible only to nest
-              a still-active Supplementary) - excluded here since it's
-              read-only, same reasoning as isReturnEligible already gating
-              Return/Transfer/Close below. */}
-          {isPrimaryWorkOrder(record) && !isTerminalWorkOrder(record.status) && (
-            <Button size="small" onClick={() => openSupplementaryModal(record)}>
-              {t('workOrders.active.addSupplementaryButton')}
-            </Button>
-          )}
-          {/* WRH-34/AC-1: "not draft" gate, matching the backend's
-              "in_progress or later" availability rule (there is no
-              STATUS_CLOSED yet, so "not draft" is the real rule). WRH-35/
-              AC-2: offered on supplementary rows too - the backend resolves
-              a supplementary's own request to its Primary's consolidated
-              document instead of rejecting it (see
-              WorkOrderViewSet.packing_list's own comment). */}
-          {isPackingListEligible(record) && (
-            <Button
-              size="small"
-              loading={
-                downloadPackingListMutation.isPending &&
-                downloadPackingListMutation.variables === record.id
-              }
-              onClick={() => handleDownloadPackingList(record)}
-            >
-              {t('workOrders.active.downloadPackingListButton')}
-            </Button>
-          )}
-          {isReturnEligible(record.status) && (
-            <Button size="small" onClick={() => openReturnModal(record)}>
-              {t('workOrders.return.button')}
-            </Button>
-          )}
-          {/* WRH-36/AC-1: same "fulfilled or partially_returned" gate as
-              Return - reuses isReturnEligible rather than a parallel
-              constant, matching the backend's own RETURN_ELIGIBLE_STATUSES
-              reuse in transfer(). */}
-          {isReturnEligible(record.status) && (
-            <Button size="small" onClick={() => openTransferModal(record)}>
-              {t('workOrders.transfer.button')}
-            </Button>
-          )}
-          {/* WRH-40/AC-1/AC-4: same "fulfilled or partially_returned" gate
-              as Return/Transfer - reuses isReturnEligible, matching the
-              backend's own CLOSE_ELIGIBLE_STATUSES = RETURN_ELIGIBLE_STATUSES
-              alias. AC-1: a Popconfirm titled with the still-out count when
-              there is one; AC-4: a plain confirm with no count/warning line
-              when there's nothing still out. */}
-          {isReturnEligible(record.status) && (
-            <Popconfirm
-              title={
-                stillOutCount(record.line_items) > 0
-                  ? t('workOrders.close.warning', { count: stillOutCount(record.line_items) })
-                  : t('workOrders.close.confirmTitle')
-              }
-              onConfirm={() =>
-                closeMutation.mutate(record.id, {
-                  onError: () => message.error(t('workOrders.close.error')),
-                })
-              }
-              okText={t('common.ok')}
-              cancelText={t('common.cancel')}
-              okButtonProps={{
-                loading: closeMutation.isPending && closeMutation.variables === record.id,
-              }}
-            >
-              <Button size="small" danger>
-                {t('workOrders.close.button')}
-              </Button>
-            </Popconfirm>
-          )}
-        </Space>
-      ),
-    },
-  ];
-
   const detailRows = flattenWorkOrderDetailRows(workOrderDetail?.line_items ?? []);
 
   const detailColumns = [
@@ -1049,86 +1055,40 @@ export function WorkOrdersPage() {
   return (
     <>
       <Typography.Title level={3}>{t('workOrders.title')}</Typography.Title>
-      <Tabs
-        activeKey={activeTabKey}
-        onChange={setActiveTabKey}
-        items={[
-          {
-            key: 'active',
-            label: t('workOrders.tabs.active'),
-            children: isActiveError ? (
-              <Alert type="error" message={t('workOrders.active.loadError')} showIcon />
-            ) : (
-              <Table<ActiveWorkOrder>
-                rowKey="id"
-                columns={activeColumns}
-                dataSource={activeWorkOrders}
-                loading={isActiveLoading}
-                locale={{ emptyText: t('workOrders.active.emptyState') }}
-                // WRH-69: a terminal Primary only stays on this list to
-                // nest a still-active Supplementary - grayed out (via
-                // tokens.ts, not a hardcoded hex) so it reads as done/
-                // read-only rather than another actionable row. Only the
-                // top-level Table needs this - a nested supplementary
-                // Table's rows are never terminal (the backend's own
-                // nested Prefetch already excludes them).
-                onRow={(record) =>
-                  isTerminalWorkOrder(record.status)
-                    ? {
-                        style: {
-                          backgroundColor: colors.surfaceMuted,
-                          color: colors.textMuted,
-                        },
-                      }
-                    : {}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        <Button type="primary" onClick={openCreateModal}>
+          {t('workOrders.newButton')}
+        </Button>
+      </div>
+      {isListError || isActiveError ? (
+        <Alert
+          type="error"
+          message={t('workOrders.loadError')}
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      ) : (
+        <Table<WorkOrder>
+          rowKey="id"
+          columns={columns}
+          dataSource={workOrders}
+          loading={isLoading || isActiveLoading}
+          locale={{ emptyText: t('workOrders.emptyState') }}
+          // WRH-69: a terminal WO (returned/closed) reads as done/read-only
+          // rather than another actionable row - grayed out via tokens.ts,
+          // not a hardcoded hex.
+          onRow={(record) =>
+            isTerminalWorkOrder(record.status)
+              ? {
+                  style: {
+                    backgroundColor: colors.surfaceMuted,
+                    color: colors.textMuted,
+                  },
                 }
-                expandable={{
-                  rowExpandable: (record) => record.supplementaries.length > 0,
-                  expandedRowRender: (record) => (
-                    <Table<ActiveWorkOrderSupplementary>
-                      rowKey="id"
-                      size="small"
-                      pagination={false}
-                      showHeader={false}
-                      columns={activeColumns}
-                      dataSource={record.supplementaries}
-                    />
-                  ),
-                }}
-              />
-            ),
-          },
-          {
-            key: 'manage',
-            label: t('workOrders.tabs.manage'),
-            children: (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-                  <Button type="primary" onClick={openCreateModal}>
-                    {t('workOrders.newButton')}
-                  </Button>
-                </div>
-                {isListError ? (
-                  <Alert
-                    type="error"
-                    message={t('workOrders.loadError')}
-                    showIcon
-                    style={{ marginBottom: 16 }}
-                  />
-                ) : (
-                  <Table<WorkOrder>
-                    rowKey="id"
-                    columns={columns}
-                    dataSource={workOrders}
-                    loading={isLoading}
-                    locale={{ emptyText: t('workOrders.emptyState') }}
-                  />
-                )}
-              </>
-            ),
-          },
-        ]}
-      />
+              : {}
+          }
+        />
+      )}
       <Modal
         title={t('workOrders.detail.title', {
           reference: workOrderDetail?.reference ?? '',

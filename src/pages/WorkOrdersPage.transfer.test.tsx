@@ -5,6 +5,7 @@ import type { ActiveWorkOrder, WorkOrder } from '../features/work-orders/types';
 import { apiClient } from '../lib/apiClient';
 import '../i18n';
 import {
+  clickRowAction,
   makeActiveWorkOrder,
   makeProductType,
   makeWorkOrder,
@@ -47,13 +48,7 @@ function mockTransferItemRejection(workOrder: ActiveWorkOrder, field: string, me
 }
 
 async function openTransferModal(user: ReturnType<typeof userEvent.setup>) {
-  // hidden: true - see hiddenTrueForRoleQueries.md: skips testing-library's
-  // default accessibility-tree visibility check (the actual slow part is
-  // jsdom resolving antd's CSS var() chains per candidate). Scoped to a
-  // single active-tab row's "Transfer" action button here, so there's no
-  // Manage/Active-pane duplicate to collide with.
-  const button = await screen.findByRole('button', { name: /^transfer$|^نقل$/i, hidden: true });
-  await user.click(button);
+  await clickRowAction(user, 'WO-1', /^transfer$|^نقل$/i);
 }
 
 // WRH-68: destination_line_item is now a second, dependent Select - always
@@ -112,7 +107,10 @@ describe('WorkOrdersPage - transfer', () => {
     });
     mockListEndpoints(mockedApiClient.get, {
       activeWorkOrders: [sourceWorkOrder],
-      workOrders: [makeWorkOrder({ id: 1, reference: 'WO-1' }), destinationWorkOrder],
+      workOrders: [
+        makeWorkOrder({ id: 1, reference: 'WO-1', status: 'fulfilled' }),
+        destinationWorkOrder,
+      ],
     });
     mockTransferItem(sourceWorkOrder, {
       serial_number: 'SN-042',
@@ -122,7 +120,7 @@ describe('WorkOrdersPage - transfer', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openTransferModal(user);
     await submitTransfer(user, 'SN-042', 'WO-2 — Winter Expo');
 
@@ -142,13 +140,13 @@ describe('WorkOrdersPage - transfer', () => {
     mockListEndpoints(mockedApiClient.get, {
       activeWorkOrders: [sourceWorkOrder],
       workOrders: [
-        makeWorkOrder({ id: 1, reference: 'WO-1' }),
+        makeWorkOrder({ id: 1, reference: 'WO-1', status: 'fulfilled' }),
         makeWorkOrder({ id: 3, reference: 'WO-1-S1', job_name: 'Winter Expo (Supp)' }),
       ],
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openTransferModal(user);
     const dialog = screen.getByRole('dialog', { hidden: true });
     const destinationCombobox = within(dialog).getAllByRole('combobox', { hidden: true })[0];
@@ -166,6 +164,7 @@ describe('WorkOrdersPage - transfer', () => {
     mockListEndpoints(mockedApiClient.get, {
       activeWorkOrders: [sourceWorkOrder],
       workOrders: [
+        makeWorkOrder({ id: 1, reference: 'WO-1', status: 'fulfilled' }),
         makeWorkOrder({
           id: 2,
           reference: 'WO-2',
@@ -184,7 +183,7 @@ describe('WorkOrdersPage - transfer', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openTransferModal(user);
     const dialog = screen.getByRole('dialog', { hidden: true });
     const [destinationCombobox, lineItemCombobox] = within(dialog).getAllByRole('combobox', {
@@ -212,7 +211,10 @@ describe('WorkOrdersPage - transfer', () => {
     const sourceWorkOrder = makeActiveWorkOrder({ id: 1, reference: 'WO-1', status: 'fulfilled' });
     mockListEndpoints(mockedApiClient.get, {
       activeWorkOrders: [sourceWorkOrder],
-      workOrders: [makeWorkOrder({ id: 2, reference: 'WO-2' })],
+      workOrders: [
+        makeWorkOrder({ id: 1, reference: 'WO-1', status: 'fulfilled' }),
+        makeWorkOrder({ id: 2, reference: 'WO-2' }),
+      ],
     });
     mockTransferItemRejection(
       sourceWorkOrder,
@@ -221,7 +223,7 @@ describe('WorkOrdersPage - transfer', () => {
     );
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openTransferModal(user);
     await submitTransfer(user, 'SN-042', 'WO-2 — Summer Gala');
 
@@ -232,7 +234,10 @@ describe('WorkOrdersPage - transfer', () => {
     const sourceWorkOrder = makeActiveWorkOrder({ id: 1, reference: 'WO-1', status: 'fulfilled' });
     mockListEndpoints(mockedApiClient.get, {
       activeWorkOrders: [sourceWorkOrder],
-      workOrders: [makeWorkOrder({ id: 2, reference: 'WO-2' })],
+      workOrders: [
+        makeWorkOrder({ id: 1, reference: 'WO-1', status: 'fulfilled' }),
+        makeWorkOrder({ id: 2, reference: 'WO-2' }),
+      ],
     });
     mockTransferItemRejection(
       sourceWorkOrder,
@@ -241,7 +246,7 @@ describe('WorkOrdersPage - transfer', () => {
     );
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openTransferModal(user);
     await submitTransfer(user, 'SN-042', 'WO-2 — Summer Gala');
 
@@ -256,7 +261,10 @@ describe('WorkOrdersPage - transfer', () => {
     const sourceWorkOrder = makeActiveWorkOrder({ id: 1, reference: 'WO-1', status: 'fulfilled' });
     mockListEndpoints(mockedApiClient.get, {
       activeWorkOrders: [sourceWorkOrder],
-      workOrders: [makeWorkOrder({ id: 2, reference: 'WO-2' })],
+      workOrders: [
+        makeWorkOrder({ id: 1, reference: 'WO-1', status: 'fulfilled' }),
+        makeWorkOrder({ id: 2, reference: 'WO-2' }),
+      ],
     });
     let resolvePost: ((value: { data: unknown }) => void) | undefined;
     mockedApiClient.post.mockImplementation(
@@ -267,7 +275,7 @@ describe('WorkOrdersPage - transfer', () => {
     );
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openTransferModal(user);
     await submitTransfer(user, 'SN-9001', 'WO-2 — Summer Gala');
 
@@ -306,7 +314,12 @@ describe('WorkOrdersPage - transfer', () => {
         return Promise.resolve({ data: [sourceWorkOrder] });
       }
       if (url === '/api/work-orders/') {
-        return Promise.resolve({ data: [makeWorkOrder({ id: 2, reference: 'WO-2' })] });
+        return Promise.resolve({
+          data: [
+            makeWorkOrder({ id: 1, reference: 'WO-1', status: 'fulfilled' }),
+            makeWorkOrder({ id: 2, reference: 'WO-2' }),
+          ],
+        });
       }
       return Promise.reject(new Error(`Unexpected GET ${url}`));
     });
@@ -318,7 +331,7 @@ describe('WorkOrdersPage - transfer', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openTransferModal(user);
     const callsBeforeSubmit = getCallCount;
     await submitTransfer(user, 'SN-042', 'WO-2 — Summer Gala');

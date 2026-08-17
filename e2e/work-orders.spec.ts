@@ -1,8 +1,11 @@
-import { test, expect, type Route } from '@playwright/test';
+import { test, expect, type Page, type Route } from '@playwright/test';
 
 // This spec mocks the backend entirely via page.route (auth + product-types
 // + work-orders endpoints) rather than assuming a live backend at
 // VITE_API_BASE_URL, following purchase-orders.spec.ts's precedent.
+// WRH-75: the Active/Manage tabs are gone - every test drives a single
+// merged table, and every row action lives behind a per-row kebab (3-dots)
+// menu instead of an inline button.
 const USER = {
   id: 1,
   username: 'jane',
@@ -22,6 +25,7 @@ interface WorkOrderLineItem {
 
 interface WorkOrder {
   id: number;
+  reference: string;
   job_name: string;
   client_name: string;
   expected_date_out: string;
@@ -43,7 +47,7 @@ async function stubAuth(route: Route) {
   await route.continue();
 }
 
-function registerProductTypesRoute(page: import('@playwright/test').Page) {
+function registerProductTypesRoute(page: Page) {
   const productTypes = [
     { id: 1, name: 'Bar LED Model A', model_code: '', description: '', category: 1 },
     { id: 2, name: 'Fog Machine', model_code: '', description: '', category: 1 },
@@ -56,6 +60,14 @@ function registerProductTypesRoute(page: import('@playwright/test').Page) {
 
     await route.continue();
   });
+}
+
+// WRH-75: opens the row matching `jobName`'s kebab menu and clicks the item
+// with `actionName`.
+async function clickRowAction(page: Page, jobName: RegExp, actionName: RegExp) {
+  const row = page.getByRole('row', { name: jobName });
+  await row.getByRole('button').click();
+  await page.getByRole('menu').last().getByText(actionName).click();
 }
 
 test('creates a work order with multiple line items and it appears in the list', async ({
@@ -71,9 +83,6 @@ test('creates a work order with multiple line items and it appears in the list',
   await page.route('**/api/work-orders/**', async (route) => {
     const method = route.request().method();
 
-    // The page always fires the Active tab's own list query on mount too
-    // (it's the default tab) - stub it separately with an empty list since
-    // this spec exercises the Manage tab and its flat WorkOrder shape.
     if (method === 'GET' && route.request().url().endsWith('/active/')) {
       await route.fulfill({ status: 200, json: [] });
       return;
@@ -87,7 +96,8 @@ test('creates a work order with multiple line items and it appears in the list',
     if (method === 'POST') {
       const body = route.request().postDataJSON();
       const created: WorkOrder = {
-        id: nextId++,
+        id: nextId,
+        reference: `WO-${nextId}`,
         job_name: body.job_name,
         client_name: body.client_name,
         expected_date_out: body.expected_date_out,
@@ -105,6 +115,7 @@ test('creates a work order with multiple line items and it appears in the list',
           }),
         ),
       };
+      nextId += 1;
       workOrders.push(created);
       await route.fulfill({ status: 201, json: created });
       return;
@@ -114,7 +125,6 @@ test('creates a work order with multiple line items and it appears in the list',
   });
 
   await page.goto('/work-orders');
-  await page.getByRole('tab', { name: /manage|الإدارة/i }).click();
 
   await page.getByRole('button', { name: /new wo|أمر عمل جديد/i }).click();
   await page.getByLabel(/job name|اسم المهمة/i).fill('Summer Gala');
@@ -165,7 +175,6 @@ test('requires a product type and quantity before submitting', async ({ page }) 
   });
 
   await page.goto('/work-orders');
-  await page.getByRole('tab', { name: /manage|الإدارة/i }).click();
 
   await page.getByRole('button', { name: /new wo|أمر عمل جديد/i }).click();
   await page.getByLabel(/job name|اسم المهمة/i).fill('Summer Gala');
@@ -183,6 +192,7 @@ test('fulfills a WO end-to-end: start, scan to completion, complete', async ({ p
   // TC-01/TC-02/TC-04/AC-1/AC-2/AC-4
   const workOrder: WorkOrder = {
     id: 1,
+    reference: 'WO-1',
     job_name: 'Summer Gala',
     client_name: 'Acme Events',
     expected_date_out: '2026-08-01',
@@ -242,9 +252,6 @@ test('fulfills a WO end-to-end: start, scan to completion, complete', async ({ p
       return;
     }
 
-    // The page always fires the Active tab's own list query on mount too
-    // (it's the default tab) - stub it separately with an empty list since
-    // this spec exercises the Manage tab and its flat WorkOrder shape.
     if (method === 'GET' && url.endsWith('/active/')) {
       await route.fulfill({ status: 200, json: [] });
       return;
@@ -259,22 +266,14 @@ test('fulfills a WO end-to-end: start, scan to completion, complete', async ({ p
   });
 
   await page.goto('/work-orders');
-  await page.getByRole('tab', { name: /manage|الإدارة/i }).click();
 
-  // Scoped to the row's own action button rather than matching accessible
-  // name text: AntD's Button loading-spinner fade-out animation (real
-  // browser only, unlike jsdom) can briefly prefix the next button's
-  // accessible name with "loading" right after the mutation settles, and
-  // the button's own label also changes ("Start Fulfillment" -> "Scan")
-  // once the row re-renders for the new status.
-  const row = page.getByRole('row', { name: /summer gala/i });
-  await row.getByRole('button').click();
+  await clickRowAction(page, /summer gala/i, /start fulfillment|بدء التنفيذ/i);
   await expect(page.getByText(/^in progress$|^قيد التنفيذ$/i)).toBeVisible();
 
+  await clickRowAction(page, /summer gala/i, /^scan$|^مسح$/i);
   const completeButton = page.getByRole('button', {
     name: /complete fulfillment|إتمام التنفيذ/i,
   });
-  await row.getByRole('button').click();
   await expect(completeButton).toBeDisabled();
 
   await page.getByRole('dialog').getByRole('combobox').click();
@@ -284,8 +283,7 @@ test('fulfills a WO end-to-end: start, scan to completion, complete', async ({ p
   // WRH-26 added a second submit button (box scan) to this same dialog, and
   // AntD's loading-spinner fade-out animation can transiently prefix this
   // button's own accessible name with "loading" right after a scan
-  // resolves (same quirk noted on the Manage tab's row-level Scan button
-  // above), which a name-based locator would flakily miss mid-transition.
+  // resolves, which a name-based locator would flakily miss mid-transition.
   const scanButton = dialog.locator('form').first().locator('button[type="submit"]');
   await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-1001');
   await scanButton.click();
@@ -299,39 +297,51 @@ test('fulfills a WO end-to-end: start, scan to completion, complete', async ({ p
   await expect(page.getByText(/^fulfilled$|^تم التنفيذ$/i)).toBeVisible();
 });
 
-test('views the Active tab: nested supplementary and drill-down to exact serials', async ({
+test('lists every work order in one screen, including a supplementary, and drills into exact serials', async ({
   page,
 }) => {
-  // TC-01/TC-02/TC-03/AC-1/AC-2/AC-3
+  // TC-01/TC-02/TC-03/AC-1/AC-2/AC-3: WRH-75 dropped the Active tab's
+  // Primary-nests-supplementary expand row - both now render as their own
+  // flat rows in the single merged table.
   const primary = {
     id: 1,
+    reference: 'WO-1',
     job_name: 'Summer Gala',
     client_name: 'Acme Events',
     expected_date_out: '2026-08-01',
     status: 'fulfilled',
+    created_by: 1,
+    created_by_username: 'jane',
     line_items: [
       {
         id: 1,
         product_type: 1,
         product_type_name: 'Bar LED Model A',
         quantity: 1,
-        returned_quantity: 0,
-        still_out_quantity: 1,
-      },
-    ],
-    supplementaries: [
-      {
-        id: 2,
-        job_name: 'Summer Gala (Supplementary)',
-        client_name: 'Acme Events',
-        expected_date_out: '2026-08-02',
-        status: 'draft',
-        line_items: [],
+        scanned_quantity: 1,
+        remaining_quantity: 0,
       },
     ],
   };
+  const supplementary = {
+    id: 2,
+    reference: 'WO-1-S1',
+    job_name: 'Summer Gala (Supplementary)',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-02',
+    status: 'draft',
+    created_by: 1,
+    created_by_username: 'jane',
+    line_items: [] as unknown[],
+  };
+  const activePrimary = {
+    ...primary,
+    line_items: [{ ...primary.line_items[0], returned_quantity: 0, still_out_quantity: 1 }],
+    supplementaries: [],
+  };
   const detail = {
     id: 1,
+    reference: 'WO-1',
     job_name: 'Summer Gala',
     client_name: 'Acme Events',
     expected_date_out: '2026-08-01',
@@ -357,11 +367,15 @@ test('views the Active tab: nested supplementary and drill-down to exact serials
     const method = route.request().method();
 
     if (method === 'GET' && url.endsWith('/active/')) {
-      await route.fulfill({ status: 200, json: [primary] });
+      await route.fulfill({ status: 200, json: [activePrimary] });
       return;
     }
     if (method === 'GET' && /\/work-orders\/1\/$/.test(url)) {
       await route.fulfill({ status: 200, json: detail });
+      return;
+    }
+    if (method === 'GET' && url.endsWith('/work-orders/')) {
+      await route.fulfill({ status: 200, json: [primary, supplementary] });
       return;
     }
     if (method === 'GET') {
@@ -374,16 +388,13 @@ test('views the Active tab: nested supplementary and drill-down to exact serials
 
   await page.goto('/work-orders');
 
-  await expect(page.getByText('Summer Gala').first()).toBeVisible();
-  await expect(page.getByText('Summer Gala (Supplementary)')).not.toBeVisible();
-
-  await page.getByRole('button', { name: /expand row/i }).click();
+  await expect(page.getByText('Summer Gala', { exact: true })).toBeVisible();
   await expect(page.getByText('Summer Gala (Supplementary)')).toBeVisible();
 
-  await page
-    .getByRole('button', { name: /view details|عرض التفاصيل/i })
-    .first()
-    .click();
+  // Anchored on the reference cell (which leads the row's accessible name)
+  // rather than the job name - "WO-1 " (with a trailing space) doesn't also
+  // match the supplementary's "WO-1-S1" reference.
+  await clickRowAction(page, /^WO-1\s/, /view details|عرض التفاصيل/i);
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByText('SN-0001')).toBeVisible();
   await expect(dialog.getByText(/^out$|^خارج$/i)).toBeVisible();
@@ -391,8 +402,20 @@ test('views the Active tab: nested supplementary and drill-down to exact serials
 
 test('returns items against a fulfilled WO: partial then full return', async ({ page }) => {
   // AC-1/AC-2/TC-01/TC-02
-  const workOrder = {
+  const flatWorkOrder = {
     id: 1,
+    reference: 'WO-1',
+    job_name: 'Summer Gala',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-01',
+    status: 'fulfilled',
+    created_by: 1,
+    created_by_username: 'jane',
+    line_items: [] as unknown[],
+  };
+  const activeWorkOrder = {
+    id: 1,
+    reference: 'WO-1',
     job_name: 'Summer Gala',
     client_name: 'Acme Events',
     expected_date_out: '2026-08-01',
@@ -404,6 +427,7 @@ test('returns items against a fulfilled WO: partial then full return', async ({ 
         product_type_name: 'Bar LED Model A',
         quantity: 2,
         returned_quantity: 0,
+        damaged_quantity: 0,
         still_out_quantity: 2,
       },
     ],
@@ -421,19 +445,31 @@ test('returns items against a fulfilled WO: partial then full return', async ({ 
       const body = route.request().postDataJSON() as { serial_number: string };
       returnedSerials.add(body.serial_number);
       const returnedCount = returnedSerials.size;
-      workOrder.status = returnedCount >= 2 ? 'returned' : 'partially_returned';
-      workOrder.line_items = [
+      activeWorkOrder.status = returnedCount >= 2 ? 'returned' : 'partially_returned';
+      activeWorkOrder.line_items = [
         {
-          ...workOrder.line_items[0],
+          ...activeWorkOrder.line_items[0],
           returned_quantity: returnedCount,
           still_out_quantity: 2 - returnedCount,
         },
       ];
-      await route.fulfill({ status: 200, json: workOrder });
+      await route.fulfill({
+        status: 200,
+        json: {
+          id: activeWorkOrder.id,
+          job_name: activeWorkOrder.job_name,
+          status: activeWorkOrder.status,
+          line_items: activeWorkOrder.line_items,
+        },
+      });
       return;
     }
     if (method === 'GET' && url.endsWith('/active/')) {
-      await route.fulfill({ status: 200, json: [workOrder] });
+      await route.fulfill({ status: 200, json: [activeWorkOrder] });
+      return;
+    }
+    if (method === 'GET' && url.endsWith('/work-orders/')) {
+      await route.fulfill({ status: 200, json: [flatWorkOrder] });
       return;
     }
     if (method === 'GET') {
@@ -446,10 +482,7 @@ test('returns items against a fulfilled WO: partial then full return', async ({ 
 
   await page.goto('/work-orders');
 
-  await page
-    .getByRole('row', { name: /summer gala/i })
-    .getByRole('button', { name: /^return$|^إرجاع$/i })
-    .click();
+  await clickRowAction(page, /summer gala/i, /^return$|^إرجاع$/i);
   const dialog = page.getByRole('dialog');
   // Scoped to the item-return form specifically (not by accessible name) -
   // WRH-26 added a second submit button (box return) to this same dialog,
@@ -469,8 +502,20 @@ test('returns items against a fulfilled WO: partial then full return', async ({ 
 
 test('manually closes a fulfilled WO, sweeping remaining items to Missing', async ({ page }) => {
   // WRH-40 (US-019a) AC-1/AC-2/TC-01/TC-02
-  const workOrder = {
+  const flatWorkOrder = {
     id: 1,
+    reference: 'WO-1',
+    job_name: 'Summer Gala',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-01',
+    status: 'fulfilled',
+    created_by: 1,
+    created_by_username: 'jane',
+    line_items: [] as unknown[],
+  };
+  const activeWorkOrder = {
+    id: 1,
+    reference: 'WO-1',
     job_name: 'Summer Gala',
     client_name: 'Acme Events',
     expected_date_out: '2026-08-01',
@@ -482,6 +527,7 @@ test('manually closes a fulfilled WO, sweeping remaining items to Missing', asyn
         product_type_name: 'Bar LED Model A',
         quantity: 3,
         returned_quantity: 0,
+        damaged_quantity: 0,
         still_out_quantity: 3,
       },
     ],
@@ -495,18 +541,25 @@ test('manually closes a fulfilled WO, sweeping remaining items to Missing', asyn
     const method = route.request().method();
 
     if (method === 'POST' && url.endsWith('/close/')) {
-      workOrder.status = 'closed';
+      flatWorkOrder.status = 'closed';
       await route.fulfill({
         status: 200,
         json: {
-          work_order: { id: workOrder.id, job_name: workOrder.job_name, status: 'closed' },
+          work_order: { id: flatWorkOrder.id, job_name: flatWorkOrder.job_name, status: 'closed' },
           missing_count: 3,
         },
       });
       return;
     }
     if (method === 'GET' && url.endsWith('/active/')) {
-      await route.fulfill({ status: 200, json: workOrder.status === 'closed' ? [] : [workOrder] });
+      await route.fulfill({
+        status: 200,
+        json: flatWorkOrder.status === 'closed' ? [] : [activeWorkOrder],
+      });
+      return;
+    }
+    if (method === 'GET' && url.endsWith('/work-orders/')) {
+      await route.fulfill({ status: 200, json: [flatWorkOrder] });
       return;
     }
     if (method === 'GET') {
@@ -519,8 +572,7 @@ test('manually closes a fulfilled WO, sweeping remaining items to Missing', asyn
 
   await page.goto('/work-orders');
 
-  const row = page.getByRole('row', { name: /summer gala/i });
-  await row.getByRole('button', { name: /^close work order$|^إغلاق أمر العمل$/i }).click();
+  await clickRowAction(page, /summer gala/i, /^close work order$|^إغلاق أمر العمل$/i);
   // Arabic count=3 selects the CLDR "few" plural form (different noun
   // agreement than "other"), so this matches loosely rather than one exact
   // full sentence - see WorkOrdersPage.close.test.tsx's identical note.
@@ -528,17 +580,11 @@ test('manually closes a fulfilled WO, sweeping remaining items to Missing', asyn
 
   await page.getByRole('button', { name: /^ok$|^موافق$/i }).click();
 
-  // The active list excludes a closed WO (WRH-40), so the row disappears
-  // once the invalidated query refetches.
-  await expect(page.getByRole('row', { name: /summer gala/i })).toHaveCount(0);
+  await expect(page.getByText(/^closed$|^مغلق$/i)).toBeVisible();
 });
 
 test('transfers an item from one work order to another', async ({ page }) => {
   // WRH-36/AC-1/AC-2/TC-01
-  // Active-tab shape (returned/damaged/still_out counts), not the flat
-  // WorkOrder shape - matches the "views the Active tab" test's precedent
-  // of an untyped literal rather than this file's narrower local WorkOrder
-  // interface, which lacks `reference`/`supplementaries`.
   const activeSourceWorkOrder = {
     id: 1,
     reference: 'WO-1',
@@ -559,7 +605,7 @@ test('transfers an item from one work order to another', async ({ page }) => {
     ],
     supplementaries: [],
   };
-  // Flat WorkOrder shape - what the Manage tab's list (and the transfer
+  // Flat WorkOrder shape - what the merged table's list (and the transfer
   // modal's destination picker) actually consumes.
   const flatSourceWorkOrder = {
     id: 1,
@@ -636,10 +682,7 @@ test('transfers an item from one work order to another', async ({ page }) => {
 
   await page.goto('/work-orders');
 
-  await page
-    .getByRole('row', { name: /summer gala/i })
-    .getByRole('button', { name: /^transfer$|^نقل$/i })
-    .click();
+  await clickRowAction(page, /summer gala/i, /^transfer$|^نقل$/i);
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-042');
   // WRH-68: two comboboxes now - destination WO, then its own line item.
@@ -654,10 +697,11 @@ test('transfers an item from one work order to another', async ({ page }) => {
   ).toBeVisible();
 });
 
-test('creates a supplementary work order linked to a Primary and it appears nested with its own reference', async ({
+test('creates a supplementary work order linked to a Primary and it appears with its own reference', async ({
   page,
 }) => {
-  // WRH-53/AC-1/AC-2/TC-01
+  // WRH-53/AC-1/AC-2/TC-01: WRH-75 - the created supplementary shows up as
+  // its own flat row, not nested under the Primary via an expand row.
   let nextId = 2;
   const primary = {
     id: 1,
@@ -666,6 +710,12 @@ test('creates a supplementary work order linked to a Primary and it appears nest
     client_name: 'Acme Events',
     expected_date_out: '2026-08-01',
     status: 'fulfilled',
+    created_by: 1,
+    created_by_username: 'jane',
+    line_items: [] as unknown[],
+  };
+  const activePrimary = {
+    ...primary,
     line_items: [
       {
         id: 1,
@@ -679,6 +729,7 @@ test('creates a supplementary work order linked to a Primary and it appears nest
     ],
     supplementaries: [] as unknown[],
   };
+  const supplementaries: unknown[] = [];
 
   await page.route('**/api/auth/**', stubAuth);
   await registerProductTypesRoute(page);
@@ -694,30 +745,36 @@ test('creates a supplementary work order linked to a Primary and it appears nest
         parent_work_order?: number;
         line_items: { product_type: number; quantity: number }[];
       };
-      const sequence = primary.supplementaries.length + 1;
+      const sequence = supplementaries.length + 1;
       const created = {
-        id: nextId++,
+        id: nextId,
         reference: `WO-${primary.id}-S${sequence}`,
         job_name: body.job_name,
         client_name: body.client_name,
         expected_date_out: body.expected_date_out,
         status: 'draft',
+        created_by: 1,
+        created_by_username: 'jane',
         line_items: body.line_items.map((item, index) => ({
           id: index + 1,
           product_type: item.product_type,
           product_type_name: 'Bar LED Model A',
           quantity: item.quantity,
-          returned_quantity: 0,
-          damaged_quantity: 0,
-          still_out_quantity: 0,
+          scanned_quantity: 0,
+          remaining_quantity: item.quantity,
         })),
       };
-      primary.supplementaries.push(created);
+      nextId += 1;
+      supplementaries.push(created);
       await route.fulfill({ status: 201, json: created });
       return;
     }
     if (method === 'GET' && url.endsWith('/active/')) {
-      await route.fulfill({ status: 200, json: [primary] });
+      await route.fulfill({ status: 200, json: [activePrimary] });
+      return;
+    }
+    if (method === 'GET' && url.endsWith('/work-orders/')) {
+      await route.fulfill({ status: 200, json: [primary, ...supplementaries] });
       return;
     }
     if (method === 'GET') {
@@ -730,10 +787,7 @@ test('creates a supplementary work order linked to a Primary and it appears nest
 
   await page.goto('/work-orders');
 
-  await page
-    .getByRole('row', { name: /summer gala/i })
-    .getByRole('button', { name: /add supplementary|إضافة أمر تكميلي/i })
-    .click();
+  await clickRowAction(page, /summer gala/i, /add supplementary|إضافة أمر تكميلي/i);
 
   const dialog = page.getByRole('dialog');
   await expect(dialog).toContainText('WO-1');
@@ -747,8 +801,6 @@ test('creates a supplementary work order linked to a Primary and it appears nest
 
   await page.getByRole('button', { name: 'OK' }).click();
 
-  await expect(page.getByText('WO-1').first()).toBeVisible();
-  await page.getByRole('button', { name: /expand row/i }).click();
   await expect(page.getByText('WO-1-S1')).toBeVisible();
   await expect(page.getByText('Extra Lighting')).toBeVisible();
 });
@@ -757,8 +809,20 @@ test('marks a returning unit as damaged: excluded from stock and its own summary
   page,
 }) => {
   // WRH-57/AC-1/AC-2/AC-3/TC-01/TC-02/TC-03
-  const workOrder = {
+  const flatWorkOrder = {
     id: 1,
+    reference: 'WO-1',
+    job_name: 'Summer Gala',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-01',
+    status: 'fulfilled',
+    created_by: 1,
+    created_by_username: 'jane',
+    line_items: [] as unknown[],
+  };
+  const activeWorkOrder = {
+    id: 1,
+    reference: 'WO-1',
     job_name: 'Summer Gala',
     client_name: 'Acme Events',
     expected_date_out: '2026-08-01',
@@ -789,29 +853,41 @@ test('marks a returning unit as damaged: excluded from stock and its own summary
         damaged?: boolean;
       };
       if (body.damaged) {
-        workOrder.line_items = [
+        activeWorkOrder.line_items = [
           {
-            ...workOrder.line_items[0],
-            damaged_quantity: workOrder.line_items[0].damaged_quantity + 1,
-            still_out_quantity: workOrder.line_items[0].still_out_quantity - 1,
+            ...activeWorkOrder.line_items[0],
+            damaged_quantity: activeWorkOrder.line_items[0].damaged_quantity + 1,
+            still_out_quantity: activeWorkOrder.line_items[0].still_out_quantity - 1,
           },
         ];
       } else {
-        workOrder.line_items = [
+        activeWorkOrder.line_items = [
           {
-            ...workOrder.line_items[0],
-            returned_quantity: workOrder.line_items[0].returned_quantity + 1,
-            still_out_quantity: workOrder.line_items[0].still_out_quantity - 1,
+            ...activeWorkOrder.line_items[0],
+            returned_quantity: activeWorkOrder.line_items[0].returned_quantity + 1,
+            still_out_quantity: activeWorkOrder.line_items[0].still_out_quantity - 1,
           },
         ];
       }
-      workOrder.status =
-        workOrder.line_items[0].still_out_quantity <= 0 ? 'returned' : 'partially_returned';
-      await route.fulfill({ status: 200, json: workOrder });
+      activeWorkOrder.status =
+        activeWorkOrder.line_items[0].still_out_quantity <= 0 ? 'returned' : 'partially_returned';
+      await route.fulfill({
+        status: 200,
+        json: {
+          id: activeWorkOrder.id,
+          job_name: activeWorkOrder.job_name,
+          status: activeWorkOrder.status,
+          line_items: activeWorkOrder.line_items,
+        },
+      });
       return;
     }
     if (method === 'GET' && url.endsWith('/active/')) {
-      await route.fulfill({ status: 200, json: [workOrder] });
+      await route.fulfill({ status: 200, json: [activeWorkOrder] });
+      return;
+    }
+    if (method === 'GET' && url.endsWith('/work-orders/')) {
+      await route.fulfill({ status: 200, json: [flatWorkOrder] });
       return;
     }
     if (method === 'GET') {
@@ -824,10 +900,7 @@ test('marks a returning unit as damaged: excluded from stock and its own summary
 
   await page.goto('/work-orders');
 
-  await page
-    .getByRole('row', { name: /summer gala/i })
-    .getByRole('button', { name: /^return$|^إرجاع$/i })
-    .click();
+  await clickRowAction(page, /summer gala/i, /^return$|^إرجاع$/i);
   const dialog = page.getByRole('dialog');
 
   await page.getByLabel(/serial number|الرقم التسلسلي/i).fill('SN-9001');
@@ -847,18 +920,24 @@ test('marks a returning unit as damaged: excluded from stock and its own summary
   await expect(dialog.getByText(/^returned$|^تم الإرجاع$/i)).toBeVisible();
 });
 
-test('downloads a packing list PDF from a Primary WO on the Active tab', async ({ page }) => {
+test('downloads a packing list PDF from a Primary WO', async ({ page }) => {
   // WRH-34/AC-1: mirrors serialized-items.spec.ts's "downloads a bulk QR
   // labels PDF" pattern - page.route stubs the PDF endpoint with a fake
   // binary body, then the actual browser download is asserted via
   // page.waitForEvent('download') + suggestedFilename().
-  const primary = {
+  const flatWorkOrder = {
     id: 1,
     reference: 'WO-1',
     job_name: 'Summer Gala',
     client_name: 'Acme Events',
     expected_date_out: '2026-08-01',
     status: 'fulfilled',
+    created_by: 1,
+    created_by_username: 'jane',
+    line_items: [] as unknown[],
+  };
+  const activePrimary = {
+    ...flatWorkOrder,
     line_items: [
       {
         id: 1,
@@ -892,7 +971,11 @@ test('downloads a packing list PDF from a Primary WO on the Active tab', async (
       return;
     }
     if (method === 'GET' && url.endsWith('/active/')) {
-      await route.fulfill({ status: 200, json: [primary] });
+      await route.fulfill({ status: 200, json: [activePrimary] });
+      return;
+    }
+    if (method === 'GET' && url.endsWith('/work-orders/')) {
+      await route.fulfill({ status: 200, json: [flatWorkOrder] });
       return;
     }
     if (method === 'GET') {
@@ -908,7 +991,7 @@ test('downloads a packing list PDF from a Primary WO on the Active tab', async (
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: /download packing list|تحميل قائمة التعبئة/i }).click(),
+    clickRowAction(page, /summer gala/i, /download packing list|تحميل قائمة التعبئة/i),
   ]);
 
   expect(download.suggestedFilename()).toBe('packing-list-WO-1.pdf');
@@ -918,32 +1001,39 @@ test('downloads the consolidated packing list PDF from a supplementary row direc
   page,
 }) => {
   // WRH-35/AC-2: requesting the packing list from a supplementary's own row
-  // (not its Primary) returns the same consolidated document - the button
-  // is now offered on supplementary rows too (see isPackingListEligible),
-  // and the backend resolves the request id (2, the supplementary) to its
+  // (not its Primary) returns the same consolidated document - the action
+  // is offered on supplementary rows too (see isPackingListEligible), and
+  // the backend resolves the request id (2, the supplementary) to its
   // Primary's (1) consolidated PDF. The download filename is still composed
   // client-side from the row's own reference (handleDownloadPackingList),
   // not the server's Content-Disposition, so it reads "WO-1-S1" even though
   // the PDF content served is the Primary's consolidated document.
-  const primary = {
+  const flatPrimary = {
     id: 1,
     reference: 'WO-1',
     job_name: 'Summer Gala',
     client_name: 'Acme Events',
     expected_date_out: '2026-08-01',
     status: 'fulfilled',
+    created_by: 1,
+    created_by_username: 'jane',
     line_items: [] as unknown[],
-    supplementaries: [
-      {
-        id: 2,
-        reference: 'WO-1-S1',
-        job_name: 'Summer Gala (Supplementary)',
-        client_name: 'Acme Events',
-        expected_date_out: '2026-08-02',
-        status: 'fulfilled',
-        line_items: [] as unknown[],
-      },
-    ],
+  };
+  const flatSupplementary = {
+    id: 2,
+    reference: 'WO-1-S1',
+    job_name: 'Summer Gala (Supplementary)',
+    client_name: 'Acme Events',
+    expected_date_out: '2026-08-02',
+    status: 'fulfilled',
+    created_by: 1,
+    created_by_username: 'jane',
+    line_items: [] as unknown[],
+  };
+  const activePrimary = {
+    ...flatPrimary,
+    line_items: [] as unknown[],
+    supplementaries: [{ ...flatSupplementary, line_items: [] as unknown[] }],
   };
 
   await page.route('**/api/auth/**', stubAuth);
@@ -965,7 +1055,11 @@ test('downloads the consolidated packing list PDF from a supplementary row direc
       return;
     }
     if (method === 'GET' && url.endsWith('/active/')) {
-      await route.fulfill({ status: 200, json: [primary] });
+      await route.fulfill({ status: 200, json: [activePrimary] });
+      return;
+    }
+    if (method === 'GET' && url.endsWith('/work-orders/')) {
+      await route.fulfill({ status: 200, json: [flatPrimary, flatSupplementary] });
       return;
     }
     if (method === 'GET') {
@@ -977,17 +1071,15 @@ test('downloads the consolidated packing list PDF from a supplementary row direc
   });
 
   await page.goto('/work-orders');
-  await expect(page.getByText('Summer Gala').first()).toBeVisible();
-
-  await page.getByRole('button', { name: /expand row/i }).click();
   await expect(page.getByText('Summer Gala (Supplementary)')).toBeVisible();
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page
-      .getByRole('button', { name: /download packing list|تحميل قائمة التعبئة/i })
-      .last()
-      .click(),
+    clickRowAction(
+      page,
+      /summer gala \(supplementary\)/i,
+      /download packing list|تحميل قائمة التعبئة/i,
+    ),
   ]);
 
   expect(download.suggestedFilename()).toBe('packing-list-WO-1-S1.pdf');

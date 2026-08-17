@@ -5,10 +5,11 @@ import type { WorkOrder } from '../features/work-orders/types';
 import { apiClient } from '../lib/apiClient';
 import '../i18n';
 import {
-  makeActiveWorkOrder,
+  clickRowAction,
   makeProductType,
   makeWorkOrder,
   mockListEndpoints,
+  openRowActionMenu,
   renderWorkOrdersPage,
 } from './workOrdersTestSupport';
 
@@ -187,44 +188,29 @@ describe('WorkOrdersPage - fulfillment', () => {
     mockListEndpoints(mockedApiClient.get, { workOrders: [workOrder] });
     mockFulfillmentEndpoints(workOrder);
 
+    const user = userEvent.setup();
     await renderWorkOrdersPage();
-
-    await userEvent.setup().click(
-      await screen.findByRole('button', {
-        name: /start fulfillment|بدء التنفيذ/i,
-        hidden: true,
-      }),
-    );
+    await clickRowAction(user, workOrder.reference, /start fulfillment|بدء التنفيذ/i);
 
     expect(mockedApiClient.post).toHaveBeenCalledWith(`/api/work-orders/${workOrder.id}/start/`);
     expect(await screen.findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
   });
 
-  // Timeout bump - this test does two full render/interact cycles (start on
-  // Manage, then switch to Active). It measured ~48s in isolation before the
-  // getByRole hidden:true fix (see the accessibility-visibility-check note
-  // on those queries below); after that fix it's ~16.5s plain, but
-  // `npm run test:coverage`'s v8 instrumentation (the actual CI command)
-  // measured ~35.4s for this one test - hence the bump, not the 150000ms it
-  // used to carry. WRH-69: bumped 60000->90000 - an unrelated diff
-  // elsewhere in WorkOrdersPage.tsx pushed the whole run's per-file
-  // instrumentation overhead up enough to fail this already-once-bumped
-  // test at exactly its old ceiling, matching LESSONS.md's WRH-55 entry
-  // ("a big-enough diff can push a completely unrelated pre-existing test
-  // over its already-bumped timeout too").
-  it('refreshes the Active tab after starting a WO from the Manage tab', async () => {
-    // Regression: the Active tab's query is a separate cache from the
-    // flat work-orders list and doesn't remount on tab switch (AntD keeps
-    // an already-rendered pane mounted) - starting a WO on Manage must
-    // invalidate it or the Active tab keeps showing the pre-start status.
+  it('invalidates the active-work-orders lookup after starting a WO', async () => {
+    // WRH-75: the Active/Manage tabs are gone - what used to be "the Active
+    // tab must refresh" is now "the activeLineItemsById lookup (see
+    // WorkOrdersPage's own comment) must refetch", since starting a WO
+    // doesn't change its own row's returned/damaged/still-out numbers but
+    // does change whether it's eligible for the actions that read them.
     const workOrder = makeWorkOrder({ status: 'draft' });
-    let activeStatus: 'draft' | 'in_progress' = 'draft';
+    let getCallCount = 0;
     mockedApiClient.get.mockImplementation((url: string) => {
       if (url === '/api/product-types/') {
         return Promise.resolve({ data: [makeProductType()] });
       }
       if (url === '/api/work-orders/active/') {
-        return Promise.resolve({ data: [makeActiveWorkOrder({ status: activeStatus })] });
+        getCallCount += 1;
+        return Promise.resolve({ data: [] });
       }
       if (url === '/api/work-orders/') {
         return Promise.resolve({ data: [workOrder] });
@@ -233,44 +219,19 @@ describe('WorkOrdersPage - fulfillment', () => {
     });
     mockedApiClient.post.mockImplementation((url: string) => {
       if (url === `/api/work-orders/${workOrder.id}/start/`) {
-        activeStatus = 'in_progress';
         return Promise.resolve({ data: { ...workOrder, status: 'in_progress' } });
       }
       return Promise.reject(new Error(`Unexpected POST ${url}`));
     });
 
+    const user = userEvent.setup();
     await renderWorkOrdersPage();
-    await userEvent.setup().click(
-      await screen.findByRole('button', {
-        name: /start fulfillment|بدء التنفيذ/i,
-        hidden: true,
-      }),
-    );
-    // AntD keeps both tab panes mounted (not unmounted) once rendered, only
-    // marking the inactive one `aria-hidden="true"`. With `hidden: true`
-    // these row queries now traverse BOTH panes, and both the Manage and
-    // Active panes contain a "Summer Gala" row - so scoping to the
-    // tabpanel itself (by its accessible name, via AntD's
-    // aria-labelledby-to-tab-label wiring) is now required to disambiguate,
-    // not just a nice-to-have pin.
-    const managePane = screen.getByRole('tabpanel', { name: /manage|الإدارة/i, hidden: true });
-    const manageRow = await within(managePane).findByRole('row', {
-      name: /summer gala/i,
-      hidden: true,
-    });
-    await within(manageRow).findByText(/^in progress$|^قيد التنفيذ$/i);
+    const countBeforeStart = getCallCount;
+    await clickRowAction(user, workOrder.reference, /start fulfillment|بدء التنفيذ/i);
 
-    await userEvent
-      .setup()
-      .click(screen.getByRole('tab', { name: /active|النشطة/i, hidden: true }));
-
-    const activePane = screen.getByRole('tabpanel', { name: /active|النشطة/i, hidden: true });
-    const activeRow = await within(activePane).findByRole('row', {
-      name: /summer gala/i,
-      hidden: true,
-    });
-    expect(await within(activeRow).findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
-  }, 90000);
+    await screen.findByText(/^in progress$|^قيد التنفيذ$/i);
+    await waitFor(() => expect(getCallCount).toBeGreaterThan(countBeforeStart));
+  });
 
   it('shows a toast when starting fulfillment fails, leaving the WO as draft', async () => {
     const workOrder = makeWorkOrder();
@@ -283,14 +244,9 @@ describe('WorkOrdersPage - fulfillment', () => {
       },
     });
 
+    const user = userEvent.setup();
     await renderWorkOrdersPage();
-
-    await userEvent.setup().click(
-      await screen.findByRole('button', {
-        name: /start fulfillment|بدء التنفيذ/i,
-        hidden: true,
-      }),
-    );
+    await clickRowAction(user, workOrder.reference, /start fulfillment|بدء التنفيذ/i);
 
     expect(
       await screen.findByText(/failed to start fulfillment|فشل بدء التنفيذ/i),
@@ -298,31 +254,25 @@ describe('WorkOrdersPage - fulfillment', () => {
     expect(screen.getByText(/^draft$|^مسودة$/i)).toBeInTheDocument();
   });
 
-  // WRH-55 lesson (see LESSONS.md): this test needs a 45000ms per-test
-  // timeout override under CI's coverage-instrumented runner - the override
-  // apparently didn't survive WorkOrdersPage.test.tsx later being split
-  // into per-flow files (this test landed here with only the global
-  // 20000ms testTimeout). Restoring the same value WRH-55 established
-  // rather than re-deriving a new one.
   it('does not show a loading state on other draft rows when starting one WO', async () => {
     // Efficiency/altitude regression: a shared mutation instance must not
-    // spin every draft row's button when only one row's start is pending.
-    const workOrderA = makeWorkOrder({ id: 1, job_name: 'Job A' });
-    const workOrderB = makeWorkOrder({ id: 2, job_name: 'Job B' });
+    // disable every draft row's kebab "Start Fulfillment" item when only
+    // one row's start is pending.
+    const workOrderA = makeWorkOrder({ id: 1, reference: 'WO-1', job_name: 'Job A' });
+    const workOrderB = makeWorkOrder({ id: 2, reference: 'WO-2', job_name: 'Job B' });
     mockListEndpoints(mockedApiClient.get, { workOrders: [workOrderA, workOrderB] });
     // Never resolves within this test - keeps workOrderA's start pending.
     mockedApiClient.post.mockImplementationOnce(() => new Promise(() => {}));
 
+    const user = userEvent.setup();
     await renderWorkOrdersPage();
+    await clickRowAction(user, workOrderA.reference, /start fulfillment|بدء التنفيذ/i);
 
-    // hidden: true safe here - this test provides no activeWorkOrders, so
-    // the Active pane is empty and can't produce a "Job A"/"Job B" duplicate.
-    const rowA = await screen.findByRole('row', { name: /job a/i, hidden: true });
-    await userEvent.setup().click(within(rowA).getByRole('button', { hidden: true }));
-
-    const rowB = screen.getByRole('row', { name: /job b/i, hidden: true });
-    expect(within(rowB).getByRole('button', { hidden: true })).toBeEnabled();
-  }, 45000);
+    const menuB = await openRowActionMenu(user, workOrderB.reference);
+    expect(
+      within(menuB).getByRole('menuitem', { name: /start fulfillment|بدء التنفيذ/i }),
+    ).not.toHaveAttribute('aria-disabled', 'true');
+  });
 
   it('updates the live counter as items are scanned', async () => {
     // TC-02/AC-2
@@ -345,7 +295,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
+    await clickRowAction(user, workOrder.reference, /^scan$|^مسح$/i);
     await selectScanLineItem(user, 'Bar LED Model A');
     await scanSerial(user, 'SN-1001');
     await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
@@ -388,7 +338,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
+    await clickRowAction(user, workOrder.reference, /^scan$|^مسح$/i);
     const completeButton = screen.getByRole('button', {
       name: /complete fulfillment|إتمام التنفيذ/i,
       hidden: true,
@@ -432,7 +382,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
+    await clickRowAction(user, workOrder.reference, /^scan$|^مسح$/i);
     await user.click(
       screen.getByRole('button', { name: /complete fulfillment|إتمام التنفيذ/i, hidden: true }),
     );
@@ -459,7 +409,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
+    await clickRowAction(user, workOrder.reference, /^scan$|^مسح$/i);
     await selectScanLineItem(user, 'Bar LED Model A');
     await scanSerial(user, 'SN-042');
 
@@ -501,7 +451,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
+    await clickRowAction(user, workOrder.reference, /^scan$|^مسح$/i);
     await scanBox(user, 'BX-001');
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/1/scan-box/', {
@@ -542,7 +492,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
+    await clickRowAction(user, workOrder.reference, /^scan$|^مسح$/i);
     await scanBox(user, 'BX-002');
 
     expect(
@@ -561,7 +511,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await user.click(await screen.findByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
+    await clickRowAction(user, workOrder.reference, /^scan$|^مسح$/i);
     await scanBox(user, 'BX-DOES-NOT-EXIST');
 
     expect(

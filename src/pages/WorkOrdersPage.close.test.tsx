@@ -5,15 +5,20 @@ import type { ActiveWorkOrder } from '../features/work-orders/types';
 import { apiClient } from '../lib/apiClient';
 import '../i18n';
 import {
+  clickRowAction,
   makeActiveWorkOrder,
+  makeWorkOrder,
   mockListEndpoints,
+  openRowActionMenu,
   renderWorkOrdersPage,
 } from './workOrdersTestSupport';
 
-// WRH-40 (US-019a) - covers the Active tab's "Close Work Order" action:
-// AC-1/AC-2 (warning + confirm sweeps remaining items to Missing), AC-4
-// (zero-out closes cleanly with no warning). Mirrors
+// WRH-40 (US-019a) - covers the merged screen's "Close Work Order" kebab
+// action: AC-1/AC-2 (warning + confirm sweeps remaining items to Missing),
+// AC-4 (zero-out closes cleanly with no warning). Mirrors
 // WorkOrdersPage.return.test.tsx's file-per-feature split and mock shape.
+// WRH-75: every case here needs a matching `workOrders` entry alongside its
+// `activeWorkOrders` one - see WorkOrdersPage.active.test.tsx's header.
 
 vi.mock('../lib/apiClient', () => ({
   apiClient: {
@@ -33,12 +38,8 @@ function mockCloseWorkOrder(workOrder: ActiveWorkOrder, response: unknown) {
   });
 }
 
-async function closeWorkOrder(user: ReturnType<typeof userEvent.setup>) {
-  const button = await screen.findByRole('button', {
-    name: /close work order|إغلاق أمر العمل/i,
-    hidden: true,
-  });
-  await user.click(button);
+async function closeWorkOrder(user: ReturnType<typeof userEvent.setup>, reference = 'WO-1') {
+  await clickRowAction(user, reference, /close work order|إغلاق أمر العمل/i);
   await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
 }
 
@@ -63,7 +64,10 @@ describe('WorkOrdersPage - close', () => {
         },
       ],
     });
-    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: 'fulfilled' })],
+      activeWorkOrders: [workOrder],
+    });
     mockCloseWorkOrder(workOrder, {
       work_order: {
         id: workOrder.id,
@@ -75,12 +79,9 @@ describe('WorkOrdersPage - close', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
-    const button = await screen.findByRole('button', {
-      name: /close work order|إغلاق أمر العمل/i,
-      hidden: true,
-    });
-    await user.click(button);
+    await renderWorkOrdersPage();
+    await screen.findByText(workOrder.job_name);
+    await clickRowAction(user, 'WO-1', /close work order|إغلاق أمر العمل/i);
 
     // Arabic count=3 selects the CLDR "few" plural form (different noun
     // agreement than "other"), so this matches loosely on the number +
@@ -110,7 +111,10 @@ describe('WorkOrdersPage - close', () => {
         },
       ],
     });
-    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: 'fulfilled' })],
+      activeWorkOrders: [workOrder],
+    });
     mockCloseWorkOrder(workOrder, {
       work_order: {
         id: workOrder.id,
@@ -122,12 +126,9 @@ describe('WorkOrdersPage - close', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
-    const button = await screen.findByRole('button', {
-      name: /close work order|إغلاق أمر العمل/i,
-      hidden: true,
-    });
-    await user.click(button);
+    await renderWorkOrdersPage();
+    await screen.findByText(workOrder.job_name);
+    await clickRowAction(user, 'WO-1', /close work order|إغلاق أمر العمل/i);
 
     expect(
       await screen.findByText(/close this work order\?|إغلاق أمر العمل هذا؟/i),
@@ -135,7 +136,7 @@ describe('WorkOrdersPage - close', () => {
     expect(screen.queryByText(/still out|لا يزال بالخارج/i)).not.toBeInTheDocument();
   });
 
-  it('invalidates and refetches the Active tab after closing', async () => {
+  it('invalidates and refetches the active-work-orders lookup after closing', async () => {
     const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
     let getCallCount = 0;
     mockedApiClient.get.mockImplementation((url: string) => {
@@ -147,7 +148,7 @@ describe('WorkOrdersPage - close', () => {
         return Promise.resolve({ data: [workOrder] });
       }
       if (url === '/api/work-orders/') {
-        return Promise.resolve({ data: [] });
+        return Promise.resolve({ data: [makeWorkOrder({ status: 'fulfilled' })] });
       }
       return Promise.reject(new Error(`Unexpected GET ${url}`));
     });
@@ -162,7 +163,8 @@ describe('WorkOrdersPage - close', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
+    await screen.findByText(workOrder.job_name);
     const countBeforeClose = getCallCount;
     await closeWorkOrder(user);
 
@@ -172,26 +174,36 @@ describe('WorkOrdersPage - close', () => {
   it('does not show a close action for a draft work order', async () => {
     // WRH-41/AC-1/TC-01
     const workOrder = makeActiveWorkOrder({ status: 'draft' });
-    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: 'draft' })],
+      activeWorkOrders: [workOrder],
+    });
 
-    await renderWorkOrdersPage({ tab: 'active' });
-
+    const user = userEvent.setup();
+    await renderWorkOrdersPage();
     await screen.findByText(workOrder.job_name);
+    await openRowActionMenu(user, 'WO-1');
+
     expect(
-      screen.queryByRole('button', { name: /close work order|إغلاق أمر العمل/i, hidden: true }),
+      screen.queryByRole('menuitem', { name: /close work order|إغلاق أمر العمل/i }),
     ).not.toBeInTheDocument();
   });
 
   it('does not show a close action for an in_progress work order', async () => {
     // WRH-41/AC-2/TC-02
     const workOrder = makeActiveWorkOrder({ status: 'in_progress' });
-    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: 'in_progress' })],
+      activeWorkOrders: [workOrder],
+    });
 
-    await renderWorkOrdersPage({ tab: 'active' });
-
+    const user = userEvent.setup();
+    await renderWorkOrdersPage();
     await screen.findByText(workOrder.job_name);
+    await openRowActionMenu(user, 'WO-1');
+
     expect(
-      screen.queryByRole('button', { name: /close work order|إغلاق أمر العمل/i, hidden: true }),
+      screen.queryByRole('menuitem', { name: /close work order|إغلاق أمر العمل/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -206,7 +218,10 @@ describe('WorkOrdersPage - close', () => {
   it('leaves the work order open when the close confirmation is dismissed', async () => {
     // WRH-41/AC-5/TC-05
     const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
-    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: 'fulfilled' })],
+      activeWorkOrders: [workOrder],
+    });
     mockCloseWorkOrder(workOrder, {
       work_order: {
         id: workOrder.id,
@@ -218,28 +233,26 @@ describe('WorkOrdersPage - close', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
-    const button = await screen.findByRole('button', {
-      name: /close work order|إغلاق أمر العمل/i,
-      hidden: true,
-    });
-    await user.click(button);
+    await renderWorkOrdersPage();
+    await screen.findByText(workOrder.job_name);
+    await clickRowAction(user, 'WO-1', /close work order|إغلاق أمر العمل/i);
     await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true });
 
     await user.click(screen.getByRole('button', { name: /^cancel$|^إلغاء$/i, hidden: true }));
 
     expect(mockedApiClient.post).not.toHaveBeenCalled();
+    await openRowActionMenu(user, 'WO-1');
     expect(
-      await screen.findByRole('button', {
-        name: /close work order|إغلاق أمر العمل/i,
-        hidden: true,
-      }),
+      await screen.findByRole('menuitem', { name: /close work order|إغلاق أمر العمل/i }),
     ).toBeInTheDocument();
   }, 90000);
 
   it('shows a generic error when closing fails', async () => {
     const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
-    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: 'fulfilled' })],
+      activeWorkOrders: [workOrder],
+    });
     mockedApiClient.post.mockImplementation((url: string) => {
       if (url === `/api/work-orders/${workOrder.id}/close/`) {
         return Promise.reject({
@@ -251,7 +264,8 @@ describe('WorkOrdersPage - close', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
+    await screen.findByText(workOrder.job_name);
     await closeWorkOrder(user);
 
     expect(
