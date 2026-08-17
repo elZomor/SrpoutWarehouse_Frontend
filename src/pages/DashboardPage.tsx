@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useProductTypeStockSummary } from '../features/product-types/useProductTypes';
 import type { ProductTypeStockSummary } from '../features/product-types/types';
 import { useSerializedItems } from '../features/serialized-items/useSerializedItems';
-import { DEFAULT_STATUS_COLOR, STATUS_COLORS } from '../features/serialized-items/logic';
+import { getSerializedItemStatusColor } from '../features/serialized-items/logic';
 
 export function DashboardPage() {
   const { t } = useTranslation();
@@ -75,7 +75,7 @@ export function DashboardPage() {
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => (
-        <Tag color={STATUS_COLORS.get(status) ?? DEFAULT_STATUS_COLOR}>
+        <Tag color={getSerializedItemStatusColor(status)}>
           {t(`serializedItems.status.${status}`)}
         </Tag>
       ),

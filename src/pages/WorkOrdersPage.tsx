@@ -76,19 +76,11 @@ import {
   useWorkOrders,
 } from '../features/work-orders/useWorkOrders';
 import { getFieldErrorMessages } from '../lib/apiErrors';
+import { getSerializedItemStatusColor } from '../features/serialized-items/logic';
 import { colors } from '../theme/tokens';
 
 const DATE_FORMAT = 'YYYY-MM-DD';
 const EMPTY_LINE_ITEM = { product_type: undefined, quantity: undefined };
-// A Map (not a plain object) avoids eslint-plugin-security's
-// detect-object-injection warning on the dynamic-key lookup below, matching
-// SerializedItemsPage's identical STATUS_COLORS convention.
-const SERIALIZED_ITEM_STATUS_COLORS = new Map<string, string>([
-  ['available', 'green'],
-  ['reserved', 'gold'],
-  ['out', 'red'],
-]);
-const DEFAULT_STATUS_COLOR = 'default';
 // WRH-26/AC-2: scan-box/return-box's box_code rejections are fixed
 // constants (no interpolated free text like the per-serial patterns
 // classifyScanRejection/classifyReturnRejection handle), so exact equality
@@ -1045,7 +1037,7 @@ export function WorkOrdersPage() {
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => (
-        <Tag color={SERIALIZED_ITEM_STATUS_COLORS.get(status) ?? DEFAULT_STATUS_COLOR}>
+        <Tag color={getSerializedItemStatusColor(status)}>
           {t(`serializedItems.status.${status}`)}
         </Tag>
       ),
