@@ -88,7 +88,27 @@ describe('getSerializedItemStatusColor', () => {
     expect(getSerializedItemStatusColor('missing')).toBe('orange');
   });
 
+  it('returns purple for in_maintenance', () => {
+    expect(getSerializedItemStatusColor('in_maintenance')).toBe('purple');
+  });
+
+  it('returns red for damaged', () => {
+    expect(getSerializedItemStatusColor('damaged')).toBe('red');
+  });
+
+  it('returns default (grey) for written_off', () => {
+    expect(getSerializedItemStatusColor('written_off')).toBe('default');
+  });
+
+  it('returns blue for reserved', () => {
+    expect(getSerializedItemStatusColor('reserved')).toBe('blue');
+  });
+
+  it('returns geekblue for out', () => {
+    expect(getSerializedItemStatusColor('out')).toBe('geekblue');
+  });
+
   it('falls back to the default color for an unrecognized status', () => {
-    expect(getSerializedItemStatusColor('damaged')).toBe('default');
+    expect(getSerializedItemStatusColor('some_future_status')).toBe('default');
   });
 });

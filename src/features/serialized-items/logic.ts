@@ -14,12 +14,19 @@ import { getFieldErrorMessages } from '../../lib/apiErrors';
 // field) rather than each page keeping its own local color map, which had
 // let 'missing' render inconsistently (grey via this map's old fallback vs.
 // a separately-chosen orange on MissingItemsPage) for the identical value.
+// WRH-76: 'damaged'/'written_off'/'reserved'/'out' added the same way, so
+// every SerializedItem.status value has an explicit, consistent color
+// wherever it's rendered instead of a page having to invent its own.
 export const STATUS_COLORS = new Map<string, string>([
   ['available', 'green'],
   ['missing', 'orange'],
   // WRH-46: added the same way 'missing' was (WRH-42) - shared by every
   // page that renders this status rather than a page-local map.
   ['in_maintenance', 'purple'],
+  ['damaged', 'red'],
+  ['written_off', 'default'],
+  ['reserved', 'blue'],
+  ['out', 'geekblue'],
 ]);
 export const DEFAULT_STATUS_COLOR = 'default';
 
