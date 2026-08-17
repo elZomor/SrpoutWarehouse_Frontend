@@ -5,12 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useProductTypeStockSummary } from '../features/product-types/useProductTypes';
 import type { ProductTypeStockSummary } from '../features/product-types/types';
 import { useSerializedItems } from '../features/serialized-items/useSerializedItems';
-
-// Matches SerializedItemsPage's STATUS_COLORS precedent (a Map avoids
-// eslint-plugin-security's detect-object-injection warning on the dynamic-
-// key lookup below).
-const STATUS_COLORS = new Map<string, string>([['available', 'green']]);
-const DEFAULT_STATUS_COLOR = 'default';
+import { getSerializedItemStatusColor } from '../features/serialized-items/logic';
 
 export function DashboardPage() {
   const { t } = useTranslation();
@@ -80,7 +75,7 @@ export function DashboardPage() {
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => (
-        <Tag color={STATUS_COLORS.get(status) ?? DEFAULT_STATUS_COLOR}>
+        <Tag color={getSerializedItemStatusColor(status)}>
           {t(`serializedItems.status.${status}`)}
         </Tag>
       ),

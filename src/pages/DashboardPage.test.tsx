@@ -208,6 +208,70 @@ describe('DashboardPage', () => {
     });
   });
 
+  it('gives each stock status its own distinct color in the drill-down (WRH-76/AC-1/AC-2/AC-4)', async () => {
+    mockGetEndpoints({
+      stockSummary: [makeStockSummaryRow()],
+      serializedItems: [
+        {
+          id: 1,
+          serial: 'a',
+          serial_number: 'SN-0001',
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          status: 'available',
+          last_work_order_reference: '',
+          notes: '',
+        },
+        {
+          id: 2,
+          serial: 'b',
+          serial_number: 'SN-0002',
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          status: 'damaged',
+          last_work_order_reference: '',
+          notes: '',
+        },
+        {
+          id: 3,
+          serial: 'c',
+          serial_number: 'SN-0003',
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          status: 'written_off',
+          last_work_order_reference: '',
+          notes: '',
+        },
+        {
+          id: 4,
+          serial: 'd',
+          serial_number: 'SN-0004',
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          status: 'reserved',
+          last_work_order_reference: '',
+          notes: '',
+        },
+      ],
+    });
+    const user = userEvent.setup();
+    renderDashboardPage();
+
+    await user.click(await screen.findByRole('row', { name: /bar led model a/i, hidden: true }));
+    const dialog = await screen.findByRole('dialog', { hidden: true });
+
+    const tagClassFor = (text: RegExp) =>
+      within(dialog).getByText(text).closest('.ant-tag')?.className;
+    const availableClass = tagClassFor(/^available$|^متاح$/i);
+    const damagedClass = tagClassFor(/^damaged$|^تالف$/i);
+    const writtenOffClass = tagClassFor(/^written off$|^شطب$/i);
+    const reservedClass = tagClassFor(/^reserved$|^محجوز$/i);
+
+    const classes = [availableClass, damagedClass, writtenOffClass, reservedClass];
+    expect(classes.every(Boolean)).toBe(true);
+    expect(new Set(classes).size).toBe(classes.length);
+  });
+
   it('refetches the stock summary when the refresh button is clicked', async () => {
     // AC-4/TC-04
     mockGetEndpoints({ stockSummary: [makeStockSummaryRow()] });
