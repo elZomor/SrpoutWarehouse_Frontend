@@ -13,6 +13,15 @@ export async function createBox(input: BoxFormValues): Promise<Box> {
   return data;
 }
 
+// WRH-71/AC-1/AC-5: fetched fresh on demand when a box row is clicked,
+// rather than reusing the list row's own `items` - the list response can go
+// stale between fetches, and the detail view needs the currently-assigned
+// items at click time.
+export async function getBox(id: number): Promise<Box> {
+  const { data } = await apiClient.get<Box>(`/api/boxes/${id}/`);
+  return data;
+}
+
 // The QR code is generated on demand rather than stored (see Box's backend
 // model comment) - matches getSerializedItemQrCodeUrl's identical plain-URL
 // shape so it can be embedded directly as an <img src>.

@@ -1,21 +1,49 @@
-import { useState } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, Button, Form, Input, Modal, Select, Table, Typography } from 'antd';
+import { Alert, Button, Form, Input, Modal, Select, Spin, Table, Typography } from 'antd';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { classifyItemRejection, type ItemRejection } from '../features/boxes/logic';
 import { boxSchema, type BoxFormValues } from '../features/boxes/schema';
 import { printBoxLabel } from '../features/boxes/printLabel';
-import type { Box } from '../features/boxes/types';
-import { useBoxes, useCreateBox } from '../features/boxes/useBoxes';
+import type { Box, BoxItem } from '../features/boxes/types';
+import { useBox, useBoxes, useCreateBox } from '../features/boxes/useBoxes';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import { useSerializedItems } from '../features/serialized-items/useSerializedItems';
 
 export function BoxesPage() {
   const { t } = useTranslation();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // WRH-71/AC-1: the clicked row is kept only for its code (the detail
+  // modal's title) - the items list itself comes from useBox's own fresh
+  // fetch below, not this stale list row.
+  const [detailBox, setDetailBox] = useState<Box | null>(null);
+  // Tracks open/closed separately from detailBox itself - closing sets
+  // this false immediately (driving the Modal's close animation) but
+  // detailBox is only cleared once that animation finishes (afterOpenChange
+  // below), so the title/table don't flash blank underneath the still-
+  // visible, animating-out modal.
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  // afterOpenChange(false) fires asynchronously once the close animation
+  // ends - if the user re-opens a different box before that fires (close
+  // row 1, then immediately click row 2), a stale callback from the
+  // *earlier* close would otherwise wipe out the newly-set detailBox. A
+  // ref (always current, unlike the closure's captured isDetailOpen) lets
+  // the callback check whether a reopen has happened in the meantime.
+  const isDetailOpenRef = useRef(isDetailOpen);
+  isDetailOpenRef.current = isDetailOpen;
   const { data: boxes, isLoading, isError: isListError } = useBoxes();
   const createMutation = useCreateBox();
+  const {
+    data: boxDetail,
+    // isFetching (not isLoading) - useBox's staleTime: 0 means reopening an
+    // already-cached box triggers a background refetch that isLoading
+    // wouldn't reflect, which would otherwise render the previous,
+    // possibly-stale item list for a moment before the fresh one swaps in
+    // (AC-5).
+    isFetching: isDetailLoading,
+    isError: isDetailError,
+  } = useBox(detailBox?.id, isDetailOpen);
   const { data: productTypes, isError: isProductTypesError } = useProductTypes('');
   // WRH-27/AC-1/AC-2/AC-5: item_ids rejections name a specific item (and,
   // for AC-2, the specific other box) - classifyItemRejection anchors on
@@ -95,16 +123,33 @@ export function BoxesPage() {
         <Button
           type="link"
           size="small"
-          onClick={() =>
+          onClick={(event) => {
+            // WRH-71: the row itself now opens the detail view on click -
+            // without this, the click would bubble up to the row and pop
+            // the detail modal open behind the QR print window too.
+            event.stopPropagation();
             printBoxLabel(record, {
               qrAlt: t('boxes.qrCodeLabel'),
               loadError: t('boxes.printQrLoadError'),
-            })
-          }
+            });
+          }}
         >
           {t('boxes.printQrButton')}
         </Button>
       ),
+    },
+  ];
+
+  const detailColumns = [
+    {
+      title: t('boxes.detail.serialNumberHeader'),
+      dataIndex: 'serial_number',
+      key: 'serial_number',
+    },
+    {
+      title: t('boxes.detail.statusHeader'),
+      key: 'status',
+      render: (_: unknown, record: BoxItem) => t(`serializedItems.status.${record.status}`),
     },
   ];
 
@@ -125,8 +170,74 @@ export function BoxesPage() {
           dataSource={boxes}
           loading={isLoading}
           locale={{ emptyText: t('boxes.emptyState') }}
+          onRow={(record) => ({
+            onClick: () => {
+              setDetailBox(record);
+              setIsDetailOpen(true);
+            },
+            // Keyboard/screen-reader equivalent of the mouse-only onClick
+            // above - a plain onRow onClick has no focus/activation path
+            // otherwise.
+            onKeyDown: (event: KeyboardEvent) => {
+              // Only react when the row itself is the key's target, not a
+              // bubbled keydown from a nested interactive element (e.g. the
+              // Print QR button) - otherwise pressing Enter/Space on that
+              // button both prints the QR and opens the detail modal,
+              // while a mouse click on it only does the former.
+              if (
+                (event.key === 'Enter' || event.key === ' ') &&
+                event.target === event.currentTarget
+              ) {
+                event.preventDefault();
+                setDetailBox(record);
+                setIsDetailOpen(true);
+              }
+            },
+            // Not role="button" - that would clobber the row's own
+            // semantic "row" role inside the table and break the row/cell
+            // accessible-name computation table libraries rely on.
+            tabIndex: 0,
+            style: { cursor: 'pointer' },
+          })}
         />
       )}
+      <Modal
+        title={t('boxes.detail.title', { code: detailBox?.code ?? '' })}
+        open={isDetailOpen}
+        onCancel={() => setIsDetailOpen(false)}
+        // Clears the underlying record only once the close animation has
+        // actually finished, not on click - otherwise the title/table
+        // flash blank underneath the still-visible, animating-out modal.
+        afterOpenChange={(open) => {
+          if (!open && !isDetailOpenRef.current) {
+            setDetailBox(null);
+          }
+        }}
+        footer={[
+          <Button key="close" onClick={() => setIsDetailOpen(false)}>
+            {t('boxes.detail.closeButton')}
+          </Button>,
+        ]}
+        width={640}
+      >
+        {isDetailLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
+            <Spin />
+          </div>
+        ) : isDetailError ? (
+          <Alert type="error" message={t('boxes.detail.loadError')} showIcon />
+        ) : (
+          <Table<BoxItem>
+            rowKey="id"
+            size="small"
+            pagination={false}
+            scroll={{ y: 320 }}
+            columns={detailColumns}
+            dataSource={boxDetail?.items}
+            locale={{ emptyText: t('boxes.detail.emptyState') }}
+          />
+        )}
+      </Modal>
       <Modal
         title={t('boxes.newButton')}
         open={isModalOpen}

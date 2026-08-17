@@ -177,6 +177,14 @@
       "itemAlreadyInBoxError": "{{serial}} is already in box {{boxCode}}",
       "itemNotAvailableError": "{{serial}} is not available to box",
       "itemProductTypeMismatchError": "{{serial}} does not match this box's product type"
+    },
+    "detail": {
+      "title": "{{code}}",
+      "serialNumberHeader": "Serial Number",
+      "statusHeader": "Status",
+      "closeButton": "Close",
+      "emptyState": "No items in this box",
+      "loadError": "Failed to load box items. Please try again."
     }
   },
   "purchaseOrders": {

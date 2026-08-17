@@ -181,6 +181,14 @@
       "itemAlreadyInBoxError": "{{serial}} موجود بالفعل في الصندوق {{boxCode}}",
       "itemNotAvailableError": "{{serial}} غير متاح لوضعه في صندوق",
       "itemProductTypeMismatchError": "{{serial}} لا يطابق نوع منتج هذا الصندوق"
+    },
+    "detail": {
+      "title": "{{code}}",
+      "serialNumberHeader": "الرقم التسلسلي",
+      "statusHeader": "الحالة",
+      "closeButton": "إغلاق",
+      "emptyState": "لا توجد عناصر في هذا الصندوق",
+      "loadError": "فشل تحميل عناصر الصندوق. حاول مرة أخرى."
     }
   },
   "purchaseOrders": {
