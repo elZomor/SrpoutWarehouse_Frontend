@@ -114,18 +114,11 @@ export function mockListEndpoints(
   });
 }
 
-// Active is the default tab (it's the story's intended entry point) - most
-// Manage-tab tests need the switch, so this defaults there. Active-tab
-// tests pass `{ tab: 'active' }` to skip the switch. `initialEntries`
-// defaults to a plain '/work-orders' visit; WRH-42's navigate-state test
-// (MissingItemsPage's WO link requesting the Manage tab) passes its own
-// entry with `state: { initialTab: 'manage' }` and `tab: 'active'` (to skip
-// the auto-click below and prove the tab was selected by state alone).
+// WRH-75: the Active/Manage tabs are gone - a single table now lists every
+// WO, so there's no tab to switch to before a test can find its row.
 export async function renderWorkOrdersPage({
-  tab = 'manage',
   initialEntries = ['/work-orders'],
 }: {
-  tab?: 'active' | 'manage';
   initialEntries?: Parameters<typeof MemoryRouter>[0]['initialEntries'];
 } = {}) {
   const queryClient = new QueryClient({
@@ -156,13 +149,56 @@ export async function renderWorkOrdersPage({
     </QueryClientProvider>,
   );
 
-  if (tab === 'manage') {
-    await userEvent
-      .setup()
-      .click(await screen.findByRole('tab', { name: /manage|الإدارة/i, hidden: true }));
-  }
-
   return result;
+}
+
+// WRH-75: every row action now lives behind a per-row kebab (3-dots) menu
+// instead of an inline button - opens the menu for the row matching
+// `reference` (unique per WO, unlike job_name) and clicks the item with
+// `actionName`. AntD's Dropdown menu items render with role="menuitem".
+export async function openRowActionMenu(
+  user: ReturnType<typeof userEvent.setup>,
+  reference: string,
+) {
+  // A function matcher (not `new RegExp(...)`, which
+  // eslint-plugin-security's detect-non-literal-regexp flags even for a
+  // test-only, never-untrusted input like this) anchored so e.g. "WO-1"
+  // doesn't also match a "WO-1-S1" supplementary row's accessible name,
+  // which starts with the same prefix.
+  const row = await screen.findByRole('row', {
+    name: (accessibleName) =>
+      accessibleName === reference || accessibleName.startsWith(`${reference} `),
+    hidden: true,
+  });
+  await user.click(within(row).getByRole('button', { hidden: true }));
+  // AntD's Dropdown menu (role="menu") is a portal sibling of the sidebar
+  // nav's own always-mounted Menu (also role="menu") - the most recently
+  // opened one is the last match, same "last match wins" trick
+  // selectProductTypeForLineItem below uses for stale AntD portal nodes.
+  const menus = await screen.findAllByRole('menu', { hidden: true });
+  const menu = menus.at(-1);
+  if (!menu) {
+    throw new Error('No open row action menu found');
+  }
+  return menu;
+}
+
+export async function clickRowAction(
+  user: ReturnType<typeof userEvent.setup>,
+  reference: string,
+  actionName: string | RegExp,
+) {
+  const menu = await openRowActionMenu(user, reference);
+  // Clicks the item's own visible text, not the surrounding `role="menuitem"`
+  // `<li>` - the Close action's item has no onClick of its own (a nested
+  // Popconfirm owns the click - see WorkOrdersPage's own comment), and a
+  // click event only bubbles up to ancestors, never down into a
+  // descendant, so clicking the `<li>` itself would silently miss it.
+  // Scoped to this menu - a still-mounted (but closed, per AntD/rc-motion
+  // in jsdom - see WorkOrdersPage.return.test.tsx's own comment on this)
+  // modal elsewhere on the page can carry the exact same label text (e.g.
+  // "Return" is both a kebab action and that modal's own submit button).
+  await user.click(await within(menu).findByText(actionName));
 }
 
 export async function fillExpectedDateOut(user: ReturnType<typeof userEvent.setup>, value: string) {

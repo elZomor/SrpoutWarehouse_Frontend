@@ -314,19 +314,11 @@
       "boxSummaryMessage": "تم توسيع الصندوق {{code}}: تمت إضافة {{count}} عنصر",
       "boxSummaryMessageFlagged": "تم توسيع الصندوق {{code}}: تمت إضافة {{count}} عنصر (تم تمييز {{flaggedCount}})"
     },
-    "tabs": {
-      "active": "النشطة",
-      "manage": "الإدارة"
-    },
     "active": {
-      "productTypesHeader": "أنواع المنتجات",
-      "productTypeSummary": "{{productType}}: {{returned}} تم إرجاعه / {{damaged}} تالف / {{stillOut}} لا يزال خارجًا",
       "viewDetailsButton": "عرض التفاصيل",
       "addSupplementaryButton": "إضافة أمر تكميلي",
       "downloadPackingListButton": "تحميل قائمة التعبئة",
-      "downloadPackingListError": "فشل تحميل قائمة التعبئة. حاول مرة أخرى.",
-      "emptyState": "لا توجد أوامر عمل نشطة",
-      "loadError": "فشل تحميل أوامر العمل النشطة. حاول مرة أخرى."
+      "downloadPackingListError": "فشل تحميل قائمة التعبئة. حاول مرة أخرى."
     },
     "detail": {
       "title": "{{reference}} — {{jobName}}",

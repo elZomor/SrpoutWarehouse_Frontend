@@ -26,13 +26,10 @@ const workOrdersBaseKey = ['work-orders'] as const;
 const activeWorkOrdersKey = ['work-orders', 'active'] as const;
 const workOrderDetailKey = (workOrderId: number) => ['work-orders', 'detail', workOrderId] as const;
 
-// The Active tab's query is a separate cache from workOrdersBaseKey (its
-// shape - nested supplementaries, returned/still_out counts - can't be
-// derived from a mutation's flat WorkOrder response), and AntD Tabs keeps
-// an already-rendered pane mounted after switching away from it, so it
-// never remounts to pick up a stale result on its own - every Manage-tab
-// mutation that can change a WO's status/line-item state needs to
-// invalidate it explicitly or the Active tab silently goes stale.
+// activeWorkOrdersKey is a separate cache from workOrdersBaseKey (its shape
+// - nested supplementaries, returned/still_out counts - can't be derived
+// from a mutation's flat WorkOrder response) - every mutation that can
+// change a WO's status/line-item state needs to invalidate it explicitly.
 function invalidateActiveWorkOrders(
   queryClient: ReturnType<typeof useQueryClient>,
   workOrderId?: number,
@@ -41,6 +38,23 @@ function invalidateActiveWorkOrders(
   if (workOrderId !== undefined) {
     queryClient.invalidateQueries({ queryKey: workOrderDetailKey(workOrderId) });
   }
+}
+
+// WRH-75: the merged screen's single table reads its Status column off
+// workOrdersBaseKey for every row, so a mutation whose response doesn't get
+// patched directly into that cache (useStartWorkOrder/useCompleteWorkOrder
+// patch it themselves - see patchWorkOrder below - so they don't need this)
+// needs it invalidated too, not just activeWorkOrdersKey. return_item()/
+// return_box()'s session-close path is the case that matters here - its
+// response (WorkOrderReturnResult) doesn't match workOrdersBaseKey's flat
+// WorkOrder shape closely enough to patch directly (see
+// useReturnWorkOrderItem's own comment).
+function invalidateWorkOrderCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  workOrderId?: number,
+) {
+  queryClient.invalidateQueries({ queryKey: workOrdersBaseKey });
+  invalidateActiveWorkOrders(queryClient, workOrderId);
 }
 
 export function useWorkOrders() {
@@ -71,14 +85,13 @@ export function useCreateWorkOrder() {
   return useMutation({
     mutationFn: (input: WorkOrderFormValues) => createWorkOrder(input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: workOrdersBaseKey });
       // WRH-53: a new WO can now be a supplementary nested under an
       // existing Primary (WorkOrdersPage merges parent_work_order into the
       // payload when created via a Primary row's "Add Supplementary"
       // action) as well as a brand-new Primary - either way the Active
       // tab's nested list needs a refetch, so this stays a blanket
       // invalidation rather than trying to patch the nested shape locally.
-      invalidateActiveWorkOrders(queryClient);
+      invalidateWorkOrderCaches(queryClient);
     },
   });
 }
@@ -191,8 +204,7 @@ export function useCloseWorkOrder() {
       // workOrdersBaseKey's flat WorkOrder shape (missing reference,
       // client_name, expected_date_out, etc.) unlike useStartWorkOrder/
       // useCompleteWorkOrder, so invalidate both caches instead of patching.
-      queryClient.invalidateQueries({ queryKey: workOrdersBaseKey });
-      invalidateActiveWorkOrders(queryClient, workOrderId);
+      invalidateWorkOrderCaches(queryClient, workOrderId);
     },
   });
 }
@@ -203,7 +215,20 @@ export function useDownloadWorkOrderPackingList() {
   });
 }
 
+// WorkOrdersPage's closeFulfillmentModal: every scan/complete during that
+// session already patched workOrdersBaseKey directly (see
+// useScanWorkOrderItem/useCompleteWorkOrder above), so this only needs to
+// catch up activeWorkOrdersKey once the session ends - invalidating
+// workOrdersBaseKey too would just be a redundant refetch.
 export function useInvalidateActiveWorkOrders() {
   const queryClient = useQueryClient();
   return (workOrderId?: number) => invalidateActiveWorkOrders(queryClient, workOrderId);
+}
+
+// WorkOrdersPage's closeReturnModal: return_item()/return_box() never patch
+// workOrdersBaseKey (see invalidateWorkOrderCaches's own comment), so that
+// cache needs invalidating here too, not just activeWorkOrdersKey.
+export function useInvalidateWorkOrders() {
+  const queryClient = useQueryClient();
+  return (workOrderId?: number) => invalidateWorkOrderCaches(queryClient, workOrderId);
 }

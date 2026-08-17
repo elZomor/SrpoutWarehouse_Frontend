@@ -5,8 +5,10 @@ import type { ActiveWorkOrder } from '../features/work-orders/types';
 import { apiClient } from '../lib/apiClient';
 import '../i18n';
 import {
+  clickRowAction,
   makeActiveWorkOrder,
   makeProductType,
+  makeWorkOrder,
   mockListEndpoints,
   renderWorkOrdersPage,
 } from './workOrdersTestSupport';
@@ -51,17 +53,7 @@ function mockReturnItemRejection(workOrder: ActiveWorkOrder, field: string, mess
 }
 
 async function openReturnModal(user: ReturnType<typeof userEvent.setup>) {
-  // Queries the button directly (scoped to the whole document, not via
-  // getByRole('row', {name}) + within(row)) - only one work order exists
-  // in these tests, so there's no ambiguity, and a row's accessible name
-  // aggregates every cell's content including each contained button's
-  // own name. That computation is disproportionately expensive once a
-  // row has two interactive descendants (View Details + Return) instead
-  // of one - regression: this exact row+within pattern reliably pushed
-  // this test past even a 60s per-test override under `--coverage`,
-  // where the equivalent direct button query finishes in ~1s.
-  const button = await screen.findByRole('button', { name: /^return$|^إرجاع$/i, hidden: true });
-  await user.click(button);
+  await clickRowAction(user, 'WO-1', /^return$|^إرجاع$/i);
 }
 
 async function returnSerial(user: ReturnType<typeof userEvent.setup>, serialNumber: string) {
@@ -132,7 +124,10 @@ describe('WorkOrdersPage - return', () => {
         },
       ],
     });
-    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: workOrder.status })],
+      activeWorkOrders: [workOrder],
+    });
     mockReturnItem(workOrder, {
       id: 1,
       job_name: 'Summer Gala',
@@ -151,7 +146,7 @@ describe('WorkOrdersPage - return', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openReturnModal(user);
     await returnSerial(user, 'SN-1001');
 
@@ -188,7 +183,10 @@ describe('WorkOrdersPage - return', () => {
         },
       ],
     });
-    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: workOrder.status })],
+      activeWorkOrders: [workOrder],
+    });
     mockReturnItem(workOrder, {
       id: 1,
       job_name: 'Summer Gala',
@@ -207,7 +205,7 @@ describe('WorkOrdersPage - return', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openReturnModal(user);
     await markSerialDamaged(user, 'SN-9001');
 
@@ -241,11 +239,14 @@ describe('WorkOrdersPage - return', () => {
   // header comment).
   it('names the other work order when a returned serial was not issued on this one', async () => {
     const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
-    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: workOrder.status })],
+      activeWorkOrders: [workOrder],
+    });
     mockReturnItemRejection(workOrder, 'serial_number', 'SN-042 was not issued on WO-17');
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openReturnModal(user);
     await returnSerial(user, 'SN-042');
 
@@ -267,14 +268,14 @@ describe('WorkOrdersPage - return', () => {
         return Promise.resolve({ data: [workOrder] });
       }
       if (url === '/api/work-orders/') {
-        return Promise.resolve({ data: [] });
+        return Promise.resolve({ data: [makeWorkOrder({ status: workOrder.status })] });
       }
       return Promise.reject(new Error(`Unexpected GET ${url}`));
     });
     mockReturnItem(workOrder, { ...workOrder, status: 'partially_returned' });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openReturnModal(user);
     await returnSerial(user, 'SN-3001');
     await screen.findByText(/^partially returned$|^إرجاع جزئي$/i);
@@ -290,7 +291,10 @@ describe('WorkOrdersPage - return', () => {
     // unconditionally - a response that lands after the modal was already
     // dismissed would reopen it with stale data.
     const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
-    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: workOrder.status })],
+      activeWorkOrders: [workOrder],
+    });
     let resolvePost: ((value: { data: unknown }) => void) | undefined;
     mockedApiClient.post.mockImplementation(
       () =>
@@ -300,7 +304,7 @@ describe('WorkOrdersPage - return', () => {
     );
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openReturnModal(user);
     await returnSerial(user, 'SN-9001');
 
@@ -331,7 +335,10 @@ describe('WorkOrdersPage - return', () => {
     // this response belongs to the abandoned first session and must not
     // overwrite the freshly reopened one, even though the id matches.
     const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
-    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: workOrder.status })],
+      activeWorkOrders: [workOrder],
+    });
     let resolvePost: ((value: { data: unknown }) => void) | undefined;
     mockedApiClient.post.mockImplementation(
       () =>
@@ -341,7 +348,7 @@ describe('WorkOrdersPage - return', () => {
     );
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openReturnModal(user);
     await returnSerial(user, 'SN-8001');
 
@@ -366,7 +373,10 @@ describe('WorkOrdersPage - return', () => {
   it('returns a box and marks the WO returned once every item is back', async () => {
     // WRH-26/AC-2/AC-3
     const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
-    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: workOrder.status })],
+      activeWorkOrders: [workOrder],
+    });
     mockReturnBox(workOrder, {
       work_order: {
         id: workOrder.id,
@@ -392,7 +402,7 @@ describe('WorkOrdersPage - return', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openReturnModal(user);
     await returnBox(user, 'BX-003');
 
@@ -410,7 +420,10 @@ describe('WorkOrdersPage - return', () => {
     // up in the flagged-reason list and be excluded from the "items added"
     // count, not folded into a plain success message.
     const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
-    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: workOrder.status })],
+      activeWorkOrders: [workOrder],
+    });
     mockReturnBox(workOrder, {
       work_order: {
         id: workOrder.id,
@@ -436,7 +449,7 @@ describe('WorkOrdersPage - return', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openReturnModal(user);
     await returnBox(user, 'BX-005');
 
@@ -455,7 +468,10 @@ describe('WorkOrdersPage - return', () => {
     // the retry's mutation never fired. A barcode scanner re-feeding the
     // same code after a transient rejection is the realistic trigger.
     const workOrder = makeActiveWorkOrder({ status: 'fulfilled' });
-    mockListEndpoints(mockedApiClient.get, { activeWorkOrders: [workOrder] });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: workOrder.status })],
+      activeWorkOrders: [workOrder],
+    });
     mockedApiClient.post
       .mockRejectedValueOnce({
         isAxiosError: true,
@@ -473,7 +489,7 @@ describe('WorkOrdersPage - return', () => {
       });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await renderWorkOrdersPage({ tab: 'active' });
+    await renderWorkOrdersPage();
     await openReturnModal(user);
     await returnBox(user, 'BX-004');
 

@@ -270,9 +270,7 @@ export function isPrimaryWorkOrder(
 // resolves a supplementary's own request to its Primary's consolidated
 // document instead of rejecting it, so the button is offered on
 // supplementary rows too.
-export function isPackingListEligible(
-  record: ActiveWorkOrder | ActiveWorkOrderSupplementary,
-): boolean {
+export function isPackingListEligible(record: { status: WorkOrderStatus }): boolean {
   return record.status !== 'draft';
 }
 

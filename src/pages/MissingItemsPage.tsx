@@ -48,22 +48,14 @@ export function MissingItemsPage() {
       title: t('missingItems.workOrderLabel'),
       dataIndex: 'work_order_reference',
       key: 'work_order_reference',
-      // TC-04: "clicking navigates to that WO" - a missing item's WO is
-      // always closed (see backend's mark_found()/write_off() comment: the
-      // WO is closed by the time an item can go missing), and closed WOs
-      // are excluded from the Work Orders page's Active tab entirely - so
-      // this passes navigate state requesting the Manage tab (which does
-      // list closed WOs) rather than falling through to the default Active
-      // tab a closed WO can never appear on. No per-WO deep link/detail
-      // view exists yet, so this lands on the tab, not the exact row.
+      // TC-04: "clicking navigates to that WO" - WRH-75 merged the Work
+      // Orders page's Active/Manage tabs into one screen listing every WO
+      // regardless of status, so a closed WO (a missing item's WO is
+      // always closed - see backend's mark_found()/write_off() comment) is
+      // always reachable there now. No per-WO deep link/detail view exists
+      // yet, so this lands on the screen, not the exact row.
       render: (value: string) =>
-        value ? (
-          <Link to={ROUTES.workOrders} state={{ initialTab: 'manage' }}>
-            {value}
-          </Link>
-        ) : (
-          t('missingItems.noWorkOrder')
-        ),
+        value ? <Link to={ROUTES.workOrders}>{value}</Link> : t('missingItems.noWorkOrder'),
     },
     {
       title: t('missingItems.dateMissingLabel'),
