@@ -124,6 +124,7 @@ export interface ReturnRejection {
 export function classifyReturnRejection(
   serialErrors: string[],
   statusErrors: string[],
+  workOrderErrors: string[] = [],
 ): ReturnRejection | null {
   if (serialErrors.some((message) => message === 'Serial not found')) {
     return { messageKey: 'workOrders.return.notFoundError' };
@@ -142,6 +143,14 @@ export function classifyReturnRejection(
   }
   if (statusErrors.length > 0) {
     return { messageKey: 'workOrders.return.statusError' };
+  }
+  // WRH-80/AC-4: return-only-on-Primary is enforced server-side too, not
+  // just by hiding the button (isReturnEligible/primaryWorkOrderIds gate in
+  // WorkOrdersPage) - a defense-in-depth 400 that should be unreachable via
+  // the UI but still needs a real message if hit (stale row data, a second
+  // tab, direct API use).
+  if (workOrderErrors.length > 0) {
+    return { messageKey: 'workOrders.return.supplementaryError' };
   }
   return null;
 }

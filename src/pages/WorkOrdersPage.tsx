@@ -488,6 +488,15 @@ export function WorkOrdersPage() {
       // isReturnEligible only opens this from a non-terminal row, which is
       // always present there.
       line_items: activeLineItemsById.get(workOrder.id) ?? [],
+      // WRH-80/AC-1/AC-3: seeds the modal's consolidated view before the
+      // first scan - the return button only ever opens this for a Primary
+      // (primaryWorkOrderIds gate), which is exactly what carries its own
+      // `supplementaries` in the active-work-orders list. Every scan
+      // response after this replaces returnSession wholesale with the
+      // backend's own fresh supplementaries, so this initial value only
+      // matters for the very first render.
+      supplementaries:
+        activeWorkOrders?.find((primary) => primary.id === workOrder.id)?.supplementaries ?? [],
     });
     resetReturnForm({ serial_number: '' });
     setReturnErrorParams({});
@@ -570,9 +579,10 @@ export function WorkOrdersPage() {
         }
         const serialErrors = getFieldErrorMessages(error, 'serial_number');
         const statusErrors = getFieldErrorMessages(error, 'status');
+        const workOrderErrors = getFieldErrorMessages(error, 'work_order');
         setReturnErrorParams({});
 
-        const rejection = classifyReturnRejection(serialErrors, statusErrors);
+        const rejection = classifyReturnRejection(serialErrors, statusErrors, workOrderErrors);
         if (rejection) {
           setReturnErrorParams(rejection.params ?? {});
           setReturnError('serial_number', { type: 'server', message: rejection.messageKey });
@@ -629,6 +639,17 @@ export function WorkOrdersPage() {
           setReturnBoxError('box_code', {
             type: 'server',
             message: 'workOrders.return.boxReturnGenericError',
+          });
+          return;
+        }
+        // WRH-80/AC-4: same defense-in-depth case as the single-item return
+        // effect above - unreachable via the UI (the modal only opens for a
+        // Primary row), but a real message if hit anyway.
+        const workOrderErrors = getFieldErrorMessages(error, 'work_order');
+        if (workOrderErrors.length > 0) {
+          setReturnBoxError('box_code', {
+            type: 'server',
+            message: 'workOrders.return.supplementaryError',
           });
         }
       },
@@ -902,7 +923,13 @@ export function WorkOrdersPage() {
                     {t('workOrders.downloadPackingListButton')}
                   </Menu.Item>
                 )}
-                {isReturnEligible(record.status) && (
+                {/* WRH-80/AC-1/AC-2: return is only ever initiated from a
+                    Primary - a supplementary's items are returned as part
+                    of its Primary's consolidated flow, not on its own row.
+                    Transfer/Close stay unaffected (out of WRH-80's scope) -
+                    same primaryWorkOrderIds set the Add Supplementary item
+                    above already reads. */}
+                {isReturnEligible(record.status) && primaryWorkOrderIds.has(record.id) && (
                   <Menu.Item
                     key="return"
                     onClick={() => {
@@ -1419,6 +1446,29 @@ export function WorkOrdersPage() {
               columns={returnLineItemColumns}
               style={{ marginBottom: 16 }}
             />
+            {/* WRH-80/AC-1/AC-3: a return initiated on a Primary
+                consolidates every supplementary's items into this same
+                flow (see the backend's WorkOrderReturnSerializer.
+                supplementaries field) - each gets its own labeled summary
+                table beneath the Primary's, same returnLineItemColumns
+                shape, so a manager sees exactly what's been returned
+                across the whole Primary + supplementaries group without
+                leaving this modal. */}
+            {returnSession.supplementaries.map((supplementary) => (
+              <div key={supplementary.id} style={{ marginBottom: 16 }}>
+                <Typography.Text strong>
+                  {supplementary.reference} · {t(`workOrders.status.${supplementary.status}`)}
+                </Typography.Text>
+                <Table
+                  size="small"
+                  rowKey="id"
+                  pagination={false}
+                  dataSource={supplementary.line_items}
+                  columns={returnLineItemColumns}
+                  style={{ marginTop: 8 }}
+                />
+              </div>
+            ))}
             <Form layout="vertical" noValidate onFinish={handleReturnSubmit(onReturnSubmit)}>
               <Form.Item
                 label={t('workOrders.return.serialNumberLabel')}
