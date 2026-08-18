@@ -372,4 +372,32 @@ describe('WorkOrdersPage - active-derived actions', () => {
     await screen.findByText('Summer Gala');
     expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument();
   });
+
+  it('bounces a numeric but nonexistent :id back to the work orders list (WRH-70)', async () => {
+    // A syntactically valid id that 404s (stale bookmark, deleted WO)
+    // shouldn't leave the modal stuck open on just the error alert.
+    mockedApiClient.get.mockImplementation((url: string) => {
+      if (url === '/api/work-orders/active/') {
+        return Promise.resolve({ data: [makeActiveWorkOrder()] });
+      }
+      if (url === '/api/work-orders/') {
+        return Promise.resolve({ data: [makeWorkOrder({ status: 'fulfilled' })] });
+      }
+      if (url === '/api/product-types/') {
+        return Promise.resolve({ data: [makeProductType()] });
+      }
+      if (url === '/api/work-orders/999/') {
+        return Promise.reject({ isAxiosError: true, response: { status: 404, data: {} } });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    await renderWorkOrdersPage({ initialEntries: ['/work-orders/999'] });
+
+    await screen.findByText('Summer Gala');
+    // AntD keeps a closed Modal mounted (display: none) for its exit
+    // animation rather than unmounting it, so assert non-hidden absence
+    // (the open state) rather than querying with hidden: true.
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
 });

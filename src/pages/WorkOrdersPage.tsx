@@ -150,6 +150,15 @@ export function WorkOrdersPage() {
     isLoading: isDetailLoading,
     isError: isDetailError,
   } = useWorkOrderDetail(detailWorkOrderId);
+  useEffect(() => {
+    // A syntactically valid but nonexistent/inaccessible :id (stale
+    // bookmark, deleted WO) 404s - bounce back to the list the same way the
+    // non-numeric case above does, rather than leaving the modal stuck open
+    // on just the error alert with no way back.
+    if (detailWorkOrderId !== null && isDetailError) {
+      navigate(ROUTES.workOrders, { replace: true });
+    }
+  }, [detailWorkOrderId, isDetailError, navigate]);
   // WRH-79/AC-1/AC-6: shared history modal target for the WO detail's own
   // item rows.
   const { openHistoryItem, historyModalProps } = useItemHistoryModal();
