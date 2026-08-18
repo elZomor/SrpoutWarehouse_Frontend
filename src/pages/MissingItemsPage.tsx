@@ -48,14 +48,19 @@ export function MissingItemsPage() {
       title: t('missingItems.workOrderLabel'),
       dataIndex: 'work_order_reference',
       key: 'work_order_reference',
-      // TC-04: "clicking navigates to that WO" - WRH-75 merged the Work
-      // Orders page's Active/Manage tabs into one screen listing every WO
-      // regardless of status, so a closed WO (a missing item's WO is
-      // always closed - see backend's mark_found()/write_off() comment) is
-      // always reachable there now. No per-WO deep link/detail view exists
-      // yet, so this lands on the screen, not the exact row.
-      render: (value: string) =>
-        value ? <Link to={ROUTES.workOrders}>{value}</Link> : t('missingItems.noWorkOrder'),
+      // TC-04: "clicking navigates to that WO" - WRH-70 gave the Work
+      // Orders page a stable per-WO URL (/work-orders/:id), which opens
+      // that WO's own detail modal directly on load rather than just
+      // landing on the list (a closed WO - a missing item's WO is always
+      // closed, see backend's mark_found()/write_off() comment - is listed
+      // there regardless of status since WRH-75 merged the old Active/
+      // Manage tabs into one screen).
+      render: (value: string, record: MissingItem) =>
+        value && record.work_order_id !== null ? (
+          <Link to={ROUTES.workOrderDetailPath(record.work_order_id)}>{value}</Link>
+        ) : (
+          t('missingItems.noWorkOrder')
+        ),
     },
     {
       title: t('missingItems.dateMissingLabel'),

@@ -29,6 +29,7 @@ function App() {
           <Route path={ROUTES.boxes} element={<BoxesPage />} />
           <Route path={ROUTES.purchaseOrders} element={<PurchaseOrdersPage />} />
           <Route path={ROUTES.workOrders} element={<WorkOrdersPage />} />
+          <Route path={ROUTES.workOrderDetailPattern} element={<WorkOrdersPage />} />
           <Route path={ROUTES.missingItems} element={<MissingItemsPage />} />
           <Route path={ROUTES.damageReports} element={<DamageReportsPage />} />
           <Route path={ROUTES.maintenanceOrders} element={<MaintenanceOrdersPage />} />

@@ -316,4 +316,60 @@ describe('WorkOrdersPage - active-derived actions', () => {
     expect(within(dialog).getByText('SN-0001')).toBeInTheDocument();
     expect(within(dialog).getByText(/^out$|^خارج$/i)).toBeInTheDocument();
   }, 45000);
+
+  it('opens the exact work order detail view when navigated to its URL directly (WRH-70/AC-2)', async () => {
+    mockedApiClient.get.mockImplementation((url: string) => {
+      if (url === '/api/work-orders/active/') {
+        return Promise.resolve({ data: [makeActiveWorkOrder()] });
+      }
+      if (url === '/api/work-orders/') {
+        return Promise.resolve({ data: [makeWorkOrder({ status: 'fulfilled' })] });
+      }
+      if (url === '/api/product-types/') {
+        return Promise.resolve({ data: [makeProductType()] });
+      }
+      if (url === '/api/work-orders/1/') {
+        return Promise.resolve({
+          data: {
+            id: 1,
+            reference: 'WO-1',
+            job_name: 'Summer Gala',
+            client_name: 'Acme Events',
+            expected_date_out: '2026-08-01',
+            status: 'fulfilled',
+            created_by: 1,
+            created_by_username: 'jane',
+            parent_work_order: null,
+            line_items: [
+              {
+                id: 1,
+                product_type: 1,
+                product_type_name: 'Bar LED Model A',
+                quantity: 1,
+                serialized_items: [{ id: 1, serial_number: 'SN-0001', status: 'out' }],
+              },
+            ],
+          },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    await renderWorkOrdersPage({ initialEntries: ['/work-orders/1'] });
+
+    await screen.findByRole('dialog', { hidden: true });
+    expect(await screen.findByText('SN-0001')).toBeInTheDocument();
+  }, 45000);
+
+  it('bounces a non-numeric :id back to the work orders list (WRH-70)', async () => {
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: 'fulfilled' })],
+      activeWorkOrders: [makeActiveWorkOrder()],
+    });
+
+    await renderWorkOrdersPage({ initialEntries: ['/work-orders/not-a-number'] });
+
+    await screen.findByText('Summer Gala');
+    expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument();
+  });
 });

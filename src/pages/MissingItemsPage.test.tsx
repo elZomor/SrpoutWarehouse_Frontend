@@ -98,13 +98,24 @@ describe('MissingItemsPage', () => {
     expect(screen.getAllByText(/^missing$|^مفقود$/i)).toHaveLength(2);
   });
 
-  it('links the work order reference to the Work Orders page (TC-04)', async () => {
-    mockMissingItemsEndpoint([makeMissingItem()]);
+  it('links the work order reference straight to that WO detail view (TC-04)', async () => {
+    // WRH-70: the link now deep-links to the exact WO's own URL, not just
+    // the Work Orders list.
+    mockMissingItemsEndpoint([makeMissingItem({ work_order_id: 17 })]);
 
     renderMissingItemsPage();
 
     const link = await screen.findByRole('link', { name: 'WO-17' });
-    expect(link).toHaveAttribute('href', '/work-orders');
+    expect(link).toHaveAttribute('href', '/work-orders/17');
+  });
+
+  it('falls back to plain text (no link) when a missing item has no work order', async () => {
+    mockMissingItemsEndpoint([makeMissingItem({ work_order_id: null, work_order_reference: '' })]);
+
+    renderMissingItemsPage();
+
+    await screen.findByText('SN-042');
+    expect(screen.queryByRole('link', { name: /^WO-/ })).not.toBeInTheDocument();
   });
 
   it('combines multiple missing items into one list (TC-05)', async () => {
