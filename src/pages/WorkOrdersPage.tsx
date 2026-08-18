@@ -24,8 +24,8 @@ import dayjs from 'dayjs';
 import { useEffect, useMemo, useRef, useState, type Key } from 'react';
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { ItemHistoryModal } from '../components/ItemHistoryModal';
-import { itemHistoryRowProps, type ItemHistoryTarget } from '../components/itemHistoryRow';
+import { ItemHistoryModal, type ItemHistoryTarget } from '../components/ItemHistoryModal';
+import { clickableRowProps } from '../lib/clickableRow';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
   buildActiveWorkOrderLookup,
@@ -1142,7 +1142,7 @@ export function WorkOrdersPage() {
             dataSource={detailRows}
             locale={{ emptyText: t('workOrders.detail.emptyState') }}
             onRow={(record) =>
-              itemHistoryRowProps(
+              clickableRowProps(
                 record,
                 (item) => ({
                   serial_number: item.serial_number,

@@ -17,8 +17,8 @@ import {
 import axios from 'axios';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { ItemHistoryModal } from '../components/ItemHistoryModal';
-import { itemHistoryRowProps, type ItemHistoryTarget } from '../components/itemHistoryRow';
+import { ItemHistoryModal, type ItemHistoryTarget } from '../components/ItemHistoryModal';
+import { clickableRowProps } from '../lib/clickableRow';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
   getSerializedItemStatusColor,
@@ -255,7 +255,7 @@ export function SerializedItemsPage() {
           loading={isLoading}
           locale={{ emptyText: t('serializedItems.emptyState') }}
           onRow={(record) =>
-            itemHistoryRowProps(
+            clickableRowProps(
               record,
               (item) => ({
                 serial_number: item.serial_number,

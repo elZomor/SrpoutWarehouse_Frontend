@@ -1,10 +1,10 @@
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useRef, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Form, Input, Modal, Select, Spin, Table, Typography } from 'antd';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { ItemHistoryModal } from '../components/ItemHistoryModal';
-import { itemHistoryRowProps, type ItemHistoryTarget } from '../components/itemHistoryRow';
+import { ItemHistoryModal, type ItemHistoryTarget } from '../components/ItemHistoryModal';
+import { clickableRowProps } from '../lib/clickableRow';
 import { classifyItemRejection, type ItemRejection } from '../features/boxes/logic';
 import { boxSchema, type BoxFormValues } from '../features/boxes/schema';
 import { printBoxLabel } from '../features/boxes/printLabel';
@@ -176,35 +176,16 @@ export function BoxesPage() {
           dataSource={boxes}
           loading={isLoading}
           locale={{ emptyText: t('boxes.emptyState') }}
-          onRow={(record) => ({
-            onClick: () => {
-              setDetailBox(record);
-              setIsDetailOpen(true);
-            },
-            // Keyboard/screen-reader equivalent of the mouse-only onClick
-            // above - a plain onRow onClick has no focus/activation path
-            // otherwise.
-            onKeyDown: (event: KeyboardEvent) => {
-              // Only react when the row itself is the key's target, not a
-              // bubbled keydown from a nested interactive element (e.g. the
-              // Print QR button) - otherwise pressing Enter/Space on that
-              // button both prints the QR and opens the detail modal,
-              // while a mouse click on it only does the former.
-              if (
-                (event.key === 'Enter' || event.key === ' ') &&
-                event.target === event.currentTarget
-              ) {
-                event.preventDefault();
-                setDetailBox(record);
+          onRow={(record) =>
+            clickableRowProps(
+              record,
+              (box) => box,
+              (box) => {
+                setDetailBox(box);
                 setIsDetailOpen(true);
-              }
-            },
-            // Not role="button" - that would clobber the row's own
-            // semantic "row" role inside the table and break the row/cell
-            // accessible-name computation table libraries rely on.
-            tabIndex: 0,
-            style: { cursor: 'pointer' },
-          })}
+              },
+            )
+          }
         />
       )}
       <Modal
@@ -242,7 +223,7 @@ export function BoxesPage() {
             dataSource={boxDetail?.items}
             locale={{ emptyText: t('boxes.detail.emptyState') }}
             onRow={(record) =>
-              itemHistoryRowProps(
+              clickableRowProps(
                 record,
                 (item) => ({
                   serial_number: item.serial_number,

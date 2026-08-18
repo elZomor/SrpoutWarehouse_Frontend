@@ -1,23 +1,18 @@
 import type { KeyboardEvent } from 'react';
 
-export interface ItemHistoryTarget {
-  serial_number: string;
-  product_type_name: string;
-  status: string;
-}
-
-// WRH-79/code-review: the onClick + Enter/Space-keydown + tabIndex +
-// cursor-style wiring below was duplicated near-verbatim across
-// SerializedItemsPage, BoxesPage, and WorkOrdersPage's item-row Tables -
-// factored out here so a future fix to this interaction only needs to land
-// once. Matches BoxesPage's own pre-existing row/keydown pattern for its
-// box-list rows. Split out of ItemHistoryModal.tsx (its only consumer)
-// rather than colocated there, since a component file may only export
-// components (react-refresh/only-export-components).
-export function itemHistoryRowProps<T>(
+// WRH-79/code-review: this onClick + Enter/Space-keydown + tabIndex +
+// cursor-style wiring was duplicated near-verbatim across every AntD
+// `Table.onRow` in this repo that opens something on row click
+// (SerializedItemsPage/BoxesPage/WorkOrdersPage's item-history rows, and
+// BoxesPage's own pre-existing box-list row that opens the box detail
+// modal) - factored out here, generic over the row record type and the
+// value passed to `onOpen`, so a future fix to this interaction only needs
+// to land once. Not colocated in a component file, since a component file
+// may only export components (react-refresh/only-export-components).
+export function clickableRowProps<T, R>(
   record: T,
-  toTarget: (record: T) => ItemHistoryTarget,
-  onOpen: (target: ItemHistoryTarget) => void,
+  toTarget: (record: T) => R,
+  onOpen: (target: R) => void,
 ) {
   const open = () => onOpen(toTarget(record));
   return {
