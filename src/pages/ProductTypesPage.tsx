@@ -77,7 +77,6 @@ export function ProductTypesPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     reset();
-    createMutation.reset();
   };
 
   const onSubmit = (values: ProductTypeFormValues) => {

@@ -93,7 +93,6 @@ export function MaintenanceOrdersPage() {
     setIsModalOpen(false);
     reset();
     setItemRejection(null);
-    createMutation.reset();
   };
 
   const onSubmit = (values: MaintenanceOrderFormValues) => {

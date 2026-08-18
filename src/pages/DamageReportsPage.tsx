@@ -35,7 +35,6 @@ export function DamageReportsPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     reset();
-    createMutation.reset();
   };
 
   const onSubmit = (values: DamageReportFormValues) => {

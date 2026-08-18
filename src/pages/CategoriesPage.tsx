@@ -22,17 +22,9 @@ interface CategoryFieldProps {
   control: Control<CategoryFormValues>;
   error?: FieldError;
   multiline?: boolean;
-  onValueChange?: () => void;
 }
 
-function CategoryField({
-  name,
-  label,
-  control,
-  error,
-  multiline,
-  onValueChange,
-}: CategoryFieldProps) {
+function CategoryField({ name, label, control, error, multiline }: CategoryFieldProps) {
   const { t } = useTranslation();
 
   return (
@@ -45,17 +37,13 @@ function CategoryField({
       <Controller
         name={name}
         control={control}
-        render={({ field }) => {
-          const handleChange: typeof field.onChange = (...args) => {
-            field.onChange(...args);
-            onValueChange?.();
-          };
-          return multiline ? (
-            <Input.TextArea {...field} onChange={handleChange} id={`category-${name}`} />
+        render={({ field }) =>
+          multiline ? (
+            <Input.TextArea {...field} id={`category-${name}`} />
           ) : (
-            <Input {...field} onChange={handleChange} id={`category-${name}`} />
-          );
-        }}
+            <Input {...field} id={`category-${name}`} />
+          )
+        }
       />
     </Form.Item>
   );
@@ -91,7 +79,6 @@ export function CategoriesPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     reset();
-    createMutation.reset();
   };
 
   const onSubmit = (values: CategoryFormValues) => {

@@ -83,7 +83,6 @@ export function SerializedItemsPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     reset();
-    createMutation.reset();
   };
 
   const onSubmit = (values: SerializedItemFormValues) => {

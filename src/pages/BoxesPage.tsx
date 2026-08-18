@@ -91,7 +91,6 @@ export function BoxesPage() {
     setIsModalOpen(false);
     reset();
     setItemRejection(null);
-    createMutation.reset();
   };
 
   const onSubmit = (values: BoxFormValues) => {

@@ -88,7 +88,6 @@ export function PurchaseOrdersPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     reset();
-    createMutation.reset();
   };
 
   const onSubmit = (values: PurchaseOrderFormValues) => {

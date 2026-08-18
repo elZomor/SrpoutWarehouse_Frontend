@@ -345,7 +345,6 @@ export function WorkOrdersPage() {
     setIsModalOpen(false);
     setSupplementaryParent(null);
     reset();
-    createMutation.reset();
   };
 
   const openCreateModal = () => {
