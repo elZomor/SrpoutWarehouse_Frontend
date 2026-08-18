@@ -219,11 +219,6 @@ export function CategoriesPage() {
             label={t('categories.nameLabel')}
             control={control}
             error={errors.name}
-            onValueChange={() => {
-              if (createMutation.isError) {
-                createMutation.reset();
-              }
-            }}
           />
           <CategoryField
             name="description"
