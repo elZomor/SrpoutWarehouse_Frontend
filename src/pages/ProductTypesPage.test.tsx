@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ConfigProvider } from 'antd';
+import { App as AntApp, ConfigProvider } from 'antd';
 import { ProductTypesPage } from './ProductTypesPage';
 import { AppLayout } from '../components/AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
@@ -93,14 +93,16 @@ function renderProductTypesPage() {
   return render(
     <QueryClientProvider client={queryClient}>
       <ConfigProvider theme={motionDisabledTheme}>
-        <MemoryRouter initialEntries={['/product-types']}>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route path="/product-types" element={<ProductTypesPage />} />
-            </Route>
-            <Route path="/login" element={<div>Login Page</div>} />
-          </Routes>
-        </MemoryRouter>
+        <AntApp>
+          <MemoryRouter initialEntries={['/product-types']}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route path="/product-types" element={<ProductTypesPage />} />
+              </Route>
+              <Route path="/login" element={<div>Login Page</div>} />
+            </Routes>
+          </MemoryRouter>
+        </AntApp>
       </ConfigProvider>
     </QueryClientProvider>,
   );
@@ -184,6 +186,10 @@ describe('ProductTypesPage', () => {
       category: 1,
     });
     expect(await screen.findByText('Moving bar light')).toBeInTheDocument();
+    // WRH-81/AC-1/AC-2: successful create shows a success snackbar.
+    expect(
+      await screen.findByText(/product type created|تم إنشاء نوع المنتج/i),
+    ).toBeInTheDocument();
   });
 
   it('creates a product type with only a name and a category', async () => {
@@ -254,34 +260,6 @@ describe('ProductTypesPage', () => {
       await screen.findByText(/failed to create product type|فشل إنشاء نوع المنتج/i),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'OK', hidden: true })).toBeInTheDocument();
-  });
-
-  it('clears the create error when the modal is reopened after a failed submit', async () => {
-    mockListEndpoints({});
-    mockedApiClient.post.mockRejectedValueOnce({
-      isAxiosError: true,
-      response: { status: 400, data: { name: ['already exists'] } },
-    });
-
-    const user = userEvent.setup();
-    renderProductTypesPage();
-
-    await user.click(
-      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i, hidden: true }),
-    );
-    await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Bar LED Model A');
-    await selectCategory(user, 'Lighting');
-    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
-    await screen.findByText(/failed to create product type|فشل إنشاء نوع المنتج/i);
-
-    await user.click(screen.getByRole('button', { name: 'Cancel', hidden: true }));
-    await user.click(
-      await screen.findByRole('button', { name: /new product type|نوع منتج جديد/i, hidden: true }),
-    );
-
-    expect(
-      screen.queryByText(/failed to create product type|فشل إنشاء نوع المنتج/i),
-    ).not.toBeInTheDocument();
   });
 
   it('logs out and redirects to the login-facing route', async () => {

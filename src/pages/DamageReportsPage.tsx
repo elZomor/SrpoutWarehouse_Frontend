@@ -1,9 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, App, Button, Form, Input, Modal, Table, Typography } from 'antd';
+import { Alert, Button, Form, Input, Modal, Table, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
+import { useApiFeedback } from '../hooks/useApiFeedback';
 import { resolveDamageReportSerialErrorKey } from '../features/damage-reports/logic';
 import { damageReportSchema, type DamageReportFormValues } from '../features/damage-reports/schema';
 import type { DamageReport } from '../features/damage-reports/types';
@@ -15,7 +16,7 @@ import { getFieldErrorMessages } from '../lib/apiErrors';
 
 export function DamageReportsPage() {
   const { t } = useTranslation();
-  const { message } = App.useApp();
+  const { notifySuccess, notifyError } = useApiFeedback();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { data: damageReports, isLoading, isError: isListError } = useDamageReports();
   const createMutation = useCreateDamageReport();
@@ -34,13 +35,12 @@ export function DamageReportsPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     reset();
-    createMutation.reset();
   };
 
   const onSubmit = (values: DamageReportFormValues) => {
     createMutation.mutate(values, {
       onSuccess: (report) => {
-        message.success(t('damageReports.createSuccess', { reference: report.reference }));
+        notifySuccess(t('damageReports.createSuccess', { reference: report.reference }));
         closeModal();
       },
       onError: (error) => {
@@ -54,6 +54,8 @@ export function DamageReportsPage() {
         );
         if (messageKey) {
           setError('serial_number', { type: 'server', message: messageKey });
+        } else {
+          notifyError(t('damageReports.createError'));
         }
       },
     });
@@ -151,11 +153,6 @@ export function DamageReportsPage() {
               render={({ field }) => <Input.TextArea {...field} id="damage-report-note" rows={3} />}
             />
           </Form.Item>
-          {createMutation.isError && !errors.serial_number && (
-            <Form.Item>
-              <Alert type="error" message={t('damageReports.createError')} showIcon />
-            </Form.Item>
-          )}
         </Form>
       </Modal>
     </>

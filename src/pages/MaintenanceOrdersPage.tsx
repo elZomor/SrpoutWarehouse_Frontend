@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
-  App,
   Button,
   Form,
   Modal,
@@ -15,6 +14,7 @@ import {
 } from 'antd';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { useApiFeedback } from '../hooks/useApiFeedback';
 import { classifyItemRejection, type ItemRejection } from '../features/maintenance-orders/logic';
 import {
   maintenanceOrderSchema,
@@ -43,7 +43,7 @@ const RESOLVABLE_ITEM_STATUS = 'in_maintenance';
 
 export function MaintenanceOrdersPage() {
   const { t } = useTranslation();
-  const { message } = App.useApp();
+  const { notifySuccess, notifyError } = useApiFeedback();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { data: maintenanceOrders, isLoading, isError: isListError } = useMaintenanceOrders();
   const createMutation = useCreateMaintenanceOrder();
@@ -93,20 +93,23 @@ export function MaintenanceOrdersPage() {
     setIsModalOpen(false);
     reset();
     setItemRejection(null);
-    createMutation.reset();
   };
 
   const onSubmit = (values: MaintenanceOrderFormValues) => {
     setItemRejection(null);
     createMutation.mutate(values, {
       onSuccess: (maintenanceOrder) => {
-        message.success(
+        notifySuccess(
           t('maintenanceOrders.createSuccess', { reference: maintenanceOrder.reference }),
         );
         closeModal();
       },
       onError: (error) => {
-        setItemRejection(classifyItemRejection(error));
+        const rejection = classifyItemRejection(error);
+        setItemRejection(rejection);
+        if (!rejection) {
+          notifyError(t('maintenanceOrders.createError'));
+        }
       },
     });
   };
@@ -132,8 +135,8 @@ export function MaintenanceOrdersPage() {
     return resolveMutation
       .mutateAsync({ maintenanceOrderId, itemId, resolution })
       .then(
-        () => message.success(t('maintenanceOrders.items.resolveSuccess')),
-        () => message.error(t('maintenanceOrders.items.resolveError')),
+        () => notifySuccess(t('maintenanceOrders.items.resolveSuccess')),
+        () => notifyError(t('maintenanceOrders.items.resolveError')),
       )
       .finally(() => {
         setPendingItemIds((current) => {
@@ -307,15 +310,11 @@ export function MaintenanceOrdersPage() {
               <Alert type="error" message={t('maintenanceOrders.loadItemsError')} showIcon />
             </Form.Item>
           )}
-          {createMutation.isError && (
+          {itemRejection && (
             <Form.Item>
               <Alert
                 type="error"
-                message={
-                  itemRejection
-                    ? t(itemRejection.messageKey, itemRejection.params)
-                    : t('maintenanceOrders.createError')
-                }
+                message={t(itemRejection.messageKey, itemRejection.params)}
                 showIcon
               />
             </Form.Item>

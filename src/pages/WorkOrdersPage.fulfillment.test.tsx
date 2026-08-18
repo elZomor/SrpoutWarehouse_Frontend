@@ -194,6 +194,10 @@ describe('WorkOrdersPage - fulfillment', () => {
 
     expect(mockedApiClient.post).toHaveBeenCalledWith(`/api/work-orders/${workOrder.id}/start/`);
     expect(await screen.findByText(/^in progress$|^قيد التنفيذ$/i)).toBeInTheDocument();
+    // WRH-81/AC-1/AC-2: successful update shows a success snackbar.
+    expect(
+      await screen.findByText(/work order started|تم بدء تنفيذ أمر العمل/i),
+    ).toBeInTheDocument();
   });
 
   it('invalidates the active-work-orders lookup after starting a WO', async () => {
@@ -354,6 +358,8 @@ describe('WorkOrdersPage - fulfillment', () => {
 
     expect(mockedApiClient.post).toHaveBeenCalledWith(`/api/work-orders/1/complete/`);
     expect(await screen.findByText(/^fulfilled$|^تم التنفيذ$/i)).toBeInTheDocument();
+    // WRH-81/AC-1/AC-2: successful update shows a success snackbar.
+    expect(await screen.findByText(/fulfillment completed|تم إتمام التنفيذ/i)).toBeInTheDocument();
   });
 
   it('shows a toast when completing fulfillment fails, keeping the modal open', async () => {

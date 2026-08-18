@@ -78,6 +78,8 @@ describe('WorkOrdersPage - create', () => {
       line_items: [{ product_type: 1, quantity: 5 }],
     });
     expect(await screen.findByText('Summer Gala')).toBeInTheDocument();
+    // WRH-81/AC-1/AC-2: successful create shows a success snackbar.
+    expect(await screen.findByText(/work order created|تم إنشاء أمر العمل/i)).toBeInTheDocument();
   });
 
   it('creates a work order without a client name', async () => {

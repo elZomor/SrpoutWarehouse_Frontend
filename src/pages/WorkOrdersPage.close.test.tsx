@@ -93,6 +93,8 @@ describe('WorkOrdersPage - close', () => {
     await waitFor(() =>
       expect(mockedApiClient.post).toHaveBeenCalledWith(`/api/work-orders/${workOrder.id}/close/`),
     );
+    // WRH-81/AC-1/AC-2: successful update shows a success snackbar.
+    expect(await screen.findByText(/work order closed|تم إغلاق أمر العمل/i)).toBeInTheDocument();
   });
 
   it('shows a plain confirmation with no warning when nothing is still out', async () => {

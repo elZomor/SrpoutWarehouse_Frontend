@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, App, Button, Form, Input, Modal, Popconfirm, Space, Table, Typography } from 'antd';
+import { Alert, Button, Form, Input, Modal, Popconfirm, Space, Table, Typography } from 'antd';
 import { Controller, type Control, type FieldError, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { useApiFeedback } from '../hooks/useApiFeedback';
 import { getAssignedProductTypeCount, isDuplicateNameError } from '../features/categories/logic';
 import { categorySchema, type CategoryFormValues } from '../features/categories/schema';
 import type { Category } from '../features/categories/types';
@@ -21,17 +22,9 @@ interface CategoryFieldProps {
   control: Control<CategoryFormValues>;
   error?: FieldError;
   multiline?: boolean;
-  onValueChange?: () => void;
 }
 
-function CategoryField({
-  name,
-  label,
-  control,
-  error,
-  multiline,
-  onValueChange,
-}: CategoryFieldProps) {
+function CategoryField({ name, label, control, error, multiline }: CategoryFieldProps) {
   const { t } = useTranslation();
 
   return (
@@ -44,17 +37,13 @@ function CategoryField({
       <Controller
         name={name}
         control={control}
-        render={({ field }) => {
-          const handleChange: typeof field.onChange = (...args) => {
-            field.onChange(...args);
-            onValueChange?.();
-          };
-          return multiline ? (
-            <Input.TextArea {...field} onChange={handleChange} id={`category-${name}`} />
+        render={({ field }) =>
+          multiline ? (
+            <Input.TextArea {...field} id={`category-${name}`} />
           ) : (
-            <Input {...field} onChange={handleChange} id={`category-${name}`} />
-          );
-        }}
+            <Input {...field} id={`category-${name}`} />
+          )
+        }
       />
     </Form.Item>
   );
@@ -62,7 +51,7 @@ function CategoryField({
 
 export function CategoriesPage() {
   const { t } = useTranslation();
-  const { message } = App.useApp();
+  const { notifySuccess, notifyError } = useApiFeedback();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -90,15 +79,19 @@ export function CategoriesPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     reset();
-    createMutation.reset();
   };
 
   const onSubmit = (values: CategoryFormValues) => {
     createMutation.mutate(values, {
-      onSuccess: closeModal,
+      onSuccess: () => {
+        notifySuccess(t('categories.createSuccess'));
+        closeModal();
+      },
       onError: (error) => {
         if (isDuplicateNameError(error)) {
           setError('name', { type: 'server', message: 'categories.form.nameDuplicate' });
+        } else {
+          notifyError(t('categories.createError'));
         }
       },
     });
@@ -106,13 +99,13 @@ export function CategoriesPage() {
 
   const handleDelete = (id: number) => {
     deleteMutation.mutate(id, {
-      onSuccess: () => message.success(t('categories.deleteSuccess')),
+      onSuccess: () => notifySuccess(t('categories.deleteSuccess')),
       onError: (error) => {
         // AC-3: build the blocked-delete message from the backend's count
         // rather than showing its (English-only) `detail` text as-is, so
         // it's properly translated/pluralized in both AR and EN.
         const assignedCount = getAssignedProductTypeCount(error);
-        message.error(
+        notifyError(
           assignedCount != null
             ? t('categories.deleteBlockedError', { count: assignedCount })
             : t('categories.deleteError'),
@@ -123,8 +116,8 @@ export function CategoriesPage() {
 
   const handleArchive = (id: number) => {
     archiveMutation.mutate(id, {
-      onSuccess: () => message.success(t('categories.archiveSuccess')),
-      onError: () => message.error(t('categories.archiveError')),
+      onSuccess: () => notifySuccess(t('categories.archiveSuccess')),
+      onError: () => notifyError(t('categories.archiveError')),
     });
   };
 
@@ -213,11 +206,6 @@ export function CategoriesPage() {
             label={t('categories.nameLabel')}
             control={control}
             error={errors.name}
-            onValueChange={() => {
-              if (createMutation.isError) {
-                createMutation.reset();
-              }
-            }}
           />
           <CategoryField
             name="description"
@@ -225,11 +213,6 @@ export function CategoriesPage() {
             control={control}
             multiline
           />
-          {createMutation.isError && !errors.name && (
-            <Form.Item>
-              <Alert type="error" message={t('categories.createError')} showIcon />
-            </Form.Item>
-          )}
         </Form>
       </Modal>
     </>
