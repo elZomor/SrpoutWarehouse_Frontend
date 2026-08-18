@@ -186,6 +186,8 @@ describe('SerializedItemsPage', () => {
     });
     expect(await screen.findByText('SN-042')).toBeInTheDocument();
     expect(screen.getByText(/available|متاح/i)).toBeInTheDocument();
+    // WRH-81/AC-1/AC-2: successful create shows a success snackbar.
+    expect(await screen.findByText(/item registered|تم تسجيل الوحدة/i)).toBeInTheDocument();
   });
 
   // "opens a print window with the QR image, serial number and product

@@ -18,6 +18,7 @@ import dayjs from 'dayjs';
 import { useState } from 'react';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { useApiFeedback } from '../hooks/useApiFeedback';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
   classifyReceiveRejection,
@@ -42,6 +43,7 @@ const EMPTY_LINE_ITEM = { product_type: undefined, expected_quantity: undefined 
 
 export function PurchaseOrdersPage() {
   const { t } = useTranslation();
+  const { notifySuccess, notifyError } = useApiFeedback();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [receivingPurchaseOrderId, setReceivingPurchaseOrderId] = useState<number | null>(null);
   const { data: purchaseOrders, isLoading, isError: isListError } = usePurchaseOrders();
@@ -90,7 +92,13 @@ export function PurchaseOrdersPage() {
   };
 
   const onSubmit = (values: PurchaseOrderFormValues) => {
-    createMutation.mutate(values, { onSuccess: closeModal });
+    createMutation.mutate(values, {
+      onSuccess: () => {
+        notifySuccess(t('purchaseOrders.createSuccess'));
+        closeModal();
+      },
+      onError: () => notifyError(t('purchaseOrders.createError')),
+    });
   };
 
   const openReceiveModal = (purchaseOrder: PurchaseOrder) => {
@@ -339,11 +347,6 @@ export function PurchaseOrdersPage() {
           {isProductTypesError && (
             <Form.Item>
               <Alert type="error" message={t('purchaseOrders.loadProductTypesError')} showIcon />
-            </Form.Item>
-          )}
-          {createMutation.isError && (
-            <Form.Item>
-              <Alert type="error" message={t('purchaseOrders.createError')} showIcon />
             </Form.Item>
           )}
         </Form>

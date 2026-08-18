@@ -214,6 +214,8 @@ describe('BoxesPage', () => {
       item_ids: [1],
     });
     expect(await screen.findByText('BX-001')).toBeInTheDocument();
+    // WRH-81/AC-1/AC-2: successful create shows a success snackbar.
+    expect(await screen.findByText(/box registered|تم تسجيل الصندوق/i)).toBeInTheDocument();
   });
 
   it('opens a print window with the QR image and box code when Print QR is clicked', async () => {

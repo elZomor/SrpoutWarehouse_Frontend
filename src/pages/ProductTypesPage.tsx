@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Form, Input, Modal, Select, Table, Typography } from 'antd';
 import { Controller, type Control, type FieldError, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { useApiFeedback } from '../hooks/useApiFeedback';
 import { useCategories } from '../features/categories/useCategories';
 import { productTypeSchema, type ProductTypeFormValues } from '../features/product-types/schema';
 import type { ProductType } from '../features/product-types/types';
@@ -45,6 +46,7 @@ function ProductTypeField({ name, label, control, error, multiline }: ProductTyp
 
 export function ProductTypesPage() {
   const { t } = useTranslation();
+  const { notifySuccess, notifyError } = useApiFeedback();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,7 +81,13 @@ export function ProductTypesPage() {
   };
 
   const onSubmit = (values: ProductTypeFormValues) => {
-    createMutation.mutate(values, { onSuccess: closeModal });
+    createMutation.mutate(values, {
+      onSuccess: () => {
+        notifySuccess(t('productTypes.createSuccess'));
+        closeModal();
+      },
+      onError: () => notifyError(t('productTypes.createError')),
+    });
   };
 
   const columns = [
@@ -182,11 +190,6 @@ export function ProductTypesPage() {
           {isCategoriesError && (
             <Form.Item>
               <Alert type="error" message={t('productTypes.loadCategoriesError')} showIcon />
-            </Form.Item>
-          )}
-          {createMutation.isError && (
-            <Form.Item>
-              <Alert type="error" message={t('productTypes.createError')} showIcon />
             </Form.Item>
           )}
         </Form>

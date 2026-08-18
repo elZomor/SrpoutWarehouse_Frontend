@@ -261,6 +261,10 @@ describe('PurchaseOrdersPage', () => {
       line_items: [{ product_type: 1, expected_quantity: 5 }],
     });
     expect(await screen.findByText('Acme Lighting Co')).toBeInTheDocument();
+    // WRH-81/AC-1/AC-2: successful create shows a success snackbar.
+    expect(
+      await screen.findByText(/purchase order created|تم إنشاء أمر الشراء/i),
+    ).toBeInTheDocument();
   });
 
   it('creates a purchase order with multiple line items', async () => {

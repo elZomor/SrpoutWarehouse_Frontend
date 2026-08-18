@@ -1,7 +1,8 @@
-import { Alert, App, Button, Popconfirm, Space, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Popconfirm, Space, Table, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { useApiFeedback } from '../hooks/useApiFeedback';
 import { getSerializedItemStatusColor } from '../features/serialized-items/logic';
 import {
   useMarkMissingItemFound,
@@ -13,22 +14,22 @@ import { ROUTES } from '../routes';
 
 export function MissingItemsPage() {
   const { t } = useTranslation();
-  const { message } = App.useApp();
+  const { notifySuccess, notifyError } = useApiFeedback();
   const { data: missingItems, isLoading, isError } = useMissingItems();
   const markFoundMutation = useMarkMissingItemFound();
   const writeOffMutation = useWriteOffMissingItem();
 
   const handleMarkFound = (id: number) => {
     markFoundMutation.mutate(id, {
-      onSuccess: () => message.success(t('missingItems.markFoundSuccess')),
-      onError: () => message.error(t('missingItems.markFoundError')),
+      onSuccess: () => notifySuccess(t('missingItems.markFoundSuccess')),
+      onError: () => notifyError(t('missingItems.markFoundError')),
     });
   };
 
   const handleWriteOff = (id: number) => {
     writeOffMutation.mutate(id, {
-      onSuccess: () => message.success(t('missingItems.writeOffSuccess')),
-      onError: () => message.error(t('missingItems.writeOffError')),
+      onSuccess: () => notifySuccess(t('missingItems.writeOffSuccess')),
+      onError: () => notifyError(t('missingItems.writeOffError')),
     });
   };
 

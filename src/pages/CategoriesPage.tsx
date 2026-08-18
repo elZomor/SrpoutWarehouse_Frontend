@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, App, Button, Form, Input, Modal, Popconfirm, Space, Table, Typography } from 'antd';
+import { Alert, Button, Form, Input, Modal, Popconfirm, Space, Table, Typography } from 'antd';
 import { Controller, type Control, type FieldError, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { useApiFeedback } from '../hooks/useApiFeedback';
 import { getAssignedProductTypeCount, isDuplicateNameError } from '../features/categories/logic';
 import { categorySchema, type CategoryFormValues } from '../features/categories/schema';
 import type { Category } from '../features/categories/types';
@@ -62,7 +63,7 @@ function CategoryField({
 
 export function CategoriesPage() {
   const { t } = useTranslation();
-  const { message } = App.useApp();
+  const { notifySuccess, notifyError } = useApiFeedback();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -95,10 +96,15 @@ export function CategoriesPage() {
 
   const onSubmit = (values: CategoryFormValues) => {
     createMutation.mutate(values, {
-      onSuccess: closeModal,
+      onSuccess: () => {
+        notifySuccess(t('categories.createSuccess'));
+        closeModal();
+      },
       onError: (error) => {
         if (isDuplicateNameError(error)) {
           setError('name', { type: 'server', message: 'categories.form.nameDuplicate' });
+        } else {
+          notifyError(t('categories.createError'));
         }
       },
     });
@@ -106,13 +112,13 @@ export function CategoriesPage() {
 
   const handleDelete = (id: number) => {
     deleteMutation.mutate(id, {
-      onSuccess: () => message.success(t('categories.deleteSuccess')),
+      onSuccess: () => notifySuccess(t('categories.deleteSuccess')),
       onError: (error) => {
         // AC-3: build the blocked-delete message from the backend's count
         // rather than showing its (English-only) `detail` text as-is, so
         // it's properly translated/pluralized in both AR and EN.
         const assignedCount = getAssignedProductTypeCount(error);
-        message.error(
+        notifyError(
           assignedCount != null
             ? t('categories.deleteBlockedError', { count: assignedCount })
             : t('categories.deleteError'),
@@ -123,8 +129,8 @@ export function CategoriesPage() {
 
   const handleArchive = (id: number) => {
     archiveMutation.mutate(id, {
-      onSuccess: () => message.success(t('categories.archiveSuccess')),
-      onError: () => message.error(t('categories.archiveError')),
+      onSuccess: () => notifySuccess(t('categories.archiveSuccess')),
+      onError: () => notifyError(t('categories.archiveError')),
     });
   };
 
@@ -225,11 +231,6 @@ export function CategoriesPage() {
             control={control}
             multiline
           />
-          {createMutation.isError && !errors.name && (
-            <Form.Item>
-              <Alert type="error" message={t('categories.createError')} showIcon />
-            </Form.Item>
-          )}
         </Form>
       </Modal>
     </>

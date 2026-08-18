@@ -116,6 +116,8 @@ describe('CategoriesPage', () => {
       description: 'Moving lights and fixtures',
     });
     expect(await screen.findByText('Moving lights and fixtures')).toBeInTheDocument();
+    // WRH-81/AC-1/AC-2: successful create shows a success snackbar.
+    expect(await screen.findByText(/category created|تم إنشاء الفئة/i)).toBeInTheDocument();
   });
 
   it('creates a category with only a name', async () => {
@@ -207,7 +209,11 @@ describe('CategoriesPage', () => {
     );
   });
 
-  it('clears the generic create-failed banner when the modal is reopened after a failed submit', async () => {
+  it('shows a snackbar and keeps the modal open on an unclassified create failure', async () => {
+    // The generic create-failed feedback moved from a persistent inline
+    // banner tied to mutation.isError to a one-shot snackbar (WRH-81) - it
+    // no longer needs "clearing" on modal reopen/edit, since it isn't
+    // rendered from mutation state at all.
     mockedApiClient.get.mockResolvedValueOnce({ data: [] });
     mockedApiClient.post.mockRejectedValueOnce({
       isAxiosError: true,
@@ -222,46 +228,11 @@ describe('CategoriesPage', () => {
     );
     await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Lighting');
     await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
-    await screen.findByText(/failed to create category|فشل إنشاء الفئة/i);
-
-    await user.click(screen.getByRole('button', { name: 'Cancel', hidden: true }));
-    await user.click(
-      await screen.findByRole('button', { name: /new category|فئة جديدة/i, hidden: true }),
-    );
 
     expect(
-      screen.queryByText(/failed to create category|فشل إنشاء الفئة/i),
-    ).not.toBeInTheDocument();
-  });
-
-  it('clears the generic create-failed banner as soon as the name is edited, without closing the modal', async () => {
-    // Regression: React Hook Form re-validates on change, which can clear
-    // `errors.name` before the mutation's own error state is reset - if the
-    // mutation error isn't cleared too, the generic banner flashes back on
-    // the very next keystroke even though nothing has been resubmitted yet.
-    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
-    mockedApiClient.post.mockRejectedValueOnce({
-      isAxiosError: true,
-      response: { status: 500, data: {} },
-    });
-
-    const user = userEvent.setup();
-    renderCategoriesPage();
-
-    await user.click(
-      await screen.findByRole('button', { name: /new category|فئة جديدة/i, hidden: true }),
-    );
-    await user.type(screen.getByLabelText(/^name$|^الاسم$/i), 'Lighting');
-    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
-    await screen.findByText(/failed to create category|فشل إنشاء الفئة/i);
-
-    await user.type(screen.getByLabelText(/^name$|^الاسم$/i), ' Fixtures');
-
-    await waitFor(() =>
-      expect(
-        screen.queryByText(/failed to create category|فشل إنشاء الفئة/i),
-      ).not.toBeInTheDocument(),
-    );
+      await screen.findByText(/failed to create category|فشل إنشاء الفئة/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'OK', hidden: true })).toBeInTheDocument();
   });
 
   it('logs out and redirects to the login-facing route', async () => {

@@ -5,6 +5,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ItemHistoryModal } from '../components/ItemHistoryModal';
 import { useItemHistoryModal } from '../components/useItemHistoryModal';
+import { useApiFeedback } from '../hooks/useApiFeedback';
 import { clickableRowProps } from '../lib/clickableRow';
 import { classifyItemRejection, type ItemRejection } from '../features/boxes/logic';
 import { boxSchema, type BoxFormValues } from '../features/boxes/schema';
@@ -16,6 +17,7 @@ import { useSerializedItems } from '../features/serialized-items/useSerializedIt
 
 export function BoxesPage() {
   const { t } = useTranslation();
+  const { notifySuccess, notifyError } = useApiFeedback();
   const [isModalOpen, setIsModalOpen] = useState(false);
   // WRH-71/AC-1: the clicked row is kept only for its code (the detail
   // modal's title) - the items list itself comes from useBox's own fresh
@@ -95,9 +97,16 @@ export function BoxesPage() {
   const onSubmit = (values: BoxFormValues) => {
     setItemRejection(null);
     createMutation.mutate(values, {
-      onSuccess: closeModal,
+      onSuccess: () => {
+        notifySuccess(t('boxes.createSuccess'));
+        closeModal();
+      },
       onError: (error) => {
-        setItemRejection(classifyItemRejection(error));
+        const rejection = classifyItemRejection(error);
+        setItemRejection(rejection);
+        if (!rejection) {
+          notifyError(t('boxes.createError'));
+        }
       },
     });
   };
@@ -316,15 +325,11 @@ export function BoxesPage() {
               <Alert type="error" message={t('boxes.loadItemsError')} showIcon />
             </Form.Item>
           )}
-          {createMutation.isError && (
+          {itemRejection && (
             <Form.Item>
               <Alert
                 type="error"
-                message={
-                  itemRejection
-                    ? t(itemRejection.messageKey, itemRejection.params)
-                    : t('boxes.createError')
-                }
+                message={t(itemRejection.messageKey, itemRejection.params)}
                 showIcon
               />
             </Form.Item>

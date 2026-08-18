@@ -2,7 +2,6 @@ import { MinusCircleOutlined, MoreOutlined, PlusOutlined } from '@ant-design/ico
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
-  App,
   Button,
   DatePicker,
   Divider,
@@ -27,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ItemHistoryModal } from '../components/ItemHistoryModal';
 import { useItemHistoryModal } from '../components/useItemHistoryModal';
+import { useApiFeedback } from '../hooks/useApiFeedback';
 import { clickableRowProps } from '../lib/clickableRow';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
@@ -97,7 +97,7 @@ const BOX_AMBIGUOUS_LINE_ITEM_MESSAGE =
 
 export function WorkOrdersPage() {
   const { t } = useTranslation();
-  const { message } = App.useApp();
+  const { notifySuccess, notifyError } = useApiFeedback();
   // WRH-75: the Active/Managing tabs are gone - every WO lives in one
   // table, so only one row's kebab menu can be open at a time.
   const [openMenuRowId, setOpenMenuRowId] = useState<number | null>(null);
@@ -375,7 +375,7 @@ export function WorkOrdersPage() {
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 0);
       },
-      onError: () => message.error(t('workOrders.downloadPackingListError')),
+      onError: () => notifyError(t('workOrders.downloadPackingListError')),
     });
   };
 
@@ -383,7 +383,13 @@ export function WorkOrdersPage() {
     const payload = supplementaryParent
       ? { ...values, parent_work_order: supplementaryParent.id }
       : values;
-    createMutation.mutate(payload, { onSuccess: closeModal });
+    createMutation.mutate(payload, {
+      onSuccess: () => {
+        notifySuccess(t('workOrders.createSuccess'));
+        closeModal();
+      },
+      onError: () => notifyError(t('workOrders.createError')),
+    });
   };
 
   const openFulfillmentModal = (workOrder: WorkOrder) => {
@@ -501,8 +507,11 @@ export function WorkOrdersPage() {
       return;
     }
     completeMutation.mutate(fulfillingWorkOrderId, {
-      onSuccess: closeFulfillmentModal,
-      onError: () => message.error(t('workOrders.scan.completeError')),
+      onSuccess: () => {
+        notifySuccess(t('workOrders.scan.completeSuccess'));
+        closeFulfillmentModal();
+      },
+      onError: () => notifyError(t('workOrders.scan.completeError')),
     });
   };
 
@@ -896,7 +905,8 @@ export function WorkOrdersPage() {
                     onClick={() => {
                       closeMenu();
                       startMutation.mutate(record.id, {
-                        onError: () => message.error(t('workOrders.startError')),
+                        onSuccess: () => notifySuccess(t('workOrders.startSuccess')),
+                        onError: () => notifyError(t('workOrders.startError')),
                       });
                     }}
                   >
@@ -1000,7 +1010,8 @@ export function WorkOrdersPage() {
                       onConfirm={() => {
                         closeMenu();
                         closeMutation.mutate(record.id, {
-                          onError: () => message.error(t('workOrders.close.error')),
+                          onSuccess: () => notifySuccess(t('workOrders.close.success')),
+                          onError: () => notifyError(t('workOrders.close.error')),
                         });
                       }}
                       onCancel={closeMenu}
@@ -1309,11 +1320,6 @@ export function WorkOrdersPage() {
           {isProductTypesError && (
             <Form.Item>
               <Alert type="error" message={t('workOrders.loadProductTypesError')} showIcon />
-            </Form.Item>
-          )}
-          {createMutation.isError && (
-            <Form.Item>
-              <Alert type="error" message={t('workOrders.createError')} showIcon />
             </Form.Item>
           )}
         </Form>

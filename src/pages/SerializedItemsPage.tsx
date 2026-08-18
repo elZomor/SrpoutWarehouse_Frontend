@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
-  App,
   Button,
   Form,
   Input,
@@ -19,6 +18,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ItemHistoryModal } from '../components/ItemHistoryModal';
 import { useItemHistoryModal } from '../components/useItemHistoryModal';
+import { useApiFeedback } from '../hooks/useApiFeedback';
 import { clickableRowProps } from '../lib/clickableRow';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
@@ -43,7 +43,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 export function SerializedItemsPage() {
   const { t } = useTranslation();
-  const { message } = App.useApp();
+  const { notifySuccess, notifyError, notifyWarning } = useApiFeedback();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [productTypeFilter, setProductTypeFilter] = useState<number | undefined>();
@@ -88,13 +88,18 @@ export function SerializedItemsPage() {
 
   const onSubmit = (values: SerializedItemFormValues) => {
     createMutation.mutate(values, {
-      onSuccess: closeModal,
+      onSuccess: () => {
+        notifySuccess(t('serializedItems.createSuccess'));
+        closeModal();
+      },
       onError: (error) => {
         if (isDuplicateSerialError(error)) {
           setError('serial_number', {
             type: 'server',
             message: 'serializedItems.form.serialNumberDuplicate',
           });
+        } else {
+          notifyError(t('serializedItems.createError'));
         }
       },
     });
@@ -102,8 +107,8 @@ export function SerializedItemsPage() {
 
   const handleDelete = (id: number) => {
     deleteMutation.mutate(id, {
-      onSuccess: () => message.success(t('serializedItems.deleteSuccess')),
-      onError: () => message.error(t('serializedItems.deleteError')),
+      onSuccess: () => notifySuccess(t('serializedItems.deleteSuccess')),
+      onError: () => notifyError(t('serializedItems.deleteError')),
     });
   };
 
@@ -126,9 +131,9 @@ export function SerializedItemsPage() {
         const messageKey = resolveQrDownloadErrorMessageKey(error, productTypeFilter !== undefined);
         const isEmptyExport = axios.isAxiosError(error) && error.response?.status === 400;
         if (isEmptyExport) {
-          message.warning(t(messageKey));
+          notifyWarning(t(messageKey));
         } else {
-          message.error(t(messageKey));
+          notifyError(t(messageKey));
         }
       },
     });
@@ -311,11 +316,6 @@ export function SerializedItemsPage() {
           {isProductTypesError && (
             <Form.Item>
               <Alert type="error" message={t('serializedItems.loadProductTypesError')} showIcon />
-            </Form.Item>
-          )}
-          {createMutation.isError && !errors.serial_number && (
-            <Form.Item>
-              <Alert type="error" message={t('serializedItems.createError')} showIcon />
             </Form.Item>
           )}
         </Form>
