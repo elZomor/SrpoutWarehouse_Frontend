@@ -26,6 +26,14 @@ export function AppSidebar() {
     });
   };
 
+  // WRH-70: /work-orders/:id (the deep-linked detail view) has no menu
+  // item of its own - it's still the Work Orders nav entry, so fall back to
+  // the parent route's key rather than an exact pathname match leaving
+  // nothing selected.
+  const selectedKey = location.pathname.startsWith(`${ROUTES.workOrders}/`)
+    ? ROUTES.workOrders
+    : location.pathname;
+
   const items: MenuProps['items'] = [
     { key: ROUTES.dashboard, label: navLink(ROUTES.dashboard, t('nav.dashboard')) },
     {
@@ -133,7 +141,7 @@ export function AppSidebar() {
           <Menu
             theme="dark"
             mode="inline"
-            selectedKeys={[location.pathname]}
+            selectedKeys={[selectedKey]}
             items={items}
             style={{ borderInlineEnd: 'none', background: 'transparent' }}
           />

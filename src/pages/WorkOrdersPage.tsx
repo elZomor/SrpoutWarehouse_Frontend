@@ -24,6 +24,7 @@ import dayjs from 'dayjs';
 import { useEffect, useMemo, useRef, useState, type Key } from 'react';
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ItemHistoryModal } from '../components/ItemHistoryModal';
 import { useItemHistoryModal } from '../components/useItemHistoryModal';
 import { clickableRowProps } from '../lib/clickableRow';
@@ -80,6 +81,7 @@ import {
 } from '../features/work-orders/useWorkOrders';
 import { getFieldErrorMessages } from '../lib/apiErrors';
 import { getSerializedItemStatusColor } from '../features/serialized-items/logic';
+import { ROUTES } from '../routes';
 import { colors } from '../theme/tokens';
 
 const DATE_FORMAT = 'YYYY-MM-DD';
@@ -126,12 +128,37 @@ export function WorkOrdersPage() {
     isLoading: isActiveLoading,
     isError: isActiveError,
   } = useActiveWorkOrders();
-  const [detailWorkOrderId, setDetailWorkOrderId] = useState<number | null>(null);
+  // WRH-70: the detail modal's open/closed WO is the /work-orders/:id route
+  // param itself, not local state - a stable per-WO URL is the point (deep
+  // links from e.g. Missing Items), and deriving from the URL keeps it as
+  // the single source of truth instead of two things that could drift.
+  const { id: detailIdParam } = useParams();
+  const navigate = useNavigate();
+  const parsedDetailId = detailIdParam !== undefined ? Number(detailIdParam) : NaN;
+  const detailWorkOrderId =
+    detailIdParam !== undefined && Number.isInteger(parsedDetailId) ? parsedDetailId : null;
+  useEffect(() => {
+    // A non-numeric :id (bad/stale link) has nothing to show - bounce back
+    // to the list rather than rendering a modal that can never load.
+    if (detailIdParam !== undefined && detailWorkOrderId === null) {
+      navigate(ROUTES.workOrders, { replace: true });
+    }
+  }, [detailIdParam, detailWorkOrderId, navigate]);
+  const closeDetailModal = () => navigate(ROUTES.workOrders);
   const {
     data: workOrderDetail,
     isLoading: isDetailLoading,
     isError: isDetailError,
   } = useWorkOrderDetail(detailWorkOrderId);
+  useEffect(() => {
+    // A syntactically valid but nonexistent/inaccessible :id (stale
+    // bookmark, deleted WO) 404s - bounce back to the list the same way the
+    // non-numeric case above does, rather than leaving the modal stuck open
+    // on just the error alert with no way back.
+    if (detailWorkOrderId !== null && isDetailError) {
+      navigate(ROUTES.workOrders, { replace: true });
+    }
+  }, [detailWorkOrderId, isDetailError, navigate]);
   // WRH-79/AC-1/AC-6: shared history modal target for the WO detail's own
   // item rows.
   const { openHistoryItem, historyModalProps } = useItemHistoryModal();
@@ -891,7 +918,7 @@ export function WorkOrdersPage() {
                   key="view-details"
                   onClick={() => {
                     closeMenu();
-                    setDetailWorkOrderId(record.id);
+                    navigate(ROUTES.workOrderDetailPath(record.id));
                   }}
                 >
                   {t('workOrders.viewDetailsButton')}
@@ -1120,9 +1147,9 @@ export function WorkOrdersPage() {
           jobName: workOrderDetail?.job_name ?? '',
         })}
         open={detailWorkOrderId !== null}
-        onCancel={() => setDetailWorkOrderId(null)}
+        onCancel={closeDetailModal}
         footer={[
-          <Button key="close" onClick={() => setDetailWorkOrderId(null)}>
+          <Button key="close" onClick={closeDetailModal}>
             {t('workOrders.detail.closeButton')}
           </Button>,
         ]}

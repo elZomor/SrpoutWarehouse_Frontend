@@ -398,6 +398,23 @@ test('lists every work order in one screen, including a supplementary, and drill
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByText('SN-0001')).toBeVisible();
   await expect(dialog.getByText(/^out$|^خارج$/i)).toBeVisible();
+
+  // WRH-70/AC-2: opening the detail modal is a real, stable per-WO URL, not
+  // just local state - and closing it returns to the plain list URL.
+  await expect(page).toHaveURL(/\/work-orders\/1$/);
+  await dialog
+    .locator('.ant-modal-footer')
+    .getByRole('button', { name: /^close$|^إغلاق$/i })
+    .click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page).toHaveURL(/\/work-orders$/);
+
+  // A fresh direct navigation to that same URL (a deep link, e.g. from
+  // Missing Items) opens the exact WO's detail view straight away, with no
+  // click needed.
+  await page.goto('/work-orders/1');
+  const deepLinkedDialog = page.getByRole('dialog');
+  await expect(deepLinkedDialog.getByText('SN-0001')).toBeVisible();
 });
 
 test('returns items against a fulfilled WO: partial then full return', async ({ page }) => {

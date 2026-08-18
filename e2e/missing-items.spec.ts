@@ -106,9 +106,10 @@ test('views the missing items list, then resolves one as found and one as writte
   await expect(page.getByText('Bar LED Model A')).toBeVisible();
   await expect(page.getByText('Fog Machine')).toBeVisible();
 
-  // TC-04: the WO reference is a link back to the Work Orders page.
+  // WRH-70/TC-04: the WO reference deep-links straight to that WO's own
+  // detail URL, not just the Work Orders list.
   const workOrderLink = page.getByRole('link', { name: 'WO-17' });
-  await expect(workOrderLink).toHaveAttribute('href', '/work-orders');
+  await expect(workOrderLink).toHaveAttribute('href', '/work-orders/17');
 
   // AC-3/TC-02: mark SN-042 as found - it disappears from the active list.
   await page
