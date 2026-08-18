@@ -421,6 +421,18 @@
     "emptyState": "لا توجد معاملات",
     "loadError": "فشل تحميل سجل المعاملات. حاول مرة أخرى."
   },
+  "itemHistory": {
+    "title": "{{productType}} — {{serialNumber}}",
+    "statusLabel": "الحالة",
+    "typeLabel": "النوع",
+    "dateLabel": "التاريخ",
+    "referenceNumberLabel": "رقم المرجع",
+    "userLabel": "المستخدم",
+    "noteLabel": "ملاحظة",
+    "emptyState": "لا يوجد سجل لهذا العنصر بعد",
+    "loadError": "فشل تحميل سجل العنصر. حاول مرة أخرى.",
+    "closeButton": "إغلاق"
+  },
   "missingItems": {
     "title": "العناصر المفقودة",
     "serialNumberLabel": "الرقم التسلسلي",

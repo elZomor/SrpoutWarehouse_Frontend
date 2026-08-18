@@ -9,6 +9,7 @@ import { AppLayout } from '../components/AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
 import type { ProductType } from '../features/product-types/types';
 import type { SerializedItem } from '../features/serialized-items/types';
+import type { Transaction } from '../features/transactions/types';
 import { apiClient } from '../lib/apiClient';
 import { motionDisabledTheme } from '../test/motionDisabledTheme';
 import '../i18n';
@@ -66,10 +67,12 @@ function mockListEndpoints({
   serializedItems = [],
   productTypes = [makeProductType()],
   serializedItemsError = false,
+  transactions = [],
 }: {
   serializedItems?: SerializedItem[];
   productTypes?: ProductType[];
   serializedItemsError?: boolean;
+  transactions?: Transaction[];
 }) {
   mockedApiClient.get.mockImplementation(
     (url: string, config?: { params?: { search?: string; product_type?: number } }) => {
@@ -88,6 +91,9 @@ function mockListEndpoints({
             (productTypeFilter == null || item.product_type === productTypeFilter),
         );
         return Promise.resolve({ data: results });
+      }
+      if (url === '/api/transactions/') {
+        return Promise.resolve({ data: transactions });
       }
       return Promise.reject(new Error(`Unexpected GET ${url}`));
     },
@@ -371,6 +377,78 @@ describe('SerializedItemsPage', () => {
 
     expect(
       await screen.findByText(/failed to load serialized items|فشل تحميل الوحدات المسجلة/i),
+    ).toBeInTheDocument();
+  });
+
+  it('opens the shared item history card when a row is clicked, newest-first and empty-safe', async () => {
+    // WRH-79/AC-1/AC-2/AC-3/AC-4/AC-5/AC-6
+    mockListEndpoints({
+      serializedItems: [makeSerializedItem()],
+      transactions: [
+        {
+          id: 1,
+          transaction_type: 'receive',
+          transaction_type_display: 'Receive',
+          reference_number: 'PO-1',
+          serial_number: 'SN-042',
+          product_type_name: 'Bar LED Model A',
+          created_at: '2026-08-01T10:00:00Z',
+          user_username: 'jane',
+          note: '',
+        },
+        {
+          id: 2,
+          transaction_type: 'issue',
+          transaction_type_display: 'Issue',
+          reference_number: 'WO-1',
+          serial_number: 'SN-042',
+          product_type_name: 'Bar LED Model A',
+          created_at: '2026-08-05T10:00:00Z',
+          user_username: 'jane',
+          note: '',
+        },
+      ],
+    });
+
+    const user = userEvent.setup();
+    renderSerializedItemsPage();
+
+    await user.click(await screen.findByText('SN-042'));
+
+    const dialog = await screen.findByRole('dialog', { hidden: true });
+    expect(within(dialog).getByText('Bar LED Model A — SN-042')).toBeInTheDocument();
+    // AC-3: newest-to-oldest - the later "issue" row renders before the
+    // earlier "receive" row.
+    const rows = within(dialog).getAllByRole('row', { hidden: true });
+    const rowsText = rows.map((row) => row.textContent ?? '');
+    expect(rowsText.findIndex((text) => text.includes('WO-1'))).toBeLessThan(
+      rowsText.findIndex((text) => text.includes('PO-1')),
+    );
+
+    // Closing returns to the list with no reload/state loss (AC-5). Scoped
+    // to the footer, not the whole dialog - AntD's built-in "X" close icon
+    // also carries an (untranslated) "Close" aria-label, which would
+    // otherwise collide with our own translated footer button.
+    const footer = dialog.querySelector('.ant-modal-footer') as HTMLElement;
+    await user.click(within(footer).getByRole('button', { hidden: true }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('SN-042')).toBeInTheDocument();
+  });
+
+  it('shows an empty-state message in the item history card for an item with no history', async () => {
+    // WRH-79/AC-4
+    mockListEndpoints({ serializedItems: [makeSerializedItem()], transactions: [] });
+
+    const user = userEvent.setup();
+    renderSerializedItemsPage();
+
+    await user.click(await screen.findByText('SN-042'));
+
+    const dialog = await screen.findByRole('dialog', { hidden: true });
+    expect(
+      await within(dialog).findByText(/no history yet for this item|لا يوجد سجل لهذا العنصر بعد/i),
     ).toBeInTheDocument();
   });
 

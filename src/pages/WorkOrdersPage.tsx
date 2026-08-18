@@ -21,9 +21,10 @@ import {
   Typography,
 } from 'antd';
 import dayjs from 'dayjs';
-import { useEffect, useMemo, useRef, useState, type Key } from 'react';
+import { useEffect, useMemo, useRef, useState, type Key, type KeyboardEvent } from 'react';
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { ItemHistoryModal, type ItemHistoryTarget } from '../components/ItemHistoryModal';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
   buildActiveWorkOrderLookup,
@@ -129,6 +130,9 @@ export function WorkOrdersPage() {
     isLoading: isDetailLoading,
     isError: isDetailError,
   } = useWorkOrderDetail(detailWorkOrderId);
+  // WRH-79/AC-1/AC-6: shared history modal target for the WO detail's own
+  // item rows.
+  const [historyItem, setHistoryItem] = useState<ItemHistoryTarget | null>(null);
 
   // Derived (not a local snapshot) so the modal reflects each scan's
   // updated scanned/remaining counts as soon as useScanWorkOrderItem patches
@@ -1136,9 +1140,37 @@ export function WorkOrdersPage() {
             columns={detailColumns}
             dataSource={detailRows}
             locale={{ emptyText: t('workOrders.detail.emptyState') }}
+            onRow={(record) => ({
+              onClick: () =>
+                setHistoryItem({
+                  serial_number: record.serial_number,
+                  product_type_name: record.product_type_name,
+                  status: record.status,
+                }),
+              onKeyDown: (event: KeyboardEvent) => {
+                if (
+                  (event.key === 'Enter' || event.key === ' ') &&
+                  event.target === event.currentTarget
+                ) {
+                  event.preventDefault();
+                  setHistoryItem({
+                    serial_number: record.serial_number,
+                    product_type_name: record.product_type_name,
+                    status: record.status,
+                  });
+                }
+              },
+              tabIndex: 0,
+              style: { cursor: 'pointer' },
+            })}
           />
         )}
       </Modal>
+      <ItemHistoryModal
+        item={historyItem}
+        open={historyItem !== null}
+        onClose={() => setHistoryItem(null)}
+      />
       <Modal
         title={
           supplementaryParent

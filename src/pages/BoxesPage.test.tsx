@@ -10,6 +10,7 @@ import { currentUserQueryKey } from '../features/auth/useAuth';
 import type { Box } from '../features/boxes/types';
 import type { ProductType } from '../features/product-types/types';
 import type { SerializedItem } from '../features/serialized-items/types';
+import type { Transaction } from '../features/transactions/types';
 import { apiClient } from '../lib/apiClient';
 import { motionDisabledTheme } from '../test/motionDisabledTheme';
 import '../i18n';
@@ -82,6 +83,7 @@ function mockListEndpoints({
   boxesError = false,
   boxDetail,
   boxDetailError = false,
+  transactions = [],
 }: {
   boxes?: Box[];
   productTypes?: ProductType[];
@@ -89,6 +91,7 @@ function mockListEndpoints({
   boxesError?: boolean;
   boxDetail?: Box;
   boxDetailError?: boolean;
+  transactions?: Transaction[];
 }) {
   mockedApiClient.get.mockImplementation(
     (url: string, config?: { params?: { product_type?: number } }) => {
@@ -107,6 +110,9 @@ function mockListEndpoints({
           (item) => productTypeFilter == null || item.product_type === productTypeFilter,
         );
         return Promise.resolve({ data: results });
+      }
+      if (url === '/api/transactions/') {
+        return Promise.resolve({ data: transactions });
       }
       const boxDetailMatch = /^\/api\/boxes\/(\d+)\/$/.exec(url);
       if (boxDetailMatch) {
@@ -446,6 +452,41 @@ describe('BoxesPage', () => {
     await user.keyboard('{Enter}');
 
     expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument();
+  });
+
+  it('opens the shared item history modal when a box detail item row is clicked', async () => {
+    // WRH-79/AC-1/AC-2/AC-6
+    const detail = makeBox({ items: [{ id: 1, serial_number: 'SN-042', status: 'available' }] });
+    mockListEndpoints({
+      boxes: [makeBox()],
+      boxDetail: detail,
+      transactions: [
+        {
+          id: 1,
+          transaction_type: 'receive',
+          transaction_type_display: 'Receive',
+          reference_number: 'PO-1',
+          serial_number: 'SN-042',
+          product_type_name: 'Bar LED Model A',
+          created_at: '2026-08-01T10:00:00Z',
+          user_username: 'jane',
+          note: '',
+        },
+      ],
+    });
+
+    const user = userEvent.setup();
+    renderBoxesPage();
+
+    await user.click(await screen.findByText('BX-001'));
+    await user.click(await screen.findByText('SN-042'));
+
+    const dialogs = await screen.findAllByRole('dialog', { hidden: true });
+    const historyDialog = dialogs[dialogs.length - 1] as HTMLElement;
+    expect(within(historyDialog).getByText('Bar LED Model A — SN-042')).toBeInTheDocument();
+    expect(mockedApiClient.get).toHaveBeenCalledWith('/api/transactions/', {
+      params: { serial_number: 'SN-042' },
+    });
   });
 
   it('shows an empty-state message for a box with no items', async () => {

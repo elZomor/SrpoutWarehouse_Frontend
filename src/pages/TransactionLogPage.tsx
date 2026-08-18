@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { Alert, DatePicker, Input, Select, Table, Tag, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useTranslation } from 'react-i18next';
-import { buildTransactionListParams } from '../features/transactions/logic';
+import {
+  buildTransactionListParams,
+  getTransactionTypeColor,
+} from '../features/transactions/logic';
 import type { Transaction } from '../features/transactions/types';
 import { useTransactions } from '../features/transactions/useTransactions';
 
@@ -16,20 +19,6 @@ const TRANSACTION_TYPES = [
   'missing',
   'written_off',
 ] as const;
-// Keyed by transaction_type (not the backend's transaction_type_display) so
-// the label always goes through i18n, matching SerializedItemsPage's
-// STATUS_COLORS precedent - a Map avoids eslint-plugin-security's
-// detect-object-injection warning on the dynamic-key lookup below.
-const TYPE_COLORS = new Map<string, string>([
-  ['receive', 'green'],
-  ['issue', 'blue'],
-  ['return', 'cyan'],
-  ['damaged', 'red'],
-  ['transfer', 'purple'],
-  ['missing', 'orange'],
-  ['written_off', 'default'],
-]);
-const DEFAULT_TYPE_COLOR = 'default';
 
 const { RangePicker } = DatePicker;
 
@@ -73,7 +62,7 @@ export function TransactionLogPage() {
       dataIndex: 'transaction_type',
       key: 'transaction_type',
       render: (transactionType: string) => (
-        <Tag color={TYPE_COLORS.get(transactionType) ?? DEFAULT_TYPE_COLOR}>
+        <Tag color={getTransactionTypeColor(transactionType)}>
           {t(`transactionLog.type.${transactionType}`)}
         </Tag>
       ),

@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Form, Input, Modal, Select, Spin, Table, Typography } from 'antd';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { ItemHistoryModal, type ItemHistoryTarget } from '../components/ItemHistoryModal';
 import { classifyItemRejection, type ItemRejection } from '../features/boxes/logic';
 import { boxSchema, type BoxFormValues } from '../features/boxes/schema';
 import { printBoxLabel } from '../features/boxes/printLabel';
@@ -52,6 +53,10 @@ export function BoxesPage() {
   // interpolates a WO id into classifyScanRejection's messages - never
   // shown as a raw, untranslated server string.
   const [itemRejection, setItemRejection] = useState<ItemRejection | null>(null);
+  // WRH-79/AC-1/AC-6: shared history modal target - box items don't carry
+  // their own product_type_name (a box is scoped to one product type), so
+  // it's filled in from the open box detail's own field.
+  const [historyItem, setHistoryItem] = useState<ItemHistoryTarget | null>(null);
 
   const {
     control,
@@ -235,9 +240,37 @@ export function BoxesPage() {
             columns={detailColumns}
             dataSource={boxDetail?.items}
             locale={{ emptyText: t('boxes.detail.emptyState') }}
+            onRow={(record) => ({
+              onClick: () =>
+                setHistoryItem({
+                  serial_number: record.serial_number,
+                  product_type_name: boxDetail?.product_type_name ?? '',
+                  status: record.status,
+                }),
+              onKeyDown: (event: KeyboardEvent) => {
+                if (
+                  (event.key === 'Enter' || event.key === ' ') &&
+                  event.target === event.currentTarget
+                ) {
+                  event.preventDefault();
+                  setHistoryItem({
+                    serial_number: record.serial_number,
+                    product_type_name: boxDetail?.product_type_name ?? '',
+                    status: record.status,
+                  });
+                }
+              },
+              tabIndex: 0,
+              style: { cursor: 'pointer' },
+            })}
           />
         )}
       </Modal>
+      <ItemHistoryModal
+        item={historyItem}
+        open={historyItem !== null}
+        onClose={() => setHistoryItem(null)}
+      />
       <Modal
         title={t('boxes.newButton')}
         open={isModalOpen}

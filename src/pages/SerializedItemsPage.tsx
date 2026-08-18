@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
@@ -17,6 +17,7 @@ import {
 import axios from 'axios';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { ItemHistoryModal, type ItemHistoryTarget } from '../components/ItemHistoryModal';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
   getSerializedItemStatusColor,
@@ -45,6 +46,10 @@ export function SerializedItemsPage() {
   const [search, setSearch] = useState('');
   const [productTypeFilter, setProductTypeFilter] = useState<number | undefined>();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // WRH-79/AC-1/AC-5: kept only for the shared history modal's identity
+  // header - the modal fetches its own history, and clearing this on close
+  // doesn't touch the underlying list/filters state at all.
+  const [historyItem, setHistoryItem] = useState<ItemHistoryTarget | null>(null);
   const {
     data: serializedItems,
     isLoading,
@@ -166,12 +171,16 @@ export function SerializedItemsPage() {
         <Button
           type="link"
           size="small"
-          onClick={() =>
+          onClick={(event) => {
+            // WRH-79: the row itself now opens the history modal on click -
+            // without this, the click would bubble up to the row and pop
+            // the history modal open behind the print popup too.
+            event.stopPropagation();
             printSerializedItemLabel(record, {
               qrAlt: t('serializedItems.qrCodeLabel'),
               loadError: t('serializedItems.printQrLoadError'),
-            })
-          }
+            });
+          }}
         >
           {t('serializedItems.printQrButton')}
         </Button>
@@ -181,7 +190,7 @@ export function SerializedItemsPage() {
       title: t('serializedItems.actionsLabel'),
       key: 'actions',
       render: (_: unknown, record: SerializedItem) => (
-        <Space>
+        <Space onClick={(event) => event.stopPropagation()}>
           <Popconfirm
             title={t('serializedItems.deleteConfirmTitle')}
             onConfirm={() => handleDelete(record.id)}
@@ -244,8 +253,36 @@ export function SerializedItemsPage() {
           dataSource={serializedItems}
           loading={isLoading}
           locale={{ emptyText: t('serializedItems.emptyState') }}
+          onRow={(record) => ({
+            onClick: () =>
+              setHistoryItem({
+                serial_number: record.serial_number,
+                product_type_name: record.product_type_name,
+                status: record.status,
+              }),
+            onKeyDown: (event: KeyboardEvent) => {
+              if (
+                (event.key === 'Enter' || event.key === ' ') &&
+                event.target === event.currentTarget
+              ) {
+                event.preventDefault();
+                setHistoryItem({
+                  serial_number: record.serial_number,
+                  product_type_name: record.product_type_name,
+                  status: record.status,
+                });
+              }
+            },
+            tabIndex: 0,
+            style: { cursor: 'pointer' },
+          })}
         />
       )}
+      <ItemHistoryModal
+        item={historyItem}
+        open={historyItem !== null}
+        onClose={() => setHistoryItem(null)}
+      />
       <Modal
         title={t('serializedItems.newButton')}
         open={isModalOpen}
