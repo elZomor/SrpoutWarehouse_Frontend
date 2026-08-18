@@ -3,7 +3,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Form, Input, Modal, Select, Spin, Table, Typography } from 'antd';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { ItemHistoryModal, type ItemHistoryTarget } from '../components/ItemHistoryModal';
+import { ItemHistoryModal } from '../components/ItemHistoryModal';
+import { itemHistoryRowProps, type ItemHistoryTarget } from '../components/itemHistoryRow';
 import { classifyItemRejection, type ItemRejection } from '../features/boxes/logic';
 import { boxSchema, type BoxFormValues } from '../features/boxes/schema';
 import { printBoxLabel } from '../features/boxes/printLabel';
@@ -240,29 +241,17 @@ export function BoxesPage() {
             columns={detailColumns}
             dataSource={boxDetail?.items}
             locale={{ emptyText: t('boxes.detail.emptyState') }}
-            onRow={(record) => ({
-              onClick: () =>
-                setHistoryItem({
-                  serial_number: record.serial_number,
+            onRow={(record) =>
+              itemHistoryRowProps(
+                record,
+                (item) => ({
+                  serial_number: item.serial_number,
                   product_type_name: boxDetail?.product_type_name ?? '',
-                  status: record.status,
+                  status: item.status,
                 }),
-              onKeyDown: (event: KeyboardEvent) => {
-                if (
-                  (event.key === 'Enter' || event.key === ' ') &&
-                  event.target === event.currentTarget
-                ) {
-                  event.preventDefault();
-                  setHistoryItem({
-                    serial_number: record.serial_number,
-                    product_type_name: boxDetail?.product_type_name ?? '',
-                    status: record.status,
-                  });
-                }
-              },
-              tabIndex: 0,
-              style: { cursor: 'pointer' },
-            })}
+                setHistoryItem,
+              )
+            }
           />
         )}
       </Modal>

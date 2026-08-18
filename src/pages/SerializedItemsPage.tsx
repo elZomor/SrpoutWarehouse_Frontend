@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
@@ -17,7 +17,8 @@ import {
 import axios from 'axios';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { ItemHistoryModal, type ItemHistoryTarget } from '../components/ItemHistoryModal';
+import { ItemHistoryModal } from '../components/ItemHistoryModal';
+import { itemHistoryRowProps, type ItemHistoryTarget } from '../components/itemHistoryRow';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
   getSerializedItemStatusColor,
@@ -253,29 +254,17 @@ export function SerializedItemsPage() {
           dataSource={serializedItems}
           loading={isLoading}
           locale={{ emptyText: t('serializedItems.emptyState') }}
-          onRow={(record) => ({
-            onClick: () =>
-              setHistoryItem({
-                serial_number: record.serial_number,
-                product_type_name: record.product_type_name,
-                status: record.status,
+          onRow={(record) =>
+            itemHistoryRowProps(
+              record,
+              (item) => ({
+                serial_number: item.serial_number,
+                product_type_name: item.product_type_name,
+                status: item.status,
               }),
-            onKeyDown: (event: KeyboardEvent) => {
-              if (
-                (event.key === 'Enter' || event.key === ' ') &&
-                event.target === event.currentTarget
-              ) {
-                event.preventDefault();
-                setHistoryItem({
-                  serial_number: record.serial_number,
-                  product_type_name: record.product_type_name,
-                  status: record.status,
-                });
-              }
-            },
-            tabIndex: 0,
-            style: { cursor: 'pointer' },
-          })}
+              setHistoryItem,
+            )
+          }
         />
       )}
       <ItemHistoryModal

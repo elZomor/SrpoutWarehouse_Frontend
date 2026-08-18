@@ -21,10 +21,11 @@ import {
   Typography,
 } from 'antd';
 import dayjs from 'dayjs';
-import { useEffect, useMemo, useRef, useState, type Key, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type Key } from 'react';
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { ItemHistoryModal, type ItemHistoryTarget } from '../components/ItemHistoryModal';
+import { ItemHistoryModal } from '../components/ItemHistoryModal';
+import { itemHistoryRowProps, type ItemHistoryTarget } from '../components/itemHistoryRow';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
   buildActiveWorkOrderLookup,
@@ -1140,29 +1141,17 @@ export function WorkOrdersPage() {
             columns={detailColumns}
             dataSource={detailRows}
             locale={{ emptyText: t('workOrders.detail.emptyState') }}
-            onRow={(record) => ({
-              onClick: () =>
-                setHistoryItem({
-                  serial_number: record.serial_number,
-                  product_type_name: record.product_type_name,
-                  status: record.status,
+            onRow={(record) =>
+              itemHistoryRowProps(
+                record,
+                (item) => ({
+                  serial_number: item.serial_number,
+                  product_type_name: item.product_type_name,
+                  status: item.status,
                 }),
-              onKeyDown: (event: KeyboardEvent) => {
-                if (
-                  (event.key === 'Enter' || event.key === ' ') &&
-                  event.target === event.currentTarget
-                ) {
-                  event.preventDefault();
-                  setHistoryItem({
-                    serial_number: record.serial_number,
-                    product_type_name: record.product_type_name,
-                    status: record.status,
-                  });
-                }
-              },
-              tabIndex: 0,
-              style: { cursor: 'pointer' },
-            })}
+                setHistoryItem,
+              )
+            }
           />
         )}
       </Modal>

@@ -8,12 +8,9 @@ import {
 import type { Transaction } from '../features/transactions/types';
 import { useTransactions } from '../features/transactions/useTransactions';
 import { getSerializedItemStatusColor } from '../features/serialized-items/logic';
+import type { ItemHistoryTarget } from './itemHistoryRow';
 
-export interface ItemHistoryTarget {
-  serial_number: string;
-  product_type_name: string;
-  status: string;
-}
+export type { ItemHistoryTarget } from './itemHistoryRow';
 
 export interface ItemHistoryModalProps {
   item: ItemHistoryTarget | null;
