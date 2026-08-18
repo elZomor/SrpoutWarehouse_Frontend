@@ -97,7 +97,7 @@ export function MaintenanceOrdersPage() {
     formState: { errors },
   } = useForm<MaintenanceOrderFormValues>({
     resolver: zodResolver(maintenanceOrderSchema),
-    defaultValues: { item_ids: [] },
+    defaultValues: { item_ids: [], note: '' },
   });
 
   const closeModal = () => {
@@ -108,21 +108,29 @@ export function MaintenanceOrdersPage() {
 
   const onSubmit = (values: MaintenanceOrderFormValues) => {
     setItemRejection(null);
-    createMutation.mutate(values, {
-      onSuccess: (maintenanceOrder) => {
-        notifySuccess(
-          t('maintenanceOrders.createSuccess', { reference: maintenanceOrder.reference }),
-        );
-        closeModal();
+    // Normalizes a blank/whitespace-only note to undefined (rather than
+    // sending "") so an untouched field and a typed-then-cleared one are
+    // indistinguishable on the wire - matches handleResolve's identical
+    // normalization for its own per-item note draft below.
+    const note = values.note?.trim() ? values.note : undefined;
+    createMutation.mutate(
+      { ...values, note },
+      {
+        onSuccess: (maintenanceOrder) => {
+          notifySuccess(
+            t('maintenanceOrders.createSuccess', { reference: maintenanceOrder.reference }),
+          );
+          closeModal();
+        },
+        onError: (error) => {
+          const rejection = classifyItemRejection(error);
+          setItemRejection(rejection);
+          if (!rejection) {
+            notifyError(t('maintenanceOrders.createError'));
+          }
+        },
       },
-      onError: (error) => {
-        const rejection = classifyItemRejection(error);
-        setItemRejection(rejection);
-        if (!rejection) {
-          notifyError(t('maintenanceOrders.createError'));
-        }
-      },
-    });
+    );
   };
 
   // Returns (rather than fires-and-forgets) the mutation's promise so
@@ -143,7 +151,11 @@ export function MaintenanceOrdersPage() {
     resolution: MaintenanceOrderResolution,
   ) => {
     setPendingItemIds((current) => new Set(current).add(itemId));
-    const note = noteDrafts.get(itemId);
+    // Normalizes a blank/whitespace-only draft to undefined, matching
+    // maintenanceOrderSchema's identical "note omitted when blank"
+    // transform for the create form.
+    const draft = noteDrafts.get(itemId);
+    const note = draft?.trim() ? draft : undefined;
     return resolveMutation
       .mutateAsync({ maintenanceOrderId, itemId, resolution, note })
       .then(
@@ -208,7 +220,9 @@ export function MaintenanceOrdersPage() {
               size="small"
               style={{ width: 160 }}
               placeholder={t('maintenanceOrders.items.notePlaceholder')}
-              aria-label={t('maintenanceOrders.items.notePlaceholder')}
+              aria-label={t('maintenanceOrders.items.noteAriaLabel', {
+                serial: item.serial_number,
+              })}
               value={noteDrafts.get(item.id) ?? ''}
               disabled={isItemPending}
               onChange={(event) =>

@@ -599,7 +599,7 @@ describe('MaintenanceOrdersPage', () => {
     await screen.findByText('SN-042');
     await user.type(
       screen.getByRole('textbox', {
-        name: /optional note|ملاحظة اختيارية/i,
+        name: /note for sn-042|ملاحظة لـ sn-042/i,
         hidden: true,
       }),
       'Replaced the cable',

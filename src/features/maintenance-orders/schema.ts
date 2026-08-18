@@ -6,7 +6,10 @@ import { z } from 'zod';
 // out).
 export const maintenanceOrderSchema = z.object({
   item_ids: z.array(z.number()).min(1, 'maintenanceOrders.form.itemsRequired'),
-  // AC-1: optional free-text note captured at creation time.
+  // AC-1: optional free-text note captured at creation time. Kept as a
+  // plain optional string (not a zod .transform()) so RHF's input/output
+  // types stay identical - blank-vs-omitted normalization happens at
+  // submit time in MaintenanceOrdersPage's onSubmit instead.
   note: z.string().optional(),
 });
 

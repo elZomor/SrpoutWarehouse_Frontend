@@ -526,6 +526,7 @@
       "markNotFixableButton": "تحديد كغير قابل للإصلاح",
       "markNotFixableConfirmTitle": "هل تريد تحديد هذا العنصر كغير قابل للإصلاح؟",
       "notePlaceholder": "ملاحظة اختيارية",
+      "noteAriaLabel": "ملاحظة لـ {{serial}}",
       "resolveSuccess": "تم حل العنصر.",
       "resolveError": "فشل حل العنصر. حاول مرة أخرى."
     },

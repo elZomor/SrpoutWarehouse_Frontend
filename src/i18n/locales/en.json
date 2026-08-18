@@ -518,6 +518,7 @@
       "markNotFixableButton": "Mark Not Fixable",
       "markNotFixableConfirmTitle": "Mark this item as not fixable?",
       "notePlaceholder": "Optional note",
+      "noteAriaLabel": "Note for {{serial}}",
       "resolveSuccess": "Item resolved.",
       "resolveError": "Failed to resolve item. Please try again."
     },

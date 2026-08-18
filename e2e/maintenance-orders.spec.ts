@@ -362,7 +362,7 @@ test('captures notes on create and resolve and shows them distinctly in history 
   await expect(page.getByText('Came in with a cracked lens')).toBeVisible();
 
   await page
-    .getByRole('textbox', { name: /optional note|ملاحظة اختيارية/i })
+    .getByRole('textbox', { name: /note for sn-042|ملاحظة لـ sn-042/i })
     .fill('Replaced the lens');
   await page.getByRole('button', { name: /^mark fixed$|^تحديد كمُصلح$/i }).click();
   await page.getByRole('button', { name: /^ok$|^موافق$/i }).click();
