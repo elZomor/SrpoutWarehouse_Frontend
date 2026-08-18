@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import dayjs from 'dayjs';
-import { buildTransactionListParams } from './logic';
+import {
+  buildTransactionListParams,
+  getTransactionTypeColor,
+  sortTransactionsNewestFirst,
+} from './logic';
+import type { Transaction } from './types';
 
 // Moved off TransactionLogPage.test.tsx (WRH-34) - "filters by serial
 // number/reference/type/date range" and the "combines X and Y filters"
@@ -81,5 +86,49 @@ describe('buildTransactionListParams', () => {
         date_to: '2026-08-15',
       }),
     );
+  });
+});
+
+describe('getTransactionTypeColor', () => {
+  it('returns a distinct color for a known transaction type', () => {
+    expect(getTransactionTypeColor('damaged')).toBe('red');
+  });
+
+  it('falls back to the default color for an unknown transaction type', () => {
+    expect(getTransactionTypeColor('unknown')).toBe('default');
+  });
+});
+
+describe('sortTransactionsNewestFirst', () => {
+  function makeTransaction(overrides: Partial<Transaction> = {}): Transaction {
+    return {
+      id: 1,
+      transaction_type: 'receive',
+      transaction_type_display: 'Receive',
+      reference_number: '',
+      serial_number: 'SN-042',
+      product_type_name: 'Bar LED Model A',
+      created_at: '2026-08-01T10:00:00Z',
+      user_username: 'jane',
+      note: '',
+      ...overrides,
+    };
+  }
+
+  it('sorts newest-to-oldest by created_at', () => {
+    const oldest = makeTransaction({ id: 1, created_at: '2026-08-01T10:00:00Z' });
+    const newest = makeTransaction({ id: 2, created_at: '2026-08-05T10:00:00Z' });
+
+    expect(sortTransactionsNewestFirst([oldest, newest])).toEqual([newest, oldest]);
+  });
+
+  it('does not mutate the input array', () => {
+    const oldest = makeTransaction({ id: 1, created_at: '2026-08-01T10:00:00Z' });
+    const newest = makeTransaction({ id: 2, created_at: '2026-08-05T10:00:00Z' });
+    const input = [oldest, newest];
+
+    sortTransactionsNewestFirst(input);
+
+    expect(input).toEqual([oldest, newest]);
   });
 });

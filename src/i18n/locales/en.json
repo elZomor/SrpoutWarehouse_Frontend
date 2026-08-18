@@ -413,6 +413,18 @@
     "emptyState": "No transactions found",
     "loadError": "Failed to load transaction log. Please try again."
   },
+  "itemHistory": {
+    "title": "{{productType}} — {{serialNumber}}",
+    "statusLabel": "Status",
+    "typeLabel": "Type",
+    "dateLabel": "Date",
+    "referenceNumberLabel": "Reference #",
+    "userLabel": "User",
+    "noteLabel": "Note",
+    "emptyState": "No history yet for this item",
+    "loadError": "Failed to load item history. Please try again.",
+    "closeButton": "Close"
+  },
   "missingItems": {
     "title": "Missing Items",
     "serialNumberLabel": "Serial",

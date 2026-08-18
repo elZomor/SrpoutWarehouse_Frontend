@@ -6,9 +6,10 @@ const transactionsBaseKey = ['transactions'] as const;
 const transactionsQueryKey = (params: ListTransactionsParams) =>
   [...transactionsBaseKey, params] as const;
 
-export function useTransactions(params: ListTransactionsParams) {
+export function useTransactions(params: ListTransactionsParams, enabled: boolean = true) {
   return useQuery({
     queryKey: transactionsQueryKey(params),
     queryFn: () => listTransactions(params),
+    enabled,
   });
 }

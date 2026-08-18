@@ -1,8 +1,11 @@
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useRef, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Form, Input, Modal, Select, Spin, Table, Typography } from 'antd';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { ItemHistoryModal } from '../components/ItemHistoryModal';
+import { useItemHistoryModal } from '../components/useItemHistoryModal';
+import { clickableRowProps } from '../lib/clickableRow';
 import { classifyItemRejection, type ItemRejection } from '../features/boxes/logic';
 import { boxSchema, type BoxFormValues } from '../features/boxes/schema';
 import { printBoxLabel } from '../features/boxes/printLabel';
@@ -52,6 +55,10 @@ export function BoxesPage() {
   // interpolates a WO id into classifyScanRejection's messages - never
   // shown as a raw, untranslated server string.
   const [itemRejection, setItemRejection] = useState<ItemRejection | null>(null);
+  // WRH-79/AC-1/AC-6: shared history modal target - box items don't carry
+  // their own product_type_name (a box is scoped to one product type), so
+  // it's filled in from the open box detail's own field.
+  const { openHistoryItem, historyModalProps } = useItemHistoryModal();
 
   const {
     control,
@@ -170,35 +177,16 @@ export function BoxesPage() {
           dataSource={boxes}
           loading={isLoading}
           locale={{ emptyText: t('boxes.emptyState') }}
-          onRow={(record) => ({
-            onClick: () => {
-              setDetailBox(record);
-              setIsDetailOpen(true);
-            },
-            // Keyboard/screen-reader equivalent of the mouse-only onClick
-            // above - a plain onRow onClick has no focus/activation path
-            // otherwise.
-            onKeyDown: (event: KeyboardEvent) => {
-              // Only react when the row itself is the key's target, not a
-              // bubbled keydown from a nested interactive element (e.g. the
-              // Print QR button) - otherwise pressing Enter/Space on that
-              // button both prints the QR and opens the detail modal,
-              // while a mouse click on it only does the former.
-              if (
-                (event.key === 'Enter' || event.key === ' ') &&
-                event.target === event.currentTarget
-              ) {
-                event.preventDefault();
-                setDetailBox(record);
+          onRow={(record) =>
+            clickableRowProps(
+              record,
+              (box) => box,
+              (box) => {
+                setDetailBox(box);
                 setIsDetailOpen(true);
-              }
-            },
-            // Not role="button" - that would clobber the row's own
-            // semantic "row" role inside the table and break the row/cell
-            // accessible-name computation table libraries rely on.
-            tabIndex: 0,
-            style: { cursor: 'pointer' },
-          })}
+              },
+            )
+          }
         />
       )}
       <Modal
@@ -235,9 +223,21 @@ export function BoxesPage() {
             columns={detailColumns}
             dataSource={boxDetail?.items}
             locale={{ emptyText: t('boxes.detail.emptyState') }}
+            onRow={(record) =>
+              clickableRowProps(
+                record,
+                (item) => ({
+                  serial_number: item.serial_number,
+                  product_type_name: boxDetail?.product_type_name ?? '',
+                  status: item.status,
+                }),
+                openHistoryItem,
+              )
+            }
           />
         )}
       </Modal>
+      <ItemHistoryModal {...historyModalProps} />
       <Modal
         title={t('boxes.newButton')}
         open={isModalOpen}

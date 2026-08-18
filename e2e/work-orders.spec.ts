@@ -460,6 +460,11 @@ test('returns items against a fulfilled WO: partial then full return', async ({ 
           job_name: activeWorkOrder.job_name,
           status: activeWorkOrder.status,
           line_items: activeWorkOrder.line_items,
+          // WRH-80/AC-3: WorkOrderReturnResult.supplementaries is required
+          // (WorkOrdersPage.tsx renders `returnSession.supplementaries.map(...)`
+          // unconditionally) - omitting it here crashed that render and
+          // masked every assertion below it behind a blank dialog.
+          supplementaries: activeWorkOrder.supplementaries,
         },
       });
       return;
@@ -878,6 +883,10 @@ test('marks a returning unit as damaged: excluded from stock and its own summary
           job_name: activeWorkOrder.job_name,
           status: activeWorkOrder.status,
           line_items: activeWorkOrder.line_items,
+          // WRH-80/AC-3: see the identical comment on the other
+          // /return-item/ mock in this file - required field, its absence
+          // crashed WorkOrdersPage's render of returnSession.
+          supplementaries: activeWorkOrder.supplementaries,
         },
       });
       return;
