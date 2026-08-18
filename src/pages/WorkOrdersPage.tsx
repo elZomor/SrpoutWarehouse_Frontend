@@ -24,7 +24,8 @@ import dayjs from 'dayjs';
 import { useEffect, useMemo, useRef, useState, type Key } from 'react';
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { ItemHistoryModal, type ItemHistoryTarget } from '../components/ItemHistoryModal';
+import { ItemHistoryModal } from '../components/ItemHistoryModal';
+import { useItemHistoryModal } from '../components/useItemHistoryModal';
 import { clickableRowProps } from '../lib/clickableRow';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
@@ -133,7 +134,7 @@ export function WorkOrdersPage() {
   } = useWorkOrderDetail(detailWorkOrderId);
   // WRH-79/AC-1/AC-6: shared history modal target for the WO detail's own
   // item rows.
-  const [historyItem, setHistoryItem] = useState<ItemHistoryTarget | null>(null);
+  const { openHistoryItem, historyModalProps } = useItemHistoryModal();
 
   // Derived (not a local snapshot) so the modal reflects each scan's
   // updated scanned/remaining counts as soon as useScanWorkOrderItem patches
@@ -1149,17 +1150,13 @@ export function WorkOrdersPage() {
                   product_type_name: item.product_type_name,
                   status: item.status,
                 }),
-                setHistoryItem,
+                openHistoryItem,
               )
             }
           />
         )}
       </Modal>
-      <ItemHistoryModal
-        item={historyItem}
-        open={historyItem !== null}
-        onClose={() => setHistoryItem(null)}
-      />
+      <ItemHistoryModal {...historyModalProps} />
       <Modal
         title={
           supplementaryParent

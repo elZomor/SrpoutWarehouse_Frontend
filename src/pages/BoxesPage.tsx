@@ -3,7 +3,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Form, Input, Modal, Select, Spin, Table, Typography } from 'antd';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { ItemHistoryModal, type ItemHistoryTarget } from '../components/ItemHistoryModal';
+import { ItemHistoryModal } from '../components/ItemHistoryModal';
+import { useItemHistoryModal } from '../components/useItemHistoryModal';
 import { clickableRowProps } from '../lib/clickableRow';
 import { classifyItemRejection, type ItemRejection } from '../features/boxes/logic';
 import { boxSchema, type BoxFormValues } from '../features/boxes/schema';
@@ -57,7 +58,7 @@ export function BoxesPage() {
   // WRH-79/AC-1/AC-6: shared history modal target - box items don't carry
   // their own product_type_name (a box is scoped to one product type), so
   // it's filled in from the open box detail's own field.
-  const [historyItem, setHistoryItem] = useState<ItemHistoryTarget | null>(null);
+  const { openHistoryItem, historyModalProps } = useItemHistoryModal();
 
   const {
     control,
@@ -230,17 +231,13 @@ export function BoxesPage() {
                   product_type_name: boxDetail?.product_type_name ?? '',
                   status: item.status,
                 }),
-                setHistoryItem,
+                openHistoryItem,
               )
             }
           />
         )}
       </Modal>
-      <ItemHistoryModal
-        item={historyItem}
-        open={historyItem !== null}
-        onClose={() => setHistoryItem(null)}
-      />
+      <ItemHistoryModal {...historyModalProps} />
       <Modal
         title={t('boxes.newButton')}
         open={isModalOpen}

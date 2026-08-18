@@ -17,7 +17,8 @@ import {
 import axios from 'axios';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { ItemHistoryModal, type ItemHistoryTarget } from '../components/ItemHistoryModal';
+import { ItemHistoryModal } from '../components/ItemHistoryModal';
+import { useItemHistoryModal } from '../components/useItemHistoryModal';
 import { clickableRowProps } from '../lib/clickableRow';
 import { useProductTypes } from '../features/product-types/useProductTypes';
 import {
@@ -50,7 +51,7 @@ export function SerializedItemsPage() {
   // WRH-79/AC-1/AC-5: kept only for the shared history modal's identity
   // header - the modal fetches its own history, and clearing this on close
   // doesn't touch the underlying list/filters state at all.
-  const [historyItem, setHistoryItem] = useState<ItemHistoryTarget | null>(null);
+  const { openHistoryItem, historyModalProps } = useItemHistoryModal();
   const {
     data: serializedItems,
     isLoading,
@@ -262,16 +263,12 @@ export function SerializedItemsPage() {
                 product_type_name: item.product_type_name,
                 status: item.status,
               }),
-              setHistoryItem,
+              openHistoryItem,
             )
           }
         />
       )}
-      <ItemHistoryModal
-        item={historyItem}
-        open={historyItem !== null}
-        onClose={() => setHistoryItem(null)}
-      />
+      <ItemHistoryModal {...historyModalProps} />
       <Modal
         title={t('serializedItems.newButton')}
         open={isModalOpen}
