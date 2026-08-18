@@ -24,10 +24,11 @@ export async function resolveMaintenanceOrderItem(
   maintenanceOrderId: number,
   itemId: number,
   resolution: MaintenanceOrderResolution,
+  note?: string,
 ): Promise<MaintenanceOrder> {
   const { data } = await apiClient.post<MaintenanceOrder>(
     `/api/maintenance-orders/${maintenanceOrderId}/resolve/`,
-    { item_id: itemId, resolution },
+    { item_id: itemId, resolution, note },
   );
   return data;
 }

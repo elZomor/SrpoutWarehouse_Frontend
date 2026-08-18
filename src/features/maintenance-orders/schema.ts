@@ -6,6 +6,8 @@ import { z } from 'zod';
 // out).
 export const maintenanceOrderSchema = z.object({
   item_ids: z.array(z.number()).min(1, 'maintenanceOrders.form.itemsRequired'),
+  // AC-1: optional free-text note captured at creation time.
+  note: z.string().optional(),
 });
 
 export type MaintenanceOrderFormValues = z.infer<typeof maintenanceOrderSchema>;

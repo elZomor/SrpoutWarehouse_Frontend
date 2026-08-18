@@ -505,7 +505,9 @@
       "itemsRequired": "Select at least one damaged item",
       "itemAlreadyOnMaintenanceOrderError": "{{serial}} is already on maintenance order {{reference}}",
       "itemClaimedOnWorkOrderError": "{{serial}} is currently claimed on a work order",
-      "itemNotDamagedError": "{{serial}} must be damaged to be added to a maintenance order"
+      "itemNotDamagedError": "{{serial}} must be damaged to be added to a maintenance order",
+      "notesLabel": "Notes",
+      "notesPlaceholder": "Optional notes"
     },
     "items": {
       "serialNumberLabel": "Serial Number",
@@ -515,8 +517,21 @@
       "markFixedConfirmTitle": "Mark this item as fixed?",
       "markNotFixableButton": "Mark Not Fixable",
       "markNotFixableConfirmTitle": "Mark this item as not fixable?",
+      "notePlaceholder": "Optional note",
       "resolveSuccess": "Item resolved.",
       "resolveError": "Failed to resolve item. Please try again."
+    },
+    "notes": {
+      "historyTitle": "Notes History",
+      "actionLabel": "Action",
+      "textLabel": "Note",
+      "userLabel": "User",
+      "createdAtLabel": "Date",
+      "action": {
+        "created": "Created",
+        "fixed": "Fixed",
+        "written_off": "Written off"
+      }
     }
   }
 }
