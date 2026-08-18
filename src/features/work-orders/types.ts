@@ -73,12 +73,16 @@ export interface ActiveWorkOrder {
 
 // WRH-38: return_item()'s response - same per-line-item returned/still-out
 // shape as ActiveWorkOrderLineItem (WRH-55), now populated for real once a
-// return session starts flipping items back to available.
+// return session starts flipping items back to available. WRH-80/AC-3: also
+// shared by close() - a return initiated on a Primary now consolidates every
+// supplementary into this same response, one entry per supplementary with
+// its own fresh status/counts (same shape the active list already nests).
 export interface WorkOrderReturnResult {
   id: number;
   job_name: string;
   status: WorkOrderStatus;
   line_items: ActiveWorkOrderLineItem[];
+  supplementaries: ActiveWorkOrderSupplementary[];
 }
 
 // WRH-26/AC-2/AC-3: one entry per item inside a scanned box, each validated

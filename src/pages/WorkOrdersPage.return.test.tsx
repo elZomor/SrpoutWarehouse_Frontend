@@ -10,6 +10,7 @@ import {
   makeProductType,
   makeWorkOrder,
   mockListEndpoints,
+  openRowActionMenu,
   renderWorkOrdersPage,
 } from './workOrdersTestSupport';
 
@@ -143,6 +144,7 @@ describe('WorkOrdersPage - return', () => {
           still_out_quantity: 1,
         },
       ],
+      supplementaries: [],
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
@@ -202,6 +204,7 @@ describe('WorkOrdersPage - return', () => {
           still_out_quantity: 0,
         },
       ],
+      supplementaries: [],
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
@@ -390,6 +393,7 @@ describe('WorkOrdersPage - return', () => {
             still_out_quantity: 0,
           },
         ],
+        supplementaries: [],
       },
       box_summary: {
         code: 'BX-003',
@@ -437,6 +441,7 @@ describe('WorkOrdersPage - return', () => {
             still_out_quantity: 0,
           },
         ],
+        supplementaries: [],
       },
       box_summary: {
         code: 'BX-005',
@@ -503,5 +508,132 @@ describe('WorkOrdersPage - return', () => {
     expect(
       await screen.findByText(/box bx-004 expanded: 1 items added|تم توسيع الصندوق bx-004/i),
     ).toBeInTheDocument();
+  });
+
+  it('hides the Return action on a supplementary row but keeps it on its Primary', async () => {
+    // WRH-80/AC-1/AC-2: return is only ever initiated from a Primary -
+    // primaryWorkOrderIds (built from the active-work-orders list's own
+    // nested supplementaries) is what buildActiveWorkOrderLookup already
+    // uses for the identical Add Supplementary gate.
+    const primary = makeActiveWorkOrder({
+      id: 1,
+      reference: 'WO-1',
+      status: 'fulfilled',
+      supplementaries: [
+        {
+          id: 2,
+          reference: 'WO-1-S1',
+          job_name: 'Summer Gala',
+          client_name: 'Acme Events',
+          expected_date_out: '2026-08-01',
+          status: 'fulfilled',
+          line_items: [],
+        },
+      ],
+    });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [
+        makeWorkOrder({ id: 1, reference: 'WO-1', status: 'fulfilled' }),
+        makeWorkOrder({ id: 2, reference: 'WO-1-S1', status: 'fulfilled' }),
+      ],
+      activeWorkOrders: [primary],
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+
+    const supplementaryMenu = await openRowActionMenu(user, 'WO-1-S1');
+    expect(within(supplementaryMenu).queryByText(/^return$|^إرجاع$/i)).not.toBeInTheDocument();
+    // Transfer/Close stay unaffected - out of WRH-80's scope.
+    expect(within(supplementaryMenu).getByText(/^transfer$|^نقل$/i)).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    const primaryMenu = await openRowActionMenu(user, 'WO-1');
+    expect(within(primaryMenu).getByText(/^return$|^إرجاع$/i)).toBeInTheDocument();
+  });
+
+  it("shows a returned supplementary's own summary inside the Primary's return modal", async () => {
+    // WRH-80/AC-1/AC-3/AC-6: a return initiated on the Primary consolidates
+    // its supplementaries into the same response (WorkOrderReturnSerializer.
+    // supplementaries) - each gets its own labeled summary table.
+    const workOrder = makeActiveWorkOrder({
+      id: 1,
+      reference: 'WO-1',
+      status: 'fulfilled',
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          quantity: 1,
+          returned_quantity: 0,
+          damaged_quantity: 0,
+          still_out_quantity: 1,
+        },
+      ],
+    });
+    mockListEndpoints(mockedApiClient.get, {
+      workOrders: [makeWorkOrder({ status: workOrder.status })],
+      activeWorkOrders: [workOrder],
+    });
+    mockReturnItem(workOrder, {
+      id: 1,
+      job_name: 'Summer Gala',
+      status: 'partially_returned',
+      line_items: [
+        {
+          id: 1,
+          product_type: 1,
+          product_type_name: 'Bar LED Model A',
+          quantity: 1,
+          returned_quantity: 1,
+          damaged_quantity: 0,
+          still_out_quantity: 0,
+        },
+      ],
+      supplementaries: [
+        {
+          id: 2,
+          reference: 'WO-1-S1',
+          job_name: 'Summer Gala',
+          client_name: 'Acme Events',
+          expected_date_out: '2026-08-01',
+          status: 'returned',
+          line_items: [
+            {
+              id: 2,
+              product_type: 1,
+              product_type_name: 'Bar LED Model A',
+              // Distinct quantity from the Primary's own row above so the
+              // two summary tables' rows can't be confused with each other.
+              quantity: 3,
+              returned_quantity: 3,
+              damaged_quantity: 0,
+              still_out_quantity: 0,
+            },
+          ],
+        },
+      ],
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await renderWorkOrdersPage();
+    await openReturnModal(user);
+    await returnSerial(user, 'SN-1001');
+
+    const dialog = await screen.findByRole('dialog', { hidden: true });
+    const supplementaryLabel = await within(dialog).findByText(/WO-1-S1/);
+    const supplementarySection = supplementaryLabel.closest('div');
+    if (!supplementarySection) {
+      throw new Error('Supplementary summary section not found');
+    }
+    const supplementaryRow = within(supplementarySection).getByRole('row', {
+      name: /bar led model a/i,
+      hidden: true,
+    });
+    const cells = within(supplementaryRow)
+      .getAllByRole('cell', { hidden: true })
+      .map((cell) => cell.textContent);
+    expect(cells).toEqual(['Bar LED Model A', '3', '3', '0', '0']);
   });
 });

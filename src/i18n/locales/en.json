@@ -342,6 +342,7 @@
       "notIssuedError": "This item was not issued on WO-{{workOrderId}}.",
       "notOutError": "This item is not currently out on this work order.",
       "statusError": "This work order is not eligible for return.",
+      "supplementaryError": "Return must be initiated from the parent work order, not a supplementary.",
       "genericError": "Failed to record this return. Please try again.",
       "boxCodeLabel": "Box Code",
       "boxCodePlaceholder": "Scan or type a box code",
