@@ -336,24 +336,16 @@ describe('CategoriesPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('archives a category and it disappears from the list on refetch', async () => {
-    // AC-4/TC-04
+  it('does not render an archive button (WRH-73: archive feature removed)', async () => {
+    // AC-1/TC-1
     mockedApiClient.get.mockResolvedValueOnce({ data: [makeCategory()] });
-    mockedApiClient.post.mockResolvedValueOnce({ data: makeCategory({ archived: true }) });
-    mockedApiClient.get.mockResolvedValueOnce({ data: [] });
 
-    // See the pointerEventsCheck note above on the delete test.
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderCategoriesPage();
 
     await screen.findByText('Lighting');
-    await user.click(screen.getByRole('button', { name: /^archive$|^أرشفة$/i, hidden: true }));
-    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
-
-    await waitFor(() =>
-      expect(mockedApiClient.post).toHaveBeenCalledWith('/api/categories/1/archive/'),
-    );
-    await waitFor(() => expect(screen.queryByText('Lighting')).not.toBeInTheDocument());
+    expect(
+      screen.queryByRole('button', { name: /^archive$|^أرشفة$/i, hidden: true }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows an empty state when the search has no matches', async () => {

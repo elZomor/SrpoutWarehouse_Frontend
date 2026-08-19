@@ -8,7 +8,6 @@ import { getAssignedProductTypeCount, isDuplicateNameError } from '../features/c
 import { categorySchema, type CategoryFormValues } from '../features/categories/schema';
 import type { Category } from '../features/categories/types';
 import {
-  useArchiveCategory,
   useCategories,
   useCreateCategory,
   useDeleteCategory,
@@ -58,7 +57,6 @@ export function CategoriesPage() {
   const { data: categories, isLoading, isError: isListError } = useCategories(search);
   const createMutation = useCreateCategory();
   const deleteMutation = useDeleteCategory();
-  const archiveMutation = useArchiveCategory();
 
   useEffect(() => {
     const timeout = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
@@ -114,13 +112,6 @@ export function CategoriesPage() {
     });
   };
 
-  const handleArchive = (id: number) => {
-    archiveMutation.mutate(id, {
-      onSuccess: () => notifySuccess(t('categories.archiveSuccess')),
-      onError: () => notifyError(t('categories.archiveError')),
-    });
-  };
-
   const columns = [
     { title: t('categories.nameLabel'), dataIndex: 'name', key: 'name' },
     {
@@ -133,17 +124,6 @@ export function CategoriesPage() {
       key: 'actions',
       render: (_: unknown, record: Category) => (
         <Space>
-          <Popconfirm
-            title={t('categories.archiveConfirmTitle')}
-            onConfirm={() => handleArchive(record.id)}
-            okText={t('common.ok')}
-            cancelText={t('common.cancel')}
-            okButtonProps={{
-              loading: archiveMutation.isPending && archiveMutation.variables === record.id,
-            }}
-          >
-            <Button size="small">{t('categories.archiveButton')}</Button>
-          </Popconfirm>
           <Popconfirm
             title={t('categories.deleteConfirmTitle')}
             onConfirm={() => handleDelete(record.id)}

@@ -27,7 +27,6 @@ interface MockCategory {
   id: number;
   name: string;
   description: string;
-  archived: boolean;
   productTypeCount: number;
 }
 
@@ -37,13 +36,11 @@ function routeCategories(page: import('@playwright/test').Page, categories: Mock
   return page.route('**/api/categories/**', async (route) => {
     const url = new URL(route.request().url());
     const method = route.request().method();
-    const pathMatch = url.pathname.match(/\/api\/categories\/(\d+)\/(archive\/)?$/);
+    const pathMatch = url.pathname.match(/\/api\/categories\/(\d+)\/$/);
 
     if (method === 'GET' && !pathMatch) {
       const search = url.searchParams.get('search')?.toLowerCase() ?? '';
-      const results = categories
-        .filter((category) => !category.archived)
-        .filter((category) => category.name.toLowerCase().includes(search));
+      const results = categories.filter((category) => category.name.toLowerCase().includes(search));
       await route.fulfill({ status: 200, json: results });
       return;
     }
@@ -54,7 +51,6 @@ function routeCategories(page: import('@playwright/test').Page, categories: Mock
         id: nextId++,
         name: body.name,
         description: body.description ?? '',
-        archived: false,
         productTypeCount: 0,
       };
       categories.push(created);
@@ -64,21 +60,14 @@ function routeCategories(page: import('@playwright/test').Page, categories: Mock
 
     if (pathMatch) {
       const id = Number(pathMatch[1]);
-      const isArchiveAction = Boolean(pathMatch[2]);
       const category = categories.find((item) => item.id === id);
-
-      if (method === 'POST' && isArchiveAction && category) {
-        category.archived = true;
-        await route.fulfill({ status: 200, json: category });
-        return;
-      }
 
       if (method === 'DELETE' && category) {
         if (category.productTypeCount > 0) {
           await route.fulfill({
             status: 400,
             json: {
-              detail: `Cannot delete — ${category.productTypeCount} product types are assigned to this category. Archive it instead.`,
+              detail: `Cannot delete — ${category.productTypeCount} product types are assigned to this category. Reassign or remove them first.`,
               assigned_product_type_count: category.productTypeCount,
             },
           });
@@ -120,7 +109,7 @@ test('creates a category and finds it via search', async ({ page }) => {
 test('deletes a category with no product types', async ({ page }) => {
   // AC-5/TC-05
   const categories: MockCategory[] = [
-    { id: 1, name: 'Lighting', description: '', archived: false, productTypeCount: 0 },
+    { id: 1, name: 'Lighting', description: '', productTypeCount: 0 },
   ];
 
   await page.route('**/api/auth/**', stubAuth);
@@ -135,12 +124,12 @@ test('deletes a category with no product types', async ({ page }) => {
   await expect(page.getByText('Lighting')).not.toBeVisible();
 });
 
-test('blocks deleting a category with assigned product types and archives it instead', async ({
+test('blocks deleting a category with assigned product types and has no archive button', async ({
   page,
 }) => {
-  // AC-3/AC-4/TC-03/TC-04
+  // AC-3/TC-03; also AC-1/TC-1 (WRH-73: no archive button present anywhere)
   const categories: MockCategory[] = [
-    { id: 1, name: 'Lighting', description: '', archived: false, productTypeCount: 3 },
+    { id: 1, name: 'Lighting', description: '', productTypeCount: 3 },
   ];
 
   await page.route('**/api/auth/**', stubAuth);
@@ -149,19 +138,11 @@ test('blocks deleting a category with assigned product types and archives it ins
   await page.goto('/categories');
   await expect(page.getByText('Lighting')).toBeVisible();
 
+  await expect(page.getByRole('button', { name: /^archive$|^أرشفة$/i })).toHaveCount(0);
+
   await page.getByRole('button', { name: /^delete$|^حذف$/i }).click();
   await page.getByRole('button', { name: /^ok$|^موافق$/i }).click();
 
   await expect(page.getByText(/cannot delete.*3 product types|لا يمكن الحذف.*3/i)).toBeVisible();
   await expect(page.getByText('Lighting')).toBeVisible();
-
-  // The delete Popconfirm's OK button fades out asynchronously after being
-  // clicked; wait for it to fully unmount so the archive Popconfirm's OK
-  // button (opened next) is the only one matching this role/name.
-  await expect(page.getByRole('button', { name: /^ok$|^موافق$/i })).toHaveCount(0);
-
-  await page.getByRole('button', { name: /^archive$|^أرشفة$/i }).click();
-  await page.getByRole('button', { name: /^ok$|^موافق$/i }).click();
-
-  await expect(page.getByText('Lighting')).not.toBeVisible();
 });

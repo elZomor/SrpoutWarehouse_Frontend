@@ -17,8 +17,3 @@ export async function createCategory(input: CategoryFormValues): Promise<Categor
 export async function deleteCategory(id: number): Promise<void> {
   await apiClient.delete(`/api/categories/${id}/`);
 }
-
-export async function archiveCategory(id: number): Promise<Category> {
-  const { data } = await apiClient.post<Category>(`/api/categories/${id}/archive/`);
-  return data;
-}
