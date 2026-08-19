@@ -270,7 +270,7 @@ test('fulfills a WO end-to-end: start, scan to completion, complete', async ({ p
   await clickRowAction(page, /summer gala/i, /start fulfillment|بدء التنفيذ/i);
   await expect(page.getByText(/^in progress$|^قيد التنفيذ$/i)).toBeVisible();
 
-  await clickRowAction(page, /summer gala/i, /^scan$|^مسح$/i);
+  await clickRowAction(page, /summer gala/i, /^add$|^أضف$/i);
   const completeButton = page.getByRole('button', {
     name: /complete fulfillment|إتمام التنفيذ/i,
   });

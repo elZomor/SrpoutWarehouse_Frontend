@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp, ConfigProvider } from 'antd';
@@ -7,6 +7,15 @@ import { AppLayout } from './AppLayout';
 import { currentUserQueryKey } from '../features/auth/useAuth';
 import { motionDisabledTheme } from '../test/motionDisabledTheme';
 import '../i18n';
+
+// AppLayout pulls in ../features/auth/useAuth -> apiClient -> env.ts, which
+// throws at import time without VITE_API_BASE_URL - matches BoxesPage.test.tsx's
+// identical env mock, since CI has no VITE_API_BASE_URL.
+vi.mock('../config/env', () => ({
+  env: {
+    VITE_API_BASE_URL: 'http://localhost:8000',
+  },
+}));
 
 function renderAtPath(path: string) {
   const queryClient = new QueryClient({

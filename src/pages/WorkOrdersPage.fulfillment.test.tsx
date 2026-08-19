@@ -124,7 +124,7 @@ async function scanSerial(user: ReturnType<typeof userEvent.setup>, serialNumber
   const input = screen.getByLabelText(/serial number|الرقم التسلسلي/i);
   await user.clear(input);
   await user.type(input, serialNumber);
-  await user.click(within(dialog).getByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
+  await user.click(within(dialog).getByRole('button', { name: /^add$|^أضف$/i, hidden: true }));
 }
 
 // AC-1/TC-01, AC-3/TC-03, AC-4/TC-04: each rejects with a distinct,
@@ -173,7 +173,7 @@ async function scanBox(user: ReturnType<typeof userEvent.setup>, boxCode: string
   await user.clear(input);
   await user.type(input, boxCode);
   await user.click(
-    within(dialog).getByRole('button', { name: /^scan box$|^مسح صندوق$/i, hidden: true }),
+    within(dialog).getByRole('button', { name: /^add box$|^أضف صندوق$/i, hidden: true }),
   );
 }
 
@@ -299,7 +299,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await clickRowAction(user, workOrder.reference, /^scan$|^مسح$/i);
+    await clickRowAction(user, workOrder.reference, /^add$|^أضف$/i);
     await selectScanLineItem(user, 'Bar LED Model A');
     await scanSerial(user, 'SN-1001');
     await waitFor(() => expect(mockedApiClient.post).toHaveBeenCalledTimes(1));
@@ -342,7 +342,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await clickRowAction(user, workOrder.reference, /^scan$|^مسح$/i);
+    await clickRowAction(user, workOrder.reference, /^add$|^أضف$/i);
     const completeButton = screen.getByRole('button', {
       name: /complete fulfillment|إتمام التنفيذ/i,
       hidden: true,
@@ -388,7 +388,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await clickRowAction(user, workOrder.reference, /^scan$|^مسح$/i);
+    await clickRowAction(user, workOrder.reference, /^add$|^أضف$/i);
     await user.click(
       screen.getByRole('button', { name: /complete fulfillment|إتمام التنفيذ/i, hidden: true }),
     );
@@ -415,7 +415,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await clickRowAction(user, workOrder.reference, /^scan$|^مسح$/i);
+    await clickRowAction(user, workOrder.reference, /^add$|^أضف$/i);
     await selectScanLineItem(user, 'Bar LED Model A');
     await scanSerial(user, 'SN-042');
 
@@ -457,7 +457,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await clickRowAction(user, workOrder.reference, /^scan$|^مسح$/i);
+    await clickRowAction(user, workOrder.reference, /^add$|^أضف$/i);
     await scanBox(user, 'BX-001');
 
     expect(mockedApiClient.post).toHaveBeenCalledWith('/api/work-orders/1/scan-box/', {
@@ -498,7 +498,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await clickRowAction(user, workOrder.reference, /^scan$|^مسح$/i);
+    await clickRowAction(user, workOrder.reference, /^add$|^أضف$/i);
     await scanBox(user, 'BX-002');
 
     expect(
@@ -517,7 +517,7 @@ describe('WorkOrdersPage - fulfillment', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await renderWorkOrdersPage();
 
-    await clickRowAction(user, workOrder.reference, /^scan$|^مسح$/i);
+    await clickRowAction(user, workOrder.reference, /^add$|^أضف$/i);
     await scanBox(user, 'BX-DOES-NOT-EXIST');
 
     expect(
