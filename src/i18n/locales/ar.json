@@ -513,7 +513,9 @@
       "itemsRequired": "اختر عنصرًا تالفًا واحدًا على الأقل",
       "itemAlreadyOnMaintenanceOrderError": "{{serial}} موجود بالفعل في أمر الصيانة {{reference}}",
       "itemClaimedOnWorkOrderError": "{{serial}} مرتبط حاليًا بأمر عمل",
-      "itemNotDamagedError": "{{serial}} يجب أن يكون تالفًا لإضافته إلى أمر صيانة"
+      "itemNotDamagedError": "{{serial}} يجب أن يكون تالفًا لإضافته إلى أمر صيانة",
+      "notesLabel": "ملاحظات",
+      "notesPlaceholder": "ملاحظات اختيارية"
     },
     "items": {
       "serialNumberLabel": "الرقم التسلسلي",
@@ -523,8 +525,22 @@
       "markFixedConfirmTitle": "هل تريد تحديد هذا العنصر كمُصلح؟",
       "markNotFixableButton": "تحديد كغير قابل للإصلاح",
       "markNotFixableConfirmTitle": "هل تريد تحديد هذا العنصر كغير قابل للإصلاح؟",
+      "notePlaceholder": "ملاحظة اختيارية",
+      "noteAriaLabel": "ملاحظة لـ {{serial}}",
       "resolveSuccess": "تم حل العنصر.",
       "resolveError": "فشل حل العنصر. حاول مرة أخرى."
+    },
+    "notes": {
+      "historyTitle": "سجل الملاحظات",
+      "actionLabel": "الإجراء",
+      "textLabel": "الملاحظة",
+      "userLabel": "المستخدم",
+      "createdAtLabel": "التاريخ",
+      "action": {
+        "created": "تم الإنشاء",
+        "fixed": "تم الإصلاح",
+        "written_off": "تم الشطب"
+      }
     }
   }
 }

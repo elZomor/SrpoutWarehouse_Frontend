@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
+import dayjs from 'dayjs';
 import {
   Alert,
   Button,
   Form,
+  Input,
   Modal,
   Popconfirm,
   Select,
@@ -23,6 +25,7 @@ import {
 import type {
   MaintenanceOrder,
   MaintenanceOrderItem,
+  MaintenanceOrderNote,
   MaintenanceOrderResolution,
 } from '../features/maintenance-orders/types';
 import {
@@ -78,6 +81,15 @@ export function MaintenanceOrdersPage() {
   // now awaiting its invalidateQueries() calls, is after the refetched data
   // has actually landed, not just after the response arrived.
   const [pendingItemIds, setPendingItemIds] = useState<ReadonlySet<number>>(new Set());
+  // AC-2/AC-3: each resolve action (fixed/not_fixable) can carry its own
+  // optional note, entered per line item before either confirm button is
+  // clicked - keyed by item id since a row can have several resolvable
+  // items in flight independently, matching pendingItemIds' identical
+  // per-item shape above. A Map (not a plain object) avoids
+  // eslint-plugin-security's detect-object-injection warning on the
+  // dynamic-key lookup, matching TRANSACTION_TYPE_COLORS' identical
+  // reasoning in features/transactions/logic.ts.
+  const [noteDrafts, setNoteDrafts] = useState<ReadonlyMap<number, string>>(new Map());
 
   const {
     control,
@@ -86,7 +98,7 @@ export function MaintenanceOrdersPage() {
     formState: { errors },
   } = useForm<MaintenanceOrderFormValues>({
     resolver: zodResolver(maintenanceOrderSchema),
-    defaultValues: { item_ids: [] },
+    defaultValues: { item_ids: [], note: '' },
   });
 
   const closeModal = () => {
@@ -97,21 +109,29 @@ export function MaintenanceOrdersPage() {
 
   const onSubmit = (values: MaintenanceOrderFormValues) => {
     setItemRejection(null);
-    createMutation.mutate(values, {
-      onSuccess: (maintenanceOrder) => {
-        notifySuccess(
-          t('maintenanceOrders.createSuccess', { reference: maintenanceOrder.reference }),
-        );
-        closeModal();
+    // Normalizes a blank/whitespace-only note to undefined (rather than
+    // sending "") so an untouched field and a typed-then-cleared one are
+    // indistinguishable on the wire - matches handleResolve's identical
+    // normalization for its own per-item note draft below.
+    const note = values.note?.trim() ? values.note : undefined;
+    createMutation.mutate(
+      { ...values, note },
+      {
+        onSuccess: (maintenanceOrder) => {
+          notifySuccess(
+            t('maintenanceOrders.createSuccess', { reference: maintenanceOrder.reference }),
+          );
+          closeModal();
+        },
+        onError: (error) => {
+          const rejection = classifyItemRejection(error);
+          setItemRejection(rejection);
+          if (!rejection) {
+            notifyError(t('maintenanceOrders.createError'));
+          }
+        },
       },
-      onError: (error) => {
-        const rejection = classifyItemRejection(error);
-        setItemRejection(rejection);
-        if (!rejection) {
-          notifyError(t('maintenanceOrders.createError'));
-        }
-      },
-    });
+    );
   };
 
   // Returns (rather than fires-and-forgets) the mutation's promise so
@@ -132,10 +152,27 @@ export function MaintenanceOrdersPage() {
     resolution: MaintenanceOrderResolution,
   ) => {
     setPendingItemIds((current) => new Set(current).add(itemId));
+    // Normalizes a blank/whitespace-only draft to undefined, matching
+    // maintenanceOrderSchema's identical "note omitted when blank"
+    // transform for the create form.
+    const draft = noteDrafts.get(itemId);
+    const note = draft?.trim() ? draft : undefined;
     return resolveMutation
-      .mutateAsync({ maintenanceOrderId, itemId, resolution })
+      .mutateAsync({ maintenanceOrderId, itemId, resolution, note })
       .then(
-        () => notifySuccess(t('maintenanceOrders.items.resolveSuccess')),
+        () => {
+          notifySuccess(t('maintenanceOrders.items.resolveSuccess'));
+          // Only clear the draft on success - a failed resolve leaves the
+          // item still resolvable, and the user's typed note shouldn't be
+          // silently discarded along with the failed request, matching the
+          // create form's identical "note survives an error" behavior
+          // (its own note field is only reset via closeModal() on success).
+          setNoteDrafts((current) => {
+            const next = new Map(current);
+            next.delete(itemId);
+            return next;
+          });
+        },
         () => notifyError(t('maintenanceOrders.items.resolveError')),
       )
       .finally(() => {
@@ -187,6 +224,19 @@ export function MaintenanceOrdersPage() {
         const isItemPending = pendingItemIds.has(item.id);
         return (
           <Space>
+            <Input
+              size="small"
+              style={{ width: 160 }}
+              placeholder={t('maintenanceOrders.items.notePlaceholder')}
+              aria-label={t('maintenanceOrders.items.noteAriaLabel', {
+                serial: item.serial_number,
+              })}
+              value={noteDrafts.get(item.id) ?? ''}
+              disabled={isItemPending}
+              onChange={(event) =>
+                setNoteDrafts((current) => new Map(current).set(item.id, event.target.value))
+              }
+            />
             <Popconfirm
               title={t('maintenanceOrders.items.markFixedConfirmTitle')}
               onConfirm={() => handleResolve(maintenanceOrderId, item.id, 'fixed')}
@@ -210,6 +260,42 @@ export function MaintenanceOrdersPage() {
           </Space>
         );
       },
+    },
+  ];
+
+  // AC-4/AC-5: history shown as its own read-only table, distinct per
+  // action (create/fix/write-off) with timestamp and actor - never merged
+  // or overwritten, since each note is its own backend record.
+  const noteColumns = [
+    {
+      title: t('maintenanceOrders.notes.actionLabel'),
+      dataIndex: 'action',
+      key: 'action',
+      render: (action: MaintenanceOrderNote['action']) => (
+        <Tag>{t(`maintenanceOrders.notes.action.${action}`)}</Tag>
+      ),
+    },
+    {
+      title: t('maintenanceOrders.items.serialNumberLabel'),
+      dataIndex: 'serial_number',
+      key: 'serial_number',
+      render: (serialNumber: string | null) => serialNumber ?? '—',
+    },
+    {
+      title: t('maintenanceOrders.notes.textLabel'),
+      dataIndex: 'text',
+      key: 'text',
+    },
+    {
+      title: t('maintenanceOrders.notes.userLabel'),
+      dataIndex: 'user_username',
+      key: 'user_username',
+    },
+    {
+      title: t('maintenanceOrders.notes.createdAtLabel'),
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (createdAt: string) => dayjs(createdAt).format('YYYY-MM-DD HH:mm'),
     },
   ];
 
@@ -263,15 +349,31 @@ export function MaintenanceOrdersPage() {
             // caused an infinite Table-internal re-render loop (caught by a
             // hung test run, not lint/typecheck), so this sticks to the
             // proven, uncontrolled default instead.
-            rowExpandable: (record) => record.items.length > 0,
+            rowExpandable: (record) => record.items.length > 0 || record.notes.length > 0,
             expandedRowRender: (record) => (
-              <Table<MaintenanceOrderItem>
-                rowKey="id"
-                size="small"
-                pagination={false}
-                columns={buildItemColumns(record.id)}
-                dataSource={record.items}
-              />
+              <>
+                <Table<MaintenanceOrderItem>
+                  rowKey="id"
+                  size="small"
+                  pagination={false}
+                  columns={buildItemColumns(record.id)}
+                  dataSource={record.items}
+                />
+                {record.notes.length > 0 && (
+                  <>
+                    <Typography.Text strong style={{ display: 'block', marginTop: 16 }}>
+                      {t('maintenanceOrders.notes.historyTitle')}
+                    </Typography.Text>
+                    <Table<MaintenanceOrderNote>
+                      rowKey="id"
+                      size="small"
+                      pagination={false}
+                      columns={noteColumns}
+                      dataSource={record.notes}
+                    />
+                  </>
+                )}
+              </>
             ),
           }}
         />
@@ -310,6 +412,23 @@ export function MaintenanceOrdersPage() {
               <Alert type="error" message={t('maintenanceOrders.loadItemsError')} showIcon />
             </Form.Item>
           )}
+          <Form.Item
+            label={t('maintenanceOrders.form.notesLabel')}
+            htmlFor="maintenance-order-note"
+          >
+            <Controller
+              name="note"
+              control={control}
+              render={({ field }) => (
+                <Input.TextArea
+                  {...field}
+                  id="maintenance-order-note"
+                  placeholder={t('maintenanceOrders.form.notesPlaceholder')}
+                  rows={3}
+                />
+              )}
+            />
+          </Form.Item>
           {itemRejection && (
             <Form.Item>
               <Alert

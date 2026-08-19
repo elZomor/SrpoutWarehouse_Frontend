@@ -35,11 +35,13 @@ export function useResolveMaintenanceOrderItem() {
       maintenanceOrderId,
       itemId,
       resolution,
+      note,
     }: {
       maintenanceOrderId: number;
       itemId: number;
       resolution: MaintenanceOrderResolution;
-    }) => resolveMaintenanceOrderItem(maintenanceOrderId, itemId, resolution),
+      note?: string;
+    }) => resolveMaintenanceOrderItem(maintenanceOrderId, itemId, resolution, note),
     // `invalidateQueries()` returns a promise that resolves once the
     // invalidated query has actually refetched (not just been marked
     // stale). Returning the combined promise from onSuccess (rather than

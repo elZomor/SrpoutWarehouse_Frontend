@@ -53,6 +53,7 @@ function makeMaintenanceOrder(overrides: Partial<MaintenanceOrder> = {}): Mainte
     reference: 'MO-0001',
     status: 'open',
     items: [{ id: 1, serial_number: 'SN-042', status: 'in_maintenance' }],
+    notes: [],
     ...overrides,
   };
 }
@@ -548,5 +549,151 @@ describe('MaintenanceOrdersPage', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['product-types', 'stock-summary'],
     });
+  });
+
+  it('creates a maintenance order with a note and sends it in the request (AC-1/TC-01)', async () => {
+    const maintenanceOrders: MaintenanceOrder[] = [];
+    mockListEndpoints({
+      maintenanceOrders,
+      serializedItems: [makeSerializedItem()],
+    });
+    mockedApiClient.post.mockResolvedValueOnce({ data: makeMaintenanceOrder() });
+
+    const user = userEvent.setup();
+    renderMaintenanceOrdersPage();
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: /create maintenance order|إنشاء أمر صيانة/i,
+        hidden: true,
+      }),
+    );
+    await selectItemInForm(user, 'SN-042');
+    const dialog = screen.getByRole('dialog', { hidden: true });
+    await user.type(
+      within(dialog).getByRole('textbox', { name: /notes|ملاحظات/i, hidden: true }),
+      'Handle with care',
+    );
+    maintenanceOrders.push(makeMaintenanceOrder());
+    await user.click(screen.getByRole('button', { name: 'OK', hidden: true }));
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/api/maintenance-orders/', {
+      item_ids: [1],
+      note: 'Handle with care',
+    });
+  });
+
+  it('resolves a line item with a note and sends it in the request (TC-03)', async () => {
+    const maintenanceOrder = makeMaintenanceOrder();
+    mockListEndpoints({ maintenanceOrders: [maintenanceOrder] });
+    mockedApiClient.post.mockImplementationOnce(async () => {
+      maintenanceOrder.status = 'in_progress';
+      maintenanceOrder.items = [{ id: 1, serial_number: 'SN-042', status: 'available' }];
+      return { data: maintenanceOrder };
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderMaintenanceOrdersPage();
+
+    await expandFirstRow(user);
+    await screen.findByText('SN-042');
+    await user.type(
+      screen.getByRole('textbox', {
+        name: /note for sn-042|ملاحظة لـ sn-042/i,
+        hidden: true,
+      }),
+      'Replaced the cable',
+    );
+    await user.click(
+      screen.getByRole('button', { name: /^mark fixed$|^تحديد كمُصلح$/i, hidden: true }),
+    );
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/api/maintenance-orders/1/resolve/', {
+      item_id: 1,
+      resolution: 'fixed',
+      note: 'Replaced the cable',
+    });
+  });
+
+  it('keeps a typed note draft after a failed resolve, unlike a successful one', async () => {
+    // Regression: the draft used to be cleared in a shared .finally(),
+    // silently discarding the user's typed note on a failed request too -
+    // it should only be cleared once the request actually succeeds, same
+    // as the create form's note (only reset via closeModal() on success).
+    mockListEndpoints({ maintenanceOrders: [makeMaintenanceOrder()] });
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 500, data: {} },
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderMaintenanceOrdersPage();
+
+    await expandFirstRow(user);
+    await screen.findByText('SN-042');
+    const noteInput = screen.getByRole('textbox', {
+      name: /note for sn-042|ملاحظة لـ sn-042/i,
+      hidden: true,
+    });
+    await user.type(noteInput, 'Replaced the cable');
+    await user.click(
+      screen.getByRole('button', { name: /^mark fixed$|^تحديد كمُصلح$/i, hidden: true }),
+    );
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
+
+    await screen.findByText(/failed to resolve item|فشل حل العنصر/i);
+    expect(noteInput).toHaveValue('Replaced the cable');
+  });
+
+  it('shows the notes history distinctly for created/fixed/written-off notes (AC-4/AC-5/TC-05)', async () => {
+    mockListEndpoints({
+      maintenanceOrders: [
+        makeMaintenanceOrder({
+          items: [
+            { id: 1, serial_number: 'SN-042', status: 'available' },
+            { id: 2, serial_number: 'SN-099', status: 'in_maintenance' },
+          ],
+          notes: [
+            {
+              id: 1,
+              action: 'created',
+              text: 'Both items came in damaged',
+              serial_number: null,
+              user_username: 'jane',
+              created_at: '2026-01-01T10:00:00Z',
+            },
+            {
+              id: 2,
+              action: 'fixed',
+              text: 'Replaced the cable',
+              serial_number: 'SN-042',
+              user_username: 'jane',
+              created_at: '2026-01-02T10:00:00Z',
+            },
+            {
+              id: 3,
+              action: 'written_off',
+              text: 'Beyond repair',
+              serial_number: 'SN-099',
+              user_username: 'jane',
+              created_at: '2026-01-03T10:00:00Z',
+            },
+          ],
+        }),
+      ],
+    });
+
+    const user = userEvent.setup();
+    renderMaintenanceOrdersPage();
+
+    await expandFirstRow(user);
+
+    expect(await screen.findByText('Both items came in damaged')).toBeInTheDocument();
+    expect(screen.getByText('Replaced the cable')).toBeInTheDocument();
+    expect(screen.getByText('Beyond repair')).toBeInTheDocument();
+    expect(screen.getByText(/^created$|^تم الإنشاء$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^fixed$|^تم الإصلاح$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^written off$|^تم الشطب$/i)).toBeInTheDocument();
   });
 });
