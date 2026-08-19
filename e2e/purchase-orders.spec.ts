@@ -212,8 +212,8 @@ test('receives a PO by scanning serials, showing partial then full receipt', asy
 
   // Scoped to the submit button's type attribute rather than its accessible
   // name: AntD prefixes the loading spinner's own "loading" label onto the
-  // button's name while a scan is in flight (briefly turning "Scan"/"مسح"
-  // into "loading Scan"/"loading مسح"), which can race an anchored
+  // button's name while a scan is in flight (briefly turning "Add"/"أضف"
+  // into "loading Add"/"loading أضف"), which can race an anchored
   // name-based locator's retry window on a second scan fired right after
   // the first one settles.
   const scanButton = page.getByRole('dialog').locator('button[type="submit"]');

@@ -154,7 +154,7 @@ async function scanSerial(user: ReturnType<typeof userEvent.setup>, serialNumber
   const input = screen.getByLabelText(/serial number|الرقم التسلسلي/i);
   await user.clear(input);
   await user.type(input, serialNumber);
-  await user.click(screen.getByRole('button', { name: /^scan$|^مسح$/i, hidden: true }));
+  await user.click(screen.getByRole('button', { name: /^add$|^أضف$/i, hidden: true }));
 }
 
 function renderPurchaseOrdersPage() {
