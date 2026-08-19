@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
+import dayjs from 'dayjs';
 import {
   Alert,
   Button,
@@ -159,17 +160,24 @@ export function MaintenanceOrdersPage() {
     return resolveMutation
       .mutateAsync({ maintenanceOrderId, itemId, resolution, note })
       .then(
-        () => notifySuccess(t('maintenanceOrders.items.resolveSuccess')),
+        () => {
+          notifySuccess(t('maintenanceOrders.items.resolveSuccess'));
+          // Only clear the draft on success - a failed resolve leaves the
+          // item still resolvable, and the user's typed note shouldn't be
+          // silently discarded along with the failed request, matching the
+          // create form's identical "note survives an error" behavior
+          // (its own note field is only reset via closeModal() on success).
+          setNoteDrafts((current) => {
+            const next = new Map(current);
+            next.delete(itemId);
+            return next;
+          });
+        },
         () => notifyError(t('maintenanceOrders.items.resolveError')),
       )
       .finally(() => {
         setPendingItemIds((current) => {
           const next = new Set(current);
-          next.delete(itemId);
-          return next;
-        });
-        setNoteDrafts((current) => {
-          const next = new Map(current);
           next.delete(itemId);
           return next;
         });
@@ -287,7 +295,7 @@ export function MaintenanceOrdersPage() {
       title: t('maintenanceOrders.notes.createdAtLabel'),
       dataIndex: 'created_at',
       key: 'created_at',
-      render: (createdAt: string) => new Date(createdAt).toLocaleString(),
+      render: (createdAt: string) => dayjs(createdAt).format('YYYY-MM-DD HH:mm'),
     },
   ];
 

@@ -616,6 +616,36 @@ describe('MaintenanceOrdersPage', () => {
     });
   });
 
+  it('keeps a typed note draft after a failed resolve, unlike a successful one', async () => {
+    // Regression: the draft used to be cleared in a shared .finally(),
+    // silently discarding the user's typed note on a failed request too -
+    // it should only be cleared once the request actually succeeds, same
+    // as the create form's note (only reset via closeModal() on success).
+    mockListEndpoints({ maintenanceOrders: [makeMaintenanceOrder()] });
+    mockedApiClient.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 500, data: {} },
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderMaintenanceOrdersPage();
+
+    await expandFirstRow(user);
+    await screen.findByText('SN-042');
+    const noteInput = screen.getByRole('textbox', {
+      name: /note for sn-042|ملاحظة لـ sn-042/i,
+      hidden: true,
+    });
+    await user.type(noteInput, 'Replaced the cable');
+    await user.click(
+      screen.getByRole('button', { name: /^mark fixed$|^تحديد كمُصلح$/i, hidden: true }),
+    );
+    await user.click(await screen.findByRole('button', { name: /^ok$|^موافق$/i, hidden: true }));
+
+    await screen.findByText(/failed to resolve item|فشل حل العنصر/i);
+    expect(noteInput).toHaveValue('Replaced the cable');
+  });
+
   it('shows the notes history distinctly for created/fixed/written-off notes (AC-4/AC-5/TC-05)', async () => {
     mockListEndpoints({
       maintenanceOrders: [
